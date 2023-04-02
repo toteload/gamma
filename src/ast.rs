@@ -1,221 +1,159 @@
-use crate::sexpr::{self, SExpr, SourceSpan};
+use crate::parse::SourceSpan;
+use crate::string_interner::Symbol;
+use crate::types::TypeToken;
+
+pub struct NodeId(u32);
 
 #[derive(Clone, Debug)]
-pub enum Op {
+pub enum BinaryOpKind {
     Add,
+    Sub,
+    Mul,
     GreaterThan,
-}
-
-// Items appear at the toplevel
-pub enum Item {
-    Function {
-        name: String,
-        params: Vec<String>,
-        body: Expr,
-    },
-}
-
-// For the time being types in the AST can only be a string identifier like "int".
-// In the future, when you want to support slices or arrays, this would probably
-// have to be changed to something a little more complex, e.g. (slice int)
-type Type = String;
-
-pub struct Param {
-    name: String,
-    ty: Type,
-}
-
-pub struct Items {
-    items: Vec<Item>,
-    locs: Vec<SourceSpan>,
+    Equals,
 }
 
 #[derive(Clone, Debug)]
-pub enum Expr {
-    LiteralInt(i64),
-    Identifier(String),
-    Builtin(Op, Vec<Expr>),
-    Call(String, Vec<Expr>),
-    If {
-        cond: Box<Expr>,
-        then: Box<Expr>,
-        otherwise: Option<Box<Expr>>,
-    },
+pub enum UnaryOpKind {
+    Negate,
+    Not,
 }
-
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Debug)]
-pub enum ParseError {
-    IllegalItem,
-    IllegalExpression,
-    ExpectedAtom,
-    ExpectedList,
+pub struct Item {
+    pub attr: Attributes,
+    pub kind: ItemKind,
 }
 
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl std::error::Error for ParseError {}
-
-pub fn parse(source: &str) -> Result<Vec<Item>> {
-    use sexpr::SExprKind::*;
-
-    let tree = sexpr::parse(source)?;
-
-    if let SExpr {
-        kind: List(items), ..
-    } = tree
-    {
-        items.iter().map(parse_item).collect()
-    } else {
-        panic!("Oh oh");
-    }
-}
-
-fn parse_type(tree: &SExpr) -> Result<Type> {
-    todo!()
-}
-
-fn parse_param(tree: &SExpr) -> Result<Param> {
-    use sexpr::SExprKind::*;
-
-    let List(ref param) = tree.kind else { todo!() };
-
-    todo!()
-}
-
-fn parse_params(tree: &SExpr) -> Result<Vec<String>> {
-    use sexpr::SExprKind::*;
-
-    let List(ref params) = tree.kind else { return Err(ParseError::ExpectedList.into()); };
-
-    params
-        .iter()
-        .map(|x| match &x.kind {
-            Atom(a) => Ok(a.to_string()),
-            List(_) => Err(ParseError::ExpectedAtom.into()),
-        })
-        .collect()
-}
-
-fn parse_item(tree: &SExpr) -> Result<Item> {
-    use sexpr::SExprKind::*;
-
-    match &tree.kind {
-        List(children) => {
-            let kinds = children.iter().map(|x| &x.kind).collect::<Vec<_>>();
-
-            match &kinds[..] {
-                [Atom("fn"), Atom(name), List(_), Atom(return_type), body] => {
-                    let body = parse_expr(&children[4])?;
-                    let params = parse_params(&children[2])?;
-
-                    Ok(Item::Function {
-                        name: name.to_string(),
-                        params,
-                        body,
-                    })
-                }
-
-                _ => todo!(),
-            }
-        }
-        _ => Err(ParseError::IllegalItem.into()),
-    }
-}
-
-fn parse_expr(tree: &SExpr) -> Result<Expr> {
-    use sexpr::SExprKind::*;
-
-    match &tree.kind {
-        Atom(x) => {
-            if let Ok(val) = x.parse::<i64>() {
-                Ok(Expr::LiteralInt(val))
-            } else {
-                Ok(Expr::Identifier(x.to_string()))
-            }
-        }
-        List(children) => {
-            let kinds = children.iter().map(|x| &x.kind).collect::<Vec<_>>();
-
-            match &kinds[..] {
-                [Atom("+"), ..] => Ok(Expr::Builtin(
-                    Op::Add,
-                    children[1..]
-                        .iter()
-                        .map(|x| parse_expr(x))
-                        .collect::<Result<Vec<_>>>()?,
-                )),
-
-                [Atom(name), ..] => {
-                    let args = children[1..]
-                        .iter()
-                        .map(parse_expr)
-                        .collect::<Result<Vec<_>>>()?;
-                    Ok(Expr::Call(name.to_string(), args))
-                }
-
-                _ => todo!(),
-            }
+impl Item {
+    pub fn name_sym(&self) -> Symbol {
+        match self.kind {
+            ItemKind::Function(Function { name, .. }) => name,
         }
     }
-
-    /*
-    match e.nodes[0] {
-        Atom(x) => {
-            if let Ok(val) = x.parse::<i64>() {
-                Ok(Expr::LiteralInt(val))
-            } else {
-                Ok(Expr::Identifier(x.to_string()))
-            }
-        }
-        List { .. } => match e.list_at(0).nodes {
-            [Atom("+"), xs @ ..] => Ok(Expr::Builtin(
-                Op::Add,
-                (1..(1 + xs.len()))
-                    .map(|x| parse_expr(&e.advance(x)))
-                    .collect::<Result<Vec<_>>>()?,
-            )),
-            //[Atom(">"), xs @ ..] => Ok(Expr::Builtin(
-            //    Op::GreaterThan,
-            //    xs.iter().map(parse_expr).collect::<Result<_>>()?,
-            //)),
-            //[Atom("if"), cond, then, otherwise] => Ok(Expr::If {
-            //    cond: parse_expr(cond)?.into(),
-            //    then: parse_expr(then)?.into(),
-            //    otherwise: Some(parse_expr(otherwise)?.into()),
-            //}),
-            //[Atom("if"), cond, then] => Ok(Expr::If {
-            //    cond: parse_expr(cond)?.into(),
-            //    then: parse_expr(then)?.into(),
-            //    otherwise: None,
-            //}),
-            //[Atom(name), xs @ ..] => {
-            //    let args = xs.iter().map(parse_expr).collect::<Result<_>>()?;
-            //    Ok(Expr::Call(name.to_string(), args))
-            //}
-            _ => Err(ParseError::IllegalExpression.into()),
-        },
-    }
-    */
 }
 
-#[cfg(test)]
-mod parse_tests {
-    use super::*;
+#[derive(Clone, Debug)]
+pub struct Function {
+    pub return_type: Type,
+    pub name: Symbol,
+    pub params: Vec<Param>,
+    pub body: Box<Block>,
+}
 
-    #[test]
-    fn parse_main() {
-        let res = parse("(fn main () (+ 12 24))");
-        assert!(res.is_ok());
-    }
+#[derive(Debug)]
+pub enum ItemKind {
+    Function(Function),
+}
 
-    #[test]
-    fn parse_bad_main() {
-        assert!(parse("main").is_err());
+#[derive(Clone, Debug)]
+pub struct Type {
+    pub attr: Attributes,
+    pub kind: TypeKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum TypeKind {
+    Identifier(Symbol),
+    Int,
+    Void,
+}
+
+#[derive(Clone, Debug)]
+pub struct Attributes {
+    pub span: SourceSpan,
+    pub ty: Option<TypeToken>,
+}
+
+impl Attributes {
+    pub fn from_span(span: SourceSpan) -> Attributes {
+        Attributes { span, ty: None }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Param {
+    pub attr: Attributes,
+    pub name: Symbol,
+    pub ty: Type,
+}
+
+#[derive(Clone, Debug)]
+pub struct Statement {
+    pub attr: Attributes,
+    pub kind: StatementKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum StatementKind {
+    Let {
+        sym: Symbol,
+        ty: Type,
+        init: Box<Expr>,
+    },
+    Assign {
+        sym: Symbol,
+        val: Box<Expr>,
+    },
+    Empty,
+    Expr(Box<Expr>),
+    Block(Block),
+    If {
+        cond: Box<Expr>,
+        then: Block,
+        otherwise: Option<Block>,
+    },
+    Loop(Block),
+    Break,
+    Continue,
+    Return(Option<Box<Expr>>),
+}
+
+impl Statement {
+    pub fn new(span: SourceSpan, kind: StatementKind) -> Statement {
+        Statement {
+            attr: Attributes { span, ty: None },
+            kind,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Block {
+    pub attr: Attributes,
+    pub statements: Vec<Statement>,
+}
+
+impl Expr {
+    pub fn new(span: SourceSpan, kind: ExprKind) -> Expr {
+        Expr {
+            attr: Attributes::from_span(span),
+            kind,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Expr {
+    pub attr: Attributes,
+    pub kind: ExprKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum ExprKind {
+    IntLiteral(i64),
+    Identifier(Symbol),
+    UnaryOp {
+        op: UnaryOpKind,
+        e: Box<Expr>,
+    },
+    BinaryOp {
+        op: BinaryOpKind,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
+    Call {
+        sym: Symbol,
+        args: Vec<Expr>,
+    },
 }

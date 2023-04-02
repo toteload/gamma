@@ -14,17 +14,29 @@ pub struct SourceSpan {
 }
 
 impl SourceSpan {
+    fn new(start: SourceLocation, end: SourceLocation) -> SourceSpan {
+        SourceSpan { start, end }
+    }
+
     fn single(loc: SourceLocation) -> SourceSpan {
         SourceSpan {
             start: loc,
             end: loc,
         }
     }
+
+    pub fn invalid() -> SourceSpan {
+        SourceSpan::single(SourceLocation::invalid())
+    }
 }
 
 impl SourceLocation {
     fn new(line: u32, col: u32) -> SourceLocation {
         SourceLocation { line, col }
+    }
+
+    pub fn invalid() -> SourceLocation {
+        SourceLocation { line: 0, col: 0 }
     }
 }
 
@@ -117,7 +129,8 @@ impl<'a> Iterator for CodeCharIterator<'a> {
 pub enum TokenKind<'a> {
     BraceOpen,
     BraceClose,
-    Atom(&'a str),
+    Ident(&'a str),
+    StringLit(&'a str),
 }
 
 #[derive(Debug, PartialEq)]
@@ -177,6 +190,28 @@ impl<'a> Iterator for Tokenizer<'a> {
                         kind: TokenKind::BraceClose,
                         loc: SourceSpan::single(loc),
                     }),
+                    '"' => {
+                        // Advance until we find another '"' or the end of the source.
+                        while let Some(CodeChar::Char { ch, .. }) = self.it.peek() {
+                            if *ch == '"' {
+                                break;
+                            }
+
+                            self.it.next();
+                        }
+
+                        let Some(CodeChar::Char { ch: '"', offset: end, .. }) = self.it.next() else {
+                            todo!()
+                        };
+
+                        Some(Token {
+                            kind: TokenKind::StringLit(&self.source[offset..end]),
+                            loc: SourceSpan {
+                                start: loc,
+                                end: self.last_location(),
+                            },
+                        })
+                    }
                     _ => {
                         let end = {
                             // Consume iterator until you hit whitespace or
@@ -200,7 +235,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                         };
 
                         Some(Token {
-                            kind: TokenKind::Atom(&self.source[offset..*end]),
+                            kind: TokenKind::Ident(&self.source[offset..*end]),
                             loc: SourceSpan {
                                 start: loc,
                                 end: self.last_location(),
@@ -218,7 +253,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     UnmatchedClosingBrace(SourceLocation),
-    UnmatchedOpeningBrace(SourceLocation),
+    UnmatchedOpeningBrace,
 }
 
 impl std::fmt::Display for ParseError {
@@ -231,26 +266,46 @@ impl std::error::Error for ParseError {}
 
 #[derive(Debug)]
 pub enum Tree<T> {
-    List(Vec<Tree<T>>),
-    Atom(T),
+    Branch(Vec<Tree<T>>),
+    Leaf(T),
 }
 
 impl<T> Tree<T> {
     pub fn map<U, F: Fn(&T) -> U>(&self, f: F) -> Tree<U> {
+        // I use this inner function, because the recursion requires the function `f` to be
+        // borrowed. It cannot be moved multiple times. I don't want to pass in a borrowed
+        // funcion to `map`, so this was the solution.
         fn inner<T, U, F: Fn(&T) -> U>(t: &Tree<T>, f: &F) -> Tree<U> {
             use Tree::*;
 
             match t {
-                List(xs) => List(xs.into_iter().map(|x| inner(x, f)).collect()),
-                Atom(x) => Atom(f(x)),
+                Branch(xs) => Branch(xs.into_iter().map(|x| inner(x, f)).collect()),
+                Leaf(x) => Leaf(f(x)),
             }
         }
 
         inner(self, &f)
     }
 
-    fn zip_with<U: Clone>(self, other: Tree<U>) -> Tree<(T, U)> {
-        todo!()
+    fn zip<U: Clone>(self, other: Tree<U>) -> Option<Tree<(T, U)>> {
+        use Tree::*;
+
+        match (self, other) {
+            (Branch(xs), Branch(ys)) if xs.len() == ys.len() => {
+                let mut zs = Vec::new();
+                for (x, y) in xs.into_iter().zip(ys) {
+                    if let Some(z) = x.zip(y) {
+                        zs.push(z);
+                    } else {
+                        return None;
+                    }
+                }
+
+                Some(Branch(zs))
+            }
+            (Leaf(x), Leaf(y)) => Some(Leaf((x, y))),
+            _ => None,
+        }
     }
 }
 
@@ -262,79 +317,60 @@ mod tests {
     fn tree_map() {
         use Tree::*;
 
-        let t: Tree<i32> = List(vec![Atom(123), Atom(456), List(vec![Atom(789)])]);
+        let t: Tree<i32> = Branch(vec![Leaf(123), Leaf(456), Branch(vec![Leaf(789)])]);
 
         let s = t.map(|&x| x as f32);
 
-        let List(xs) = s else { panic!("Should be a list") };
+        let Branch(xs) = s else { panic!("Should be a list") };
 
-        assert!(matches!(xs.as_slice(), [Atom(123.0), Atom(456.0), List(_)]));
+        assert!(matches!(
+            xs.as_slice(),
+            [Leaf(123.0), Leaf(456.0), Branch(_)]
+        ));
 
-        let [_, _, List(xs)] = xs.as_slice() else { panic!(); };
+        let [_, _, Branch(xs)] = xs.as_slice() else { panic!(); };
 
-        assert!(matches!(xs.as_slice(), [Atom(789.0)]));
+        assert!(matches!(xs.as_slice(), [Leaf(789.0)]));
     }
 }
 
-fn tree_zip<T: Clone, U: Clone>(a: Tree<T>, b: Tree<U>) -> Result<Tree<(T, U)>, ()> {
-    match (a, b) {
-        (Tree::Atom(x), Tree::Atom(y)) => Ok(Tree::Atom((x, y))),
-        (Tree::List(xs), Tree::List(ys)) if xs.len() == ys.len() => {
-            let list = xs
-                .into_iter()
-                .zip(ys)
-                .map(|(x, y)| tree_zip(x, y))
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(Tree::List(list))
-        }
-        _ => Err(()),
-    }
-}
-
+#[derive(Clone)]
 pub struct SExpr<'a> {
-    pub loc: SourceSpan,
+    pub span: SourceSpan,
     pub kind: SExprKind<'a>,
 }
 
-struct SExprList<'a>(Vec<SExpr<'a>>);
-
-impl<'a> SExprList<'a> {
-    fn kinds(&self) -> Vec<&SExprKind<'a>> {
-        self.0.iter().map(|x| &x.kind).collect()
-    }
-}
-
+#[derive(Clone)]
 pub enum SExprKind<'a> {
     List(Vec<SExpr<'a>>),
-    Atom(&'a str),
+    Ident(&'a str),
+    LitString(&'a str),
 }
 
 pub fn parse(source: &str) -> Result<SExpr, ParseError> {
-    let mut stack = vec![(SourceLocation::new(1, 1), Vec::new())];
+    let mut stack = vec![(SourceSpan::invalid(), Vec::new())];
     let mut tokenizer = Tokenizer::new(source);
 
-    while let Some(tok) = tokenizer.next() {
+    for tok in tokenizer {
         match tok.kind {
             TokenKind::BraceOpen => {
-                stack.push((tok.loc.start, Vec::new()));
+                stack.push((tok.loc, Vec::new()));
             }
-            TokenKind::Atom(id) => {
+            TokenKind::Ident(id) => {
                 stack.last_mut().unwrap().1.push(SExpr {
-                    loc: tok.loc,
-                    kind: SExprKind::Atom(id),
+                    span: tok.loc,
+                    kind: SExprKind::Ident(id),
                 });
             }
+            TokenKind::StringLit(_) => todo!(),
             TokenKind::BraceClose => {
                 if stack.len() == 1 {
                     return Err(ParseError::UnmatchedClosingBrace(tok.loc.start));
                 }
 
-                if let Some((start, elems)) = stack.pop() {
+                if let Some((span, elems)) = stack.pop() {
                     stack.last_mut().unwrap().1.push(SExpr {
-                        loc: SourceSpan {
-                            start,
-                            end: tok.loc.end,
-                        },
+                        span: SourceSpan::new(span.start, tok.loc.end),
                         kind: SExprKind::List(elems),
                     });
                 } else {
@@ -345,174 +381,11 @@ pub fn parse(source: &str) -> Result<SExpr, ParseError> {
     }
 
     if stack.len() > 1 {
-        return Err(ParseError::UnmatchedOpeningBrace(stack.last().unwrap().0));
+        return Err(ParseError::UnmatchedOpeningBrace);
     }
 
     Ok(SExpr {
-        loc: SourceSpan {
-            start: SourceLocation::new(1, 1),
-            end: tokenizer.last_location(),
-        },
+        span: SourceSpan::invalid(),
         kind: SExprKind::List(stack.pop().unwrap().1),
     })
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tokenizer() {
-        let source = "
-(fn main ()
-  32)";
-
-        let mut tokenizer = Tokenizer::new(&source);
-
-        assert_eq!(
-            tokenizer.next(),
-            Some(Token {
-                loc: SourceSpan::single(SourceLocation { line: 2, col: 1 }),
-                kind: TokenKind::BraceOpen
-            })
-        );
-
-        assert_eq!(
-            tokenizer.next(),
-            Some(Token {
-                loc: SourceSpan {
-                    start: SourceLocation { line: 2, col: 2 },
-                    end: SourceLocation { line: 2, col: 3 },
-                },
-                kind: TokenKind::Atom("fn")
-            })
-        );
-
-        assert_eq!(
-            tokenizer.next(),
-            Some(Token {
-                loc: SourceSpan {
-                    start: SourceLocation { line: 2, col: 5 },
-                    end: SourceLocation { line: 2, col: 8 },
-                },
-                kind: TokenKind::Atom("main")
-            })
-        );
-
-        assert_eq!(
-            tokenizer.next(),
-            Some(Token {
-                loc: SourceSpan::single(SourceLocation { line: 2, col: 10 }),
-                kind: TokenKind::BraceOpen
-            })
-        );
-
-        assert_eq!(
-            tokenizer.next(),
-            Some(Token {
-                loc: SourceSpan::single(SourceLocation { line: 2, col: 11 }),
-                kind: TokenKind::BraceClose
-            })
-        );
-
-        assert_eq!(
-            tokenizer.next(),
-            Some(Token {
-                loc: SourceSpan {
-                    start: SourceLocation { line: 3, col: 3 },
-                    end: SourceLocation { line: 3, col: 4 },
-                },
-                kind: TokenKind::Atom("32")
-            })
-        );
-
-        assert_eq!(
-            tokenizer.next(),
-            Some(Token {
-                loc: SourceSpan::single(SourceLocation { line: 3, col: 5 }),
-                kind: TokenKind::BraceClose
-            })
-        );
-
-        assert_eq!(tokenizer.next(), None);
-    }
-
-    #[test]
-    fn parser() {
-        let source = "(abc () 12345)";
-        assert!(parse(&source).is_ok());
-
-        use super::SExprNode::*;
-
-        assert_eq!(
-            parse(&source).unwrap(),
-            SExpr {
-                nodes: vec![
-                    SExprNode::List { offset: 1, len: 1 },
-                    SExprNode::List { offset: 1, len: 3 },
-                    SExprNode::Atom("abc"),
-                    SExprNode::List { offset: 2, len: 0 },
-                    SExprNode::Atom("12345"),
-                ],
-                locs: vec![
-                    SourceSpan {
-                        start: SourceLocation { line: 0, col: 0 },
-                        end: SourceLocation { line: 0, col: 0 }
-                    },
-                    SourceSpan {
-                        start: SourceLocation { line: 1, col: 1 },
-                        end: SourceLocation { line: 1, col: 14 }
-                    },
-                    SourceSpan {
-                        start: SourceLocation { line: 1, col: 2 },
-                        end: SourceLocation { line: 1, col: 4 }
-                    },
-                    SourceSpan {
-                        start: SourceLocation { line: 1, col: 6 },
-                        end: SourceLocation { line: 1, col: 7 }
-                    },
-                    SourceSpan {
-                        start: SourceLocation { line: 1, col: 9 },
-                        end: SourceLocation { line: 1, col: 13 }
-                    },
-                ],
-            }
-        );
-    }
-
-    #[test]
-    fn unmatched_opening_brace() {
-        let source = "(a b c d (())";
-
-        let res = parse(&source);
-        assert!(res.is_err());
-
-        let err = res.unwrap_err();
-        assert_eq!(
-            err,
-            ParseError::UnmatchedOpeningBrace(SourceLocation {
-                line: 1,
-                col: 1
-            })
-        );
-    }
-
-    #[test]
-    fn unmatched_closing_brace() {
-        let source = "(a b c d ())))))";
-
-        let res = parse(&source);
-        assert!(res.is_err());
-
-        let err = res.unwrap_err();
-        assert_eq!(
-            err,
-            ParseError::UnmatchedClosingBrace(SourceLocation {
-                line: 1,
-                col: 13
-            })
-        );
-    }
-}
-*/

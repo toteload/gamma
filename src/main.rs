@@ -1,26 +1,29 @@
+#![allow(dead_code, unused_variables)]
+
 mod ast;
-mod ast_interpreter;
 mod env;
+mod parse;
 mod semantics;
-mod sexpr;
+mod string_interner;
 mod types;
 
-use crate::semantics::is_semantically_correct;
+use string_interner::StringInterner;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let source = "
-(fn main () int (add 155 2))
-(fn add ((a int) (b int)) int (+ a b))";
+    let source = include_str!("../test001.gamma");
 
-    let ast = ast::parse(source)?;
-
-    //if !is_semantically_correct(&ast) {
-    //    return Err("Program is not semantically correct".into());
+    let mut str_interner = StringInterner::new();
+    //let mut tokenizer = parse::Tokenizer::new(source, &mut str_interner).peekable();
+    //let tokens = tokenizer.collect::<Vec<_>>();
+    //for tok in tokens {
+    //    println!("{:?}", tok.kind);
     //}
 
-    let exit_code = ast_interpreter::eval(&ast)?;
+    let items = parse::parse(source, &mut str_interner)?;
 
-    println!("{:?}", exit_code);
+    semantics::do_name_validation(&items);
+
+    //println!("{:?}", items);
 
     Ok(())
 }

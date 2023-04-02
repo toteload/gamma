@@ -1,18 +1,196 @@
-#[derive(Clone, Debug)]
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::ops::Deref;
+use strum_macros::EnumDiscriminants;
+
+#[derive(Clone, Debug, Eq, EnumDiscriminants)]
+#[strum_discriminants(name(TypeTag))]
 pub enum Type {
-    Unit,
-    NonUnit(NonUnitType),
+    Unknown,
+    Void,
+    Bool,
+    Int,
+    Function {
+        params: Vec<Type>,
+        return_type: Box<Type>,
+    },
 }
 
-#[derive(Clone, Debug)]
-pub enum NonUnitType {
-    Bool,
-    Int {
-        is_signed: bool,
-        width: u64,
-    },
-    Function {
-        params: Vec<NonUnitType>,
-        return_type: Box<NonUnitType>,
-    },
+impl Type {
+    fn tag(&self) -> TypeTag {
+        self.into()
+    }
+
+    pub fn to_string(&self) -> String {
+        use Type::*;
+
+        match &self {
+            Unknown => "unknown".to_string(),
+            Void => "void".to_string(),
+            Bool => "bool".to_string(),
+            Int => "int".to_string(),
+            Function {
+                params,
+                return_type,
+            } => {
+                let mut s = "fn(".to_string();
+
+                for param in params {
+                    s += &param.to_string();
+                    s.push_str(", ");
+                }
+
+                s.push_str(") -> ");
+                s += &return_type.to_string();
+                s
+            }
+        }
+    }
+}
+
+impl Hash for Type {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let x = self.tag() as u8;
+
+        state.write_u8(x);
+
+        if let Type::Function {
+            params,
+            return_type,
+        } = self
+        {
+            for param in params {
+                param.hash(state);
+            }
+
+            return_type.hash(state);
+        }
+    }
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Type) -> bool {
+        use Type::*;
+
+        let x = self.tag();
+        let y = self.tag();
+
+        if x != y {
+            return false;
+        }
+
+        if let (
+            Function {
+                params: xparams,
+                return_type: xreturn_type,
+            },
+            Function {
+                params: yparams,
+                return_type: yreturn_type,
+            },
+        ) = (self, other)
+        {
+            let same_return_type = xreturn_type.eq(yreturn_type);
+            let same_params = xparams
+                .iter()
+                .zip(yparams)
+                .fold(true, |acc, (x, y)| acc && x.eq(y));
+
+            return same_return_type && same_params;
+        }
+
+        true
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TypeToken(u32);
+
+pub struct TypeInterner {
+    tokens: HashMap<&'static Type, TypeToken>,
+    #[allow(clippy::vec_box)]
+    types: Vec<Box<Type>>,
+}
+
+impl TypeInterner {
+    pub fn new() -> TypeInterner {
+        TypeInterner {
+            tokens: HashMap::new(),
+            types: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, ty: &Type) -> TypeToken {
+        if let Some(tok) = self.tokens.get(ty) {
+            return *tok;
+        }
+
+        let tok = TypeToken(self.types.len() as u32);
+
+        let storage: Box<Type> = Box::new(ty.clone());
+
+        let type_ref = unsafe { &*(storage.deref() as *const Type) };
+
+        self.types.push(storage);
+
+        self.tokens.insert(type_ref, tok);
+
+        tok
+    }
+
+    pub fn get_type(&self, tok: TypeToken) -> &Type {
+        &self.types[tok.0 as usize]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_type_interner_usage() {
+        use Type::*;
+
+        let mut interner = TypeInterner::new();
+
+        let a = interner.add(&Void);
+        let b = interner.add(&Bool);
+        let c = interner.add(&Int);
+
+        assert_eq!(a.0, 0);
+        assert_eq!(b.0, 1);
+        assert_eq!(c.0, 2);
+
+        assert_ne!(a, b);
+        assert_ne!(a, c);
+        assert_ne!(b, c);
+
+        assert_eq!(interner.get_type(a), &Void);
+        assert_eq!(interner.get_type(b), &Bool);
+        assert_eq!(interner.get_type(c), &Int);
+
+        let d = interner.add(&Function {
+            params: vec![Int, Int, Int],
+            return_type: Bool.into(),
+        });
+
+        assert_ne!(a, d);
+        assert_ne!(b, d);
+        assert_ne!(c, d);
+
+        assert_eq!(d.0, 3);
+
+        let e = interner.add(&Bool);
+
+        assert_eq!(b, e);
+
+        let f = interner.add(&Function {
+            params: vec![Int, Int, Int, Int],
+            return_type: Bool.into(),
+        });
+
+        assert_ne!(d, f);
+
+        assert_eq!(f.0, 4);
+    }
 }
