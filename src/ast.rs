@@ -1,98 +1,117 @@
-use crate::parse::SourceSpan;
 use crate::string_interner::Symbol;
-use crate::types::TypeToken;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct NodeId(u32);
 
-#[derive(Clone, Debug)]
+pub struct NodeIdGenerator {
+    counter: u32,
+}
+
+impl NodeIdGenerator {
+    pub fn new() -> NodeIdGenerator {
+        NodeIdGenerator { counter: 0 }
+    }
+
+    pub fn gen_id(&mut self) -> NodeId {
+        self.counter += 1;
+        NodeId(self.counter)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BinaryOpKind {
     Add,
     Sub,
     Mul,
+    Div,
+
+    LessEquals,
+    GreaterEquals,
+
+    LessThan,
     GreaterThan,
+
     Equals,
+    NotEquals,
+
+    LogicalAnd,
+    LogicalOr,
+
+    BitwiseAnd,
+    BitwiseOr,
+    Xor,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum UnaryOpKind {
     Negate,
     Not,
 }
 
+#[derive(Debug, Clone)]
+pub struct Name {
+    pub id: NodeId,
+    pub sym: Symbol,
+}
+
 #[derive(Debug)]
 pub struct Item {
-    pub attr: Attributes,
+    pub id: NodeId,
     pub kind: ItemKind,
 }
 
 impl Item {
     pub fn name_sym(&self) -> Symbol {
-        match self.kind {
-            ItemKind::Function(Function { name, .. }) => name,
+        match &self.kind {
+            ItemKind::Function { name, .. } => name.sym,
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Function {
-    pub return_type: Type,
-    pub name: Symbol,
-    pub params: Vec<Param>,
-    pub body: Box<Block>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ItemKind {
-    Function(Function),
+    Function {
+        return_type: Type,
+        name: Name,
+        params: Vec<Param>,
+        body: Box<Block>,
+    },
 }
 
 #[derive(Clone, Debug)]
 pub struct Type {
-    pub attr: Attributes,
+    pub id: NodeId,
     pub kind: TypeKind,
 }
 
 #[derive(Clone, Debug)]
 pub enum TypeKind {
-    Identifier(Symbol),
     Int,
     Void,
 }
 
 #[derive(Clone, Debug)]
-pub struct Attributes {
-    pub span: SourceSpan,
-    pub ty: Option<TypeToken>,
-}
-
-impl Attributes {
-    pub fn from_span(span: SourceSpan) -> Attributes {
-        Attributes { span, ty: None }
-    }
-}
-
-#[derive(Clone, Debug)]
 pub struct Param {
-    pub attr: Attributes,
-    pub name: Symbol,
+    pub id: NodeId,
+    pub name: Name,
     pub ty: Type,
 }
 
 #[derive(Clone, Debug)]
 pub struct Statement {
-    pub attr: Attributes,
+    pub id: NodeId,
     pub kind: StatementKind,
 }
 
 #[derive(Clone, Debug)]
 pub enum StatementKind {
     Let {
-        sym: Symbol,
+        name: Name,
         ty: Type,
         init: Box<Expr>,
     },
     Assign {
-        sym: Symbol,
+        name: Name,
         val: Box<Expr>,
     },
     Empty,
@@ -109,33 +128,15 @@ pub enum StatementKind {
     Return(Option<Box<Expr>>),
 }
 
-impl Statement {
-    pub fn new(span: SourceSpan, kind: StatementKind) -> Statement {
-        Statement {
-            attr: Attributes { span, ty: None },
-            kind,
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Block {
-    pub attr: Attributes,
+    pub id: NodeId,
     pub statements: Vec<Statement>,
-}
-
-impl Expr {
-    pub fn new(span: SourceSpan, kind: ExprKind) -> Expr {
-        Expr {
-            attr: Attributes::from_span(span),
-            kind,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
 pub struct Expr {
-    pub attr: Attributes,
+    pub id: NodeId,
     pub kind: ExprKind,
 }
 
@@ -153,7 +154,7 @@ pub enum ExprKind {
         rhs: Box<Expr>,
     },
     Call {
-        sym: Symbol,
+        name: Name,
         args: Vec<Expr>,
     },
 }

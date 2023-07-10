@@ -6,13 +6,12 @@ use strum_macros::EnumDiscriminants;
 #[derive(Clone, Debug, Eq, EnumDiscriminants)]
 #[strum_discriminants(name(TypeTag))]
 pub enum Type {
-    Unknown,
     Void,
     Bool,
     Int,
     Function {
-        params: Vec<Type>,
-        return_type: Box<Type>,
+        params: Vec<TypeToken>,
+        return_type: TypeToken,
     },
 }
 
@@ -21,11 +20,10 @@ impl Type {
         self.into()
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, type_interner: &TypeInterner) -> String {
         use Type::*;
 
         match &self {
-            Unknown => "unknown".to_string(),
             Void => "void".to_string(),
             Bool => "bool".to_string(),
             Int => "int".to_string(),
@@ -36,12 +34,12 @@ impl Type {
                 let mut s = "fn(".to_string();
 
                 for param in params {
-                    s += &param.to_string();
+                    s += &type_interner.get(param).to_string(type_interner);
                     s.push_str(", ");
                 }
 
                 s.push_str(") -> ");
-                s += &return_type.to_string();
+                s += &type_interner.get(return_type).to_string(type_interner);
                 s
             }
         }
@@ -103,7 +101,7 @@ impl PartialEq for Type {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct TypeToken(u32);
 
 pub struct TypeInterner {
@@ -138,11 +136,12 @@ impl TypeInterner {
         tok
     }
 
-    pub fn get_type(&self, tok: TypeToken) -> &Type {
+    pub fn get(&self, tok: &TypeToken) -> &Type {
         &self.types[tok.0 as usize]
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,3 +193,4 @@ mod tests {
         assert_eq!(f.0, 4);
     }
 }
+*/

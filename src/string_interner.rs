@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::ops::Deref;
+use serde::Serialize;
 
-#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
+#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq, Serialize)]
 pub struct Symbol(u32);
 
 pub struct StringInterner {
@@ -71,5 +72,7 @@ mod tests {
         let d = interner.add("chocolate");
 
         assert_eq!(b, d);
+
+        assert_eq!(interner.find_symbol("tuna").unwrap(), interner.add("tuna"));
     }
 }

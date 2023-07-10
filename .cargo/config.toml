@@ -1,0 +1,2 @@
+[env]
+LLVM_SYS_150_PREFIX = { value = "E:/david/code/LLVM/MinSizeRel-15.0.7", force = true }

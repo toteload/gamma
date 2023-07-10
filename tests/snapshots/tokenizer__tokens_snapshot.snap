@@ -1,0 +1,513 @@
+---
+source: tests/tokenizer.rs
+expression: tokens
+---
+[
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 1,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 2,
+      ),
+    ),
+    kind: KeywordFn,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 4,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 5,
+      ),
+    ),
+    kind: KeywordIf,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 7,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 10,
+      ),
+    ),
+    kind: KeywordElse,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 12,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 12,
+      ),
+    ),
+    kind: Plus,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 14,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 14,
+      ),
+    ),
+    kind: Minus,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 16,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 16,
+      ),
+    ),
+    kind: Star,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 18,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 18,
+      ),
+    ),
+    kind: Semicolon,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 20,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 20,
+      ),
+    ),
+    kind: Colon,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 22,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 22,
+      ),
+    ),
+    kind: BraceOpen,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 24,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 24,
+      ),
+    ),
+    kind: BraceClose,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 26,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 26,
+      ),
+    ),
+    kind: ParenOpen,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 28,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 28,
+      ),
+    ),
+    kind: ParenClose,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 30,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 33,
+      ),
+    ),
+    kind: KeywordVoid,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 35,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 37,
+      ),
+    ),
+    kind: KeywordLet,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 39,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 45,
+      ),
+    ),
+    kind: Identifier(Symbol(0)),
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 47,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 50,
+      ),
+    ),
+    kind: IntLiteral(4687),
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 52,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 59,
+      ),
+    ),
+    kind: KeywordContinue,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 61,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 66,
+      ),
+    ),
+    kind: KeywordReturn,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 67,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 68,
+      ),
+    ),
+    kind: Arrow,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 69,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 69,
+      ),
+    ),
+    kind: Comma,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 70,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 70,
+      ),
+    ),
+    kind: Equals,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 78,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 80,
+      ),
+    ),
+    kind: KeywordInt,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 82,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 83,
+      ),
+    ),
+    kind: LogicalAnd,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 84,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 84,
+      ),
+    ),
+    kind: BitwiseAnd,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 86,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 87,
+      ),
+    ),
+    kind: CmpEq,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 89,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 89,
+      ),
+    ),
+    kind: Xor,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 91,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 91,
+      ),
+    ),
+    kind: BitwiseAnd,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 93,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 93,
+      ),
+    ),
+    kind: BitwiseOr,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 95,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 96,
+      ),
+    ),
+    kind: LogicalOr,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 98,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 98,
+      ),
+    ),
+    kind: Not,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 99,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 99,
+      ),
+    ),
+    kind: Not,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 101,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 101,
+      ),
+    ),
+    kind: Div,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 103,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 104,
+      ),
+    ),
+    kind: CmpNe,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 106,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 107,
+      ),
+    ),
+    kind: CmpGe,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 109,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 110,
+      ),
+    ),
+    kind: CmpLe,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 112,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 112,
+      ),
+    ),
+    kind: CmpLt,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 114,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 114,
+      ),
+    ),
+    kind: CmpGt,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 116,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 119,
+      ),
+    ),
+    kind: BoolLiteral(true),
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 1,
+        col: 121,
+      ),
+      end: SourceLocation(
+        line: 1,
+        col: 125,
+      ),
+    ),
+    kind: BoolLiteral(false),
+  ),
+]

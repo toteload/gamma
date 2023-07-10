@@ -7,4 +7,16 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+nohash-hasher = "0.2.0"
 strum_macros = "0.24.3"
+jello = { path = "../jello" }
+serde = { version = "1.0.169", features = ["derive"] }
+
+[dev-dependencies]
+insta = { version = "1.30.0", features = ["yaml", "ron"] }
+
+[profile.dev.package.insta]
+opt-level = 3
+
+[profile.dev.package.similar]
+opt-level = 3
