@@ -143,6 +143,7 @@ pub struct Expr {
 #[derive(Clone, Debug)]
 pub enum ExprKind {
     IntLiteral(i64),
+    BoolLiteral(bool),
     Identifier(Symbol),
     UnaryOp {
         op: UnaryOpKind,
@@ -156,5 +157,9 @@ pub enum ExprKind {
     Call {
         name: Name,
         args: Vec<Expr>,
+    },
+    Cast {
+        ty: Type,
+        e: Box<Expr>,
     },
 }

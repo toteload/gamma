@@ -60,21 +60,17 @@ impl Parser<'_> {
         let binary_ops = HashMap::from([
             (Star, (40, BinaryOpKind::Mul)),
             (Div, (40, BinaryOpKind::Div)),
-
             (Plus, (20, BinaryOpKind::Add)),
             (Minus, (20, BinaryOpKind::Sub)),
-
             (BitwiseAnd, (20, BinaryOpKind::BitwiseAnd)),
             (BitwiseOr, (20, BinaryOpKind::BitwiseOr)),
             (Xor, (20, BinaryOpKind::Xor)),
-
             (CmpEq, (10, BinaryOpKind::Equals)),
             (CmpNe, (10, BinaryOpKind::NotEquals)),
             (CmpLt, (10, BinaryOpKind::LessThan)),
             (CmpGt, (10, BinaryOpKind::GreaterThan)),
             (CmpLe, (10, BinaryOpKind::LessEquals)),
             (CmpGe, (10, BinaryOpKind::GreaterEquals)),
-
             (LogicalAnd, (5, BinaryOpKind::LogicalAnd)),
             (LogicalOr, (5, BinaryOpKind::LogicalOr)),
         ]);
@@ -311,17 +307,16 @@ impl Parser<'_> {
                     Return(Some(return_value.into()))
                 }
             }
-            BraceOpen => todo!(),
-            Semicolon => todo!(),
+            BraceOpen => todo!("Block statement"),
+            Semicolon => todo!("Empty statement"),
             _ => todo!(),
         };
 
         self.spans.insert(id, span);
 
         let requires_semicolon = match kind {
-            Let { .. } | Continue | Break | Return(_) => true,
             If { .. } | Loop(_) => false,
-            _ => panic!(">:("),
+            _ => true,
         };
 
         if requires_semicolon {
@@ -362,6 +357,25 @@ impl Parser<'_> {
             IntLiteral(x) => {
                 span = tok.span;
                 ExprKind::IntLiteral(x)
+            }
+            BoolLiteral(x) => {
+                span = tok.span;
+                ExprKind::BoolLiteral(x)
+            }
+            KeywordCast => {
+                expect_token!(self.tokens.next(), ParenOpen)?;
+
+                let ty = self.parse_type()?;
+
+                expect_token!(self.tokens.next(), Comma)?;
+
+                let e = self.parse_expression()?;
+
+                let last_token = expect_token!(self.tokens.next(), ParenClose)?;
+
+                span = tok.span.extend(&last_token.span);
+
+                ExprKind::Cast { ty, e: e.into() }
             }
             Identifier(sym) => {
                 if let Some(Token {
@@ -433,14 +447,13 @@ impl Parser<'_> {
 
             // Check if we have another operator
             let peeked = self.tokens.peek();
-            let x = match peeked {
-                None => true,
-                Some(tok) if self.binary_ops.get(&tok.kind).is_none() => true,
+            let has_next_operator = match peeked {
+                Some(tok) if self.binary_ops.get(&tok.kind).is_some() => true,
                 _ => false,
             };
 
             // There is no next token or the next token is not an operator, so we are done.
-            if x {
+            if !has_next_operator {
                 let id = self.gen_node_id();
                 self.spans.insert(id, tok.span);
                 return Ok(Expr {
@@ -455,10 +468,10 @@ impl Parser<'_> {
 
             // We previously already found out that there is another token and that the token is
             // a binary operator.
-            let Some(peeked) = self.tokens.next() else { unreachable!() };
-            let Some((next_op_precedence, op)) = self.binary_ops.get(&peeked.kind) else { unreachable!() };
+            let Some(peeked) = self.tokens.peek() else { unreachable!() };
+            let Some((next_op_precedence, _)) = self.binary_ops.get(&peeked.kind) else { unreachable!() };
 
-            let (next_op_precedence, op) = (*next_op_precedence, *op);
+            let next_op_precedence = *next_op_precedence;
 
             if next_op_precedence > op_precedence {
                 rhs = self.parse_binop_expression(next_op_precedence, rhs)?;

@@ -1,0 +1,2 @@
+- Disallow items with the same name.
+- 

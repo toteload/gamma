@@ -11,7 +11,6 @@ pub struct CodeGenerator<'a> {
     current_function: Option<jello::FunctionValue>,
 
     i64_t: jello::IntType,
-    i1_t: jello::IntType,
 
     symbols: &'a StringInterner,
 }
@@ -39,15 +38,19 @@ impl<'a> CodeGenerator<'a> {
             module: ctx.create_module("main"),
             current_function: None,
             i64_t: ctx.i64_type(),
-            i1_t: ctx.i1_type(),
             symbols,
         }
     }
 
+    fn add_basic_block(&mut self, name: &str) -> jello::BasicBlock {
+        self.ctx
+            .append_basic_block(&self.current_function.unwrap(), name)
+    }
+
     fn gen_item(
         &mut self,
-        item: &Item,
         env: &Env<Symbol, jello::AnyValue>,
+        item: &Item,
     ) -> Result<jello::AnyValue> {
         match &item.kind {
             ItemKind::Function {
@@ -66,9 +69,7 @@ impl<'a> CodeGenerator<'a> {
                 let entry = self.ctx.append_basic_block(&f, "entry");
                 self.builder.position_at_end(entry);
 
-                for statement in &body.statements {
-                    self.gen_statement(statement, &env)?;
-                }
+                self.gen_block(&env, &body)?;
 
                 self.current_function = None;
 
@@ -77,15 +78,51 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
+    fn gen_block(&mut self, env: &Env<Symbol, jello::AnyValue>, block: &Block) -> Result<()> {
+        for statement in &block.statements {
+            self.gen_statement(&env, statement)?;
+        }
+
+        Ok(())
+    }
+
     fn gen_statement(
         &mut self,
-        stmt: &Statement,
         env: &Env<Symbol, jello::AnyValue>,
+        stmt: &Statement,
     ) -> Result<()> {
         match &stmt.kind {
             StatementKind::Return(Some(e)) => {
-                let val = self.gen_expr(e, env)?.try_into()?;
+                let val = self.gen_expr(env, e)?.try_into()?;
                 self.builder.build_ret(Some(val));
+            }
+            StatementKind::If {
+                cond,
+                then,
+                otherwise,
+            } => {
+                let cond_val = self.gen_expr(env, cond)?;
+
+                let then_block = self.add_basic_block("then");
+
+                let otherwise_block = self.add_basic_block("else");
+
+                let end_block = self.add_basic_block("end");
+
+                self.builder
+                    .build_cond_br(cond_val.try_into()?, then_block, otherwise_block);
+
+                self.builder.position_at_end(then_block);
+                self.gen_block(env, then)?;
+                self.builder.build_br(end_block);
+
+                self.builder.position_at_end(otherwise_block);
+                if let Some(otherwise) = otherwise {
+                    self.gen_block(env, otherwise)?;
+                }
+                self.builder.build_br(end_block);
+
+                self.builder.position_at_end(end_block);
             }
             _ => todo!(),
         }
@@ -95,11 +132,54 @@ impl<'a> CodeGenerator<'a> {
 
     fn gen_expr(
         &mut self,
-        e: &Expr,
         env: &Env<Symbol, jello::AnyValue>,
+        e: &Expr,
     ) -> Result<jello::AnyValue> {
         match &e.kind {
             ExprKind::IntLiteral(x) => Ok(self.i64_t.const_int(*x as u64, false).into()),
+            ExprKind::BoolLiteral(x) => Ok(self.i64_t.const_int(if *x { 1 } else { 0 }, false).into()),
+            ExprKind::BinaryOp { op, lhs, rhs } => {
+                let lhs = self.gen_expr(env, lhs)?;
+                let rhs = self.gen_expr(env, rhs)?;
+
+                match op {
+                    BinaryOpKind::Add => Ok(self
+                        .builder
+                        .build_add(lhs.try_into()?, rhs.try_into()?)
+                        .into()),
+                    BinaryOpKind::Sub => Ok(self
+                        .builder
+                        .build_sub(lhs.try_into()?, rhs.try_into()?)
+                        .into()),
+                    BinaryOpKind::Mul => Ok(self
+                        .builder
+                        .build_mul(lhs.try_into()?, rhs.try_into()?)
+                        .into()),
+
+                    BinaryOpKind::Div => todo!(),
+
+                    BinaryOpKind::Equals => Ok(self
+                        .builder
+                        .build_cmp(
+                            lhs.try_into()?,
+                            rhs.try_into()?,
+                            jello::IntComparison::Equal,
+                        )
+                        .into()),
+
+                    BinaryOpKind::LogicalAnd | BinaryOpKind::BitwiseAnd => Ok(self
+                        .builder
+                        .build_and(lhs.try_into()?, rhs.try_into()?)
+                        .into()),
+
+                    BinaryOpKind::LogicalOr | BinaryOpKind::BitwiseOr => Ok(self
+                        .builder
+                        .build_or(lhs.try_into()?, rhs.try_into()?)
+                        .into()),
+
+                    _ => todo!(),
+                }
+            }
             _ => todo!(),
             /*
             Call(name, args) => {
@@ -257,7 +337,7 @@ impl<'a> CodeGenerator<'a> {
         }
 
         for item in items {
-            self.gen_item(item, &env)?;
+            self.gen_item(&env, item)?;
         }
 
         let passes = jello::PassManager::create();

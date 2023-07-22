@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::string_interner::Symbol;
 use crate::types::{Type, TypeInterner, TypeToken};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 enum TypedScope {
     Parameters(HashMap<Symbol, TypeToken>),
@@ -38,6 +38,7 @@ pub enum TypeError {
     IfConditionMustBeBool(NodeId),
     IllegalUnaryExpression(NodeId),
     IllegalBinaryExpression(NodeId),
+    InvalidCast,
 }
 
 struct TypeChecker<'a> {
@@ -46,6 +47,8 @@ struct TypeChecker<'a> {
 
     unary_ops: HashMap<(UnaryOpKind, TypeToken), TypeToken>,
     binary_ops: HashMap<(BinaryOpKind, TypeToken, TypeToken), TypeToken>,
+
+    valid_casts: HashSet<(TypeToken, TypeToken)>,
 
     scopes: Vec<TypedScope>,
     type_errors: Vec<TypeError>,
@@ -65,26 +68,49 @@ impl TypeChecker<'_> {
         use BinaryOpKind::*;
         use UnaryOpKind::*;
 
-        let unary_ops = HashMap::from([((Negate, int_type), int_type)]);
+        let unary_ops = HashMap::from([
+            ((Negate, int_type), int_type),
+            ((Not, bool_type), bool_type),
+            ((Not, int_type), int_type),
+        ]);
 
         let binary_ops = HashMap::from([
             ((Add, int_type, int_type), int_type),
             ((Sub, int_type, int_type), int_type),
             ((Mul, int_type, int_type), int_type),
+            ((Div, int_type, int_type), int_type),
+            ((LessThan, int_type, int_type), bool_type),
+            ((LessEquals, int_type, int_type), bool_type),
             ((GreaterThan, int_type, int_type), bool_type),
+            ((GreaterEquals, int_type, int_type), bool_type),
             ((Equals, int_type, int_type), bool_type),
+            ((Equals, bool_type, bool_type), bool_type),
+            ((NotEquals, int_type, int_type), bool_type),
+            ((NotEquals, bool_type, bool_type), bool_type),
+            ((LogicalAnd, bool_type, bool_type), bool_type),
+            ((LogicalOr, bool_type, bool_type), bool_type),
+            ((BitwiseAnd, int_type, int_type), int_type),
+            ((BitwiseOr, int_type, int_type), int_type),
+            ((Xor, int_type, int_type), int_type),
         ]);
+
+        let valid_casts = HashSet::from([(int_type, bool_type), (bool_type, int_type)]);
 
         TypeChecker {
             type_interner,
             types,
             unary_ops,
             binary_ops,
+            valid_casts,
             scopes: Vec::new(),
             type_errors: Vec::new(),
             int_type,
             bool_type,
         }
+    }
+
+    fn is_valid_type_cast(&self, from: TypeToken, to: TypeToken) -> bool {
+        self.valid_casts.contains(&(from, to))
     }
 
     fn get_type_token_of(&self, sym: &Symbol) -> &TypeToken {
@@ -288,7 +314,18 @@ impl TypeChecker<'_> {
 
         let ty = match &expression.kind {
             IntLiteral(_) => self.int_type,
+            BoolLiteral(_) => self.bool_type,
             Identifier(sym) => *self.get_type_token_of(sym),
+            Cast { ty, e } => {
+                let expr_ty_token = self.visit_expr(e)?;
+                let cast_ty_token = self.get_type_token_for_type_node(&ty.kind);
+
+                if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
+                    return Err(TypeError::InvalidCast);
+                }
+
+                cast_ty_token
+            }
             UnaryOp { op, e } => {
                 let ty = self.visit_expr(e)?;
 

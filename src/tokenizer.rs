@@ -1,8 +1,8 @@
 use crate::source_location::{SourceLocation, SourceSpan};
 use crate::string_interner::{StringInterner, Symbol};
+use serde::Serialize;
 use std::iter::Peekable;
 use std::str::Chars;
-use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct Token {
@@ -21,8 +21,9 @@ pub enum TokenKind {
     KeywordReturn,
     KeywordLet,
     KeywordSet,
-    KeywordVoid,
+    KeywordCast,
 
+    KeywordVoid,
     KeywordInt,
 
     Identifier(Symbol),
@@ -164,6 +165,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     "return"   => Token { span, kind: TokenKind::KeywordReturn, },
                     "let"      => Token { span, kind: TokenKind::KeywordLet, },
                     "set"      => Token { span, kind: TokenKind::KeywordSet, },
+                    "cast"     => Token { span, kind: TokenKind::KeywordCast, },
                     "void"     => Token { span, kind: TokenKind::KeywordVoid, },
                     "int"      => Token { span, kind: TokenKind::KeywordInt, },
                     "false"    => Token { span, kind: TokenKind::BoolLiteral(false), },
@@ -316,6 +318,8 @@ impl<'a> Iterator for Tokenizer<'a> {
             }
             _ => todo!(),
         };
+
+        println!("{:?}", tok);
 
         Some(tok)
     }

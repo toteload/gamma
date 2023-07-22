@@ -120,9 +120,9 @@ impl Visitor for Analyser<'_> {
         use ExprKind::*;
 
         match &e.kind {
-            IntLiteral(_) => (),
+            IntLiteral(_) | BoolLiteral(_) => (),
             Identifier(sym) => self.validate_sym(sym, &e.id),
-            UnaryOp { e, .. } => self.visit_expr(e),
+            UnaryOp { e, .. } | Cast { e, .. } => self.visit_expr(e),
             BinaryOp { lhs, rhs, .. } => {
                 self.visit_expr(lhs);
                 self.visit_expr(rhs);

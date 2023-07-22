@@ -9,8 +9,10 @@ edition = "2018"
 [dependencies]
 nohash-hasher = "0.2.0"
 strum_macros = "0.24.3"
-jello = { path = "../jello" }
 serde = { version = "1.0.169", features = ["derive"] }
+inkwell = { version = "0.2.0", features = ["llvm15-0"] }
+llvm-sys = "150"
+anyhow = "1.0.72"
 
 [dev-dependencies]
 insta = { version = "1.30.0", features = ["yaml", "ron"] }

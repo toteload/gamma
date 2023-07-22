@@ -2,8 +2,8 @@
 
 mod ast;
 mod ast_visitor;
-mod codegen;
 mod env;
+mod ink_codegen;
 mod parser;
 mod semantics;
 mod source_location;
@@ -13,7 +13,7 @@ mod type_check;
 mod types;
 
 use ast::NodeIdGenerator;
-use codegen::CodeGenerator;
+use ink_codegen::CodeGenerator;
 use parser::Parser;
 use std::collections::HashMap;
 use string_interner::StringInterner;
@@ -50,10 +50,24 @@ impl Compiler {
 }
 */
 
+struct CompilationUnit {
+    string_interner: StringInterner,
+    id_generator: NodeIdGenerator,
+    //spans: HashMap<NodeId, SourceSpan>,
+    //items: Vec<crate::ast::Item>,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Gamma compiler version 0.1\n");
 
-    let source = "fn main() -> int { return 0; }";
+    let source = "
+fn main() -> int { 
+    if 1 + 2 == 3 {
+        return 1;
+    } else {
+        return 0; 
+    }
+}";
 
     let lines = source.lines().collect::<Vec<_>>();
 
@@ -97,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     spans.get(&received.1).unwrap(),
                 );
             }
-            _ => todo!(),
+            _ => println!("TODO: {:?}", err),
         }
     }
 
@@ -105,14 +119,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("The program successfully type checked!");
     } else {
         println!("There were type errors");
+        println!("{:?}", items);
         return Ok(());
     }
 
-    let ctx = jello::Context::create();
-    let mut code_generator = CodeGenerator::new(&ctx, &string_interner);
-    code_generator.compile(&items, "out.ll")?;
-
-    println!("Generated \"out.ll\"");
+    let ctx = inkwell::context::Context::create();
+    let mut codegen = CodeGenerator::new(&ctx, &string_interner);
+    let output = codegen.compile(&items)?;
+    println!("{}", output);
 
     Ok(())
 }

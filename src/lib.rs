@@ -2,7 +2,6 @@
 
 pub mod ast;
 pub mod ast_visitor;
-pub mod codegen;
 pub mod env;
 pub mod parser;
 pub mod semantics;
