@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::env::Env as GenericEnv;
 use crate::string_interner::{StringInterner, Symbol};
+use crate::types::{Type, TypeInterner, TypeToken};
 use anyhow::Result;
 use inkwell::{
     basic_block::BasicBlock,
@@ -12,6 +13,7 @@ use inkwell::{
     values::{AnyValue, AnyValueEnum, BasicValueEnum, FunctionValue},
     IntPredicate,
 };
+use std::collections::HashMap;
 
 type Env<'a, 'ctx> = GenericEnv<'a, Symbol, AnyValueEnum<'ctx>>;
 
@@ -20,19 +22,39 @@ pub struct CodeGenerator<'ctx> {
     builder: Builder<'ctx>,
     module: Module<'ctx>,
     current_function: Option<FunctionValue<'ctx>>,
+
     i64_t: IntType<'ctx>,
+    trap_intrinsic: FunctionValue<'ctx>,
+
     symbols: &'ctx StringInterner,
+    node_types: &'ctx HashMap<NodeId, TypeToken>,
+    type_interner: &'ctx TypeInterner,
 }
 
 impl<'ctx> CodeGenerator<'ctx> {
-    pub fn new(ctx: &'ctx Context, symbols: &'ctx StringInterner) -> Self {
+    pub fn new(
+        ctx: &'ctx Context,
+        symbols: &'ctx StringInterner,
+        node_types: &'ctx HashMap<NodeId, TypeToken>,
+        type_interner: &'ctx TypeInterner,
+    ) -> Self {
+        let module = ctx.create_module("main");
+
+        let trap_function_type = ctx.void_type().fn_type(&[], false);
+        let trap_intrinsic = module.add_function("llvm.trap", trap_function_type, None);
+
         Self {
             ctx,
             builder: ctx.create_builder(),
-            module: ctx.create_module("main"),
+            module,
             current_function: None,
+
             i64_t: ctx.i64_type(),
+            trap_intrinsic,
+
             symbols,
+            node_types,
+            type_interner,
         }
     }
 
@@ -119,6 +141,10 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.builder.position_at_end(end_block);
             }
+            StatementKind::Empty => (),
+            StatementKind::Trap => {
+                self.builder.build_call(self.trap_intrinsic, &[], "");
+            },
             _ => todo!(),
         }
 
@@ -130,6 +156,32 @@ impl<'ctx> CodeGenerator<'ctx> {
             ExprKind::IntLiteral(x) => Ok(self.i64_t.const_int(*x as u64, false).into()),
             ExprKind::BoolLiteral(x) => {
                 Ok(self.i64_t.const_int(if *x { 1 } else { 0 }, false).into())
+            }
+            ExprKind::Cast { e: src, .. } => {
+                let src_ty_token = self.node_types.get(&src.id).unwrap();
+                let src_ty = self.type_interner.get(&src_ty_token);
+
+                let dst_ty_token = self.node_types.get(&e.id).unwrap();
+                let dst_ty = self.type_interner.get(&dst_ty_token);
+
+                let val = self.gen_expr(env, src)?;
+
+                match (src_ty, dst_ty) {
+                    (&Type::Int, &Type::Bool) => Ok(self
+                        .builder
+                        .build_int_compare(
+                            IntPredicate::NE,
+                            val.into_int_value(),
+                            self.i64_t.const_int(0, false),
+                            "",
+                        )
+                        .into()),
+                    (&Type::Bool, &Type::Int) => Ok(self
+                        .builder
+                        .build_int_z_extend(val.into_int_value(), self.i64_t, "")
+                        .into()),
+                    _ => todo!(),
+                }
             }
             ExprKind::BinaryOp { op, lhs, rhs } => {
                 let lhs = self.gen_expr(env, lhs)?;
@@ -148,9 +200,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .builder
                         .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "")
                         .into()),
-
                     BinaryOpKind::Div => todo!(),
-
                     BinaryOpKind::Equals => Ok(self
                         .builder
                         .build_int_compare(
@@ -160,17 +210,18 @@ impl<'ctx> CodeGenerator<'ctx> {
                             "",
                         )
                         .into()),
-
                     BinaryOpKind::LogicalAnd | BinaryOpKind::BitwiseAnd => Ok(self
                         .builder
                         .build_and(lhs.into_int_value(), rhs.into_int_value(), "")
                         .into()),
-
                     BinaryOpKind::LogicalOr | BinaryOpKind::BitwiseOr => Ok(self
                         .builder
                         .build_or(lhs.into_int_value(), rhs.into_int_value(), "")
                         .into()),
-
+                    BinaryOpKind::Xor => Ok(self
+                        .builder
+                        .build_xor(lhs.into_int_value(), rhs.into_int_value(), "")
+                        .into()),
                     _ => todo!(),
                 }
             }

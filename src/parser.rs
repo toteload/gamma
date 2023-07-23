@@ -154,11 +154,12 @@ impl Parser<'_> {
     fn parse_type(&mut self) -> Result<Type> {
         use TokenKind::*;
 
-        let ty = expect_token!(self.tokens.next(), Identifier(_) | KeywordInt | KeywordVoid)?;
+        let ty = expect_token!(self.tokens.next(), Identifier(_) | KeywordInt | KeywordVoid | KeywordBool)?;
 
         let kind = match ty.kind {
             KeywordInt => TypeKind::Int,
             KeywordVoid => TypeKind::Void,
+            KeywordBool => TypeKind::Bool,
             _ => unreachable!(),
         };
 
@@ -296,6 +297,8 @@ impl Parser<'_> {
                 span = tok.span;
                 Continue
             }
+            Semicolon => { span = tok.span; Empty },
+            KeywordTrap => { span = tok.span; Trap },
             KeywordReturn => {
                 let tok2 = expect_token!(self.tokens.peek(), _)?;
                 if matches!(tok2.kind, Semicolon) {
@@ -308,7 +311,6 @@ impl Parser<'_> {
                 }
             }
             BraceOpen => todo!("Block statement"),
-            Semicolon => todo!("Empty statement"),
             _ => todo!(),
         };
 

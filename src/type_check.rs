@@ -134,6 +134,7 @@ impl TypeChecker<'_> {
         match type_kind {
             TypeKind::Int => self.type_interner.add(&Type::Int),
             TypeKind::Void => self.type_interner.add(&Type::Void),
+            TypeKind::Bool => self.type_interner.add(&Type::Bool),
         }
     }
 
@@ -297,7 +298,7 @@ impl TypeChecker<'_> {
                     self.type_errors.push(err);
                 }
             }
-            Empty | Break | Continue | Return(None) => (),
+            Empty | Break | Continue | Trap | Return(None) => (),
         }
     }
 

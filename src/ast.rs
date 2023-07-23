@@ -88,6 +88,7 @@ pub struct Type {
 pub enum TypeKind {
     Int,
     Void,
+    Bool,
 }
 
 #[derive(Clone, Debug)]
@@ -126,6 +127,7 @@ pub enum StatementKind {
     Break,
     Continue,
     Return(Option<Box<Expr>>),
+    Trap,
 }
 
 #[derive(Clone, Debug)]

@@ -24,11 +24,11 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [x] Add bool
 - [x] Port existing code generator to use inkwell
 - Code generator
-	- [ ] Logical operators
+	- [x] Logical operators
 	- [ ] Comparison operators
-	- [ ] arithmetic operators (maybe already done)
-	- [ ] Bitwise ops
-	- [ ] Casting behavior
+	- [x] arithmetic operators (maybe already done)
+	- [x] Bitwise ops
+	- [x] Casting behavior
 		- `bool -> int` : `true -> 1` and `false -> 0`
 		- `int -> bool` : `0 -> false` and other values evaluate to `true`
 	- [x] `if`/`else`
@@ -38,7 +38,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- [x] Add to parser and AST.
 - [ ] Add all signed and unsigned integer types. 
 	- Maybe don't do this and only provide `int` at this stage?
-	- [ ] Remove temporary `int` type.
+	- I am only allowing `int` at this point, which is a 64-bit signed integer.
 - [x] Add comparison operators
 	- `==` `!=` `>=` `<=` `>` `<`
 	- [x] Add tokens
@@ -60,7 +60,6 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- [ ] Ensure that all branches return a value (if the function should return a value).
 - Type checker
 	- [x] Condition of `if` statement must be bool
-	- [ ] `main` function must be of the correct type `fn() -> int`.
 	- [x] Logical operators can only be used on bools
 	- [x] == and != can be used on bools and integers
 	- [x] other comparison operators can be used on integers
@@ -71,10 +70,14 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 
 ### Version 0.3
 - [x] Add void.
+- [ ] Change all expressions to be of the form `(op ...)`. This way you don't have to do any operator precedence stuff. Also, there is a clear distinction between statements and expressions.
+- [x] Add `trap` statement to abort the program
+	- [x] Add to codegen
 - [ ] Add user defined functions.
 - [ ] Add `loop`, `break` and `continue`
 	- [ ] Semantic check: `break` and `continue` can only be used inside a loop
 	- [ ] Add optional labels for `loop`. You can `break :label` or `continue :label`.
+- [ ] `main` function must be of the correct type `fn() -> void`.
 - [ ] Add `let` statement.
 	- Variable initialization is optional.
  - [ ] Add assignment operator
@@ -84,7 +87,6 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [ ] `void` can only be used as the return type of a function
 - Testing
 	- [ ] Set up a way to run generated programs and compare output.
-
 
 ### Version 0.4
 - [ ] Add pointer type.

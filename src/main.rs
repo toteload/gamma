@@ -62,10 +62,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let source = "
 fn main() -> int { 
-    if 1 + 2 == 3 {
+    if cast(int, false) == 0 {
+        trap;
         return 1;
     } else {
-        return 0; 
+        return 0;;  ;;;
     }
 }";
 
@@ -124,7 +125,7 @@ fn main() -> int {
     }
 
     let ctx = inkwell::context::Context::create();
-    let mut codegen = CodeGenerator::new(&ctx, &string_interner);
+    let mut codegen = CodeGenerator::new(&ctx, &string_interner, &types, &type_interner);
     let output = codegen.compile(&items)?;
     println!("{}", output);
 

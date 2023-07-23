@@ -1,0 +1,2 @@
+- Disallow items with the same name.
+- Remove casts from from type A to type A from the AST
