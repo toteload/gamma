@@ -8,6 +8,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - Tokenizer
 	- [x] Make one
 	- [x] Write tests
+- [ ] Move tokenizer snapshot test to `tokenizer.rs`
 - Parser
 	- [x] Make one
 	- [ ] Write tests
@@ -67,7 +68,6 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [x] Add type casting of int to bool
 	- [x] What kind of syntax?
 		- `cast(bool, 456)` or `456 as bool`. I choose `cast(bool, 456)`; the syntax is easier. `(cast bool 456)`
-- [ ] Move tokenizer snapshot test to `tokenizer.rs`
 
 ### Version 0.3
 - [x] Add void.
