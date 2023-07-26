@@ -20,24 +20,6 @@
             }
           }
         ]
-      },
-      {
-        "id": "a2aec19f8fb34d8f",
-        "type": "tabs",
-        "children": [
-          {
-            "id": "f9f7710ff2f16a52",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Nice to haves.md",
-                "mode": "source",
-                "source": false
-              }
-            }
-          }
-        ]
       }
     ],
     "direction": "vertical"

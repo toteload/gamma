@@ -58,15 +58,14 @@ struct CompilationUnit {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Gamma compiler version 0.1\n");
+    println!("Gamma compiler version 0.2\n");
 
     let source = "
 fn main() -> int { 
     if cast(int, false) == 0 {
-        trap;
         return 1;
     } else {
-        return 0;;  ;;;
+        return 0;
     }
 }";
 

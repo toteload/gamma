@@ -30,7 +30,6 @@ impl TypedScope {
 
 #[derive(Debug)]
 pub enum TypeError {
-    InvalidUnaryExpr(NodeId),
     TypeMismatch {
         expected: (TypeToken, NodeId),
         received: (TypeToken, NodeId),
@@ -39,6 +38,7 @@ pub enum TypeError {
     IllegalUnaryExpression(NodeId),
     IllegalBinaryExpression(NodeId),
     InvalidCast,
+    IncorrectReturnType,
 }
 
 struct TypeChecker<'a> {
@@ -48,11 +48,15 @@ struct TypeChecker<'a> {
     unary_ops: HashMap<(UnaryOpKind, TypeToken), TypeToken>,
     binary_ops: HashMap<(BinaryOpKind, TypeToken, TypeToken), TypeToken>,
 
+    // Set of type pairs that encodes allowed type casts. For example, from int to bool
     valid_casts: HashSet<(TypeToken, TypeToken)>,
 
     scopes: Vec<TypedScope>,
     type_errors: Vec<TypeError>,
 
+    expected_return_type: Option<TypeToken>,
+
+    void_type: TypeToken,
     int_type: TypeToken,
     bool_type: TypeToken,
 }
@@ -62,6 +66,7 @@ impl TypeChecker<'_> {
         type_interner: &'a mut TypeInterner,
         types: &'a mut HashMap<NodeId, TypeToken>,
     ) -> TypeChecker<'a> {
+        let void_type = type_interner.add(&Type::Void);
         let int_type = type_interner.add(&Type::Int);
         let bool_type = type_interner.add(&Type::Bool);
 
@@ -104,8 +109,16 @@ impl TypeChecker<'_> {
             valid_casts,
             scopes: Vec::new(),
             type_errors: Vec::new(),
+            expected_return_type: None,
+            void_type,
             int_type,
             bool_type,
+        }
+    }
+
+    fn verify_return_type(&mut self, found_return_type: Option<TypeToken>) {
+        if found_return_type != self.expected_return_type {
+            self.type_errors.push(TypeError::IncorrectReturnType);
         }
     }
 
@@ -186,7 +199,13 @@ impl TypeChecker<'_> {
                     params,
                     return_type,
                     body,
-                } => self.visit_function(name, params, return_type, body),
+                } => {
+                    let return_type_token = *self.types.get(&return_type.id).unwrap();
+
+                    self.expected_return_type = Some(return_type_token).filter(|tt| *tt != self.void_type);
+
+                    self.visit_function(name, params, return_type, body);
+                }
             }
         }
     }
@@ -294,11 +313,13 @@ impl TypeChecker<'_> {
                 }
             }
             Return(Some(e)) => {
-                if let Err(err) = self.visit_expr(e) {
-                    self.type_errors.push(err);
+                match self.visit_expr(e) {
+                    Err(err) => self.type_errors.push(err),
+                    Ok(tt) => self.verify_return_type(Some(tt)),
                 }
             }
-            Empty | Break | Continue | Return(None) => (),
+            Return(None) => { self.verify_return_type(None) }
+            Empty | Break | Continue => (),
         }
     }
 

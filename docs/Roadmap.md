@@ -8,7 +8,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - Tokenizer
 	- [x] Make one
 	- [x] Write tests
-- [ ] Move tokenizer snapshot test to `tokenizer.rs`
+- [x] Move tokenizer snapshot test to `tokenizer.rs`
 - Parser
 	- [x] Make one
 	- [ ] Write tests
@@ -57,6 +57,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- [x] Verify that all used names are defined.
 	- [ ] Disallow functions with the same name. This is more of a nice to have.
 - [x] Add `if`/`else` statement.
+- [x] Type check return type.
 - [ ] Add control flow analysis.
 	- [ ] Ensure that all branches return a value (if the function should return a value).
 - Type checker
@@ -74,7 +75,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [ ] Change all expressions to be of the form `(op ...)`. This way you don't have to do any operator precedence stuff. Also, there is a clear distinction between statements and expressions.
 - [x] Add `trap` statement to abort the program
 	- [x] Add to codegen
-	- [ ] Remove the `trap` statement
+	- [x] Remove the `trap` statement
 - [ ] Add `exit` statement to exit the program with an exit code.
 	- [ ] This means the program has a small runtime, similar to C. On Windows `ExitProcess` needs to be called and on Linux `exit`.
 	- This can be used to create programs that check for conditions and exit with a specific code to signal that something is wrong. This can be used in a test suite.
