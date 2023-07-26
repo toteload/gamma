@@ -18,36 +18,6 @@ impl NodeIdGenerator {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum BinaryOpKind {
-    Add,
-    Sub,
-    Mul,
-    Div,
-
-    LessEquals,
-    GreaterEquals,
-
-    LessThan,
-    GreaterThan,
-
-    Equals,
-    NotEquals,
-
-    LogicalAnd,
-    LogicalOr,
-
-    BitwiseAnd,
-    BitwiseOr,
-    Xor,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum UnaryOpKind {
-    Negate,
-    Not,
-}
-
 #[derive(Debug, Clone)]
 pub struct Name {
     pub id: NodeId,
@@ -111,19 +81,12 @@ pub enum StatementKind {
         ty: Type,
         init: Box<Expr>,
     },
-    Assign {
-        name: Name,
-        val: Box<Expr>,
-    },
-    Empty,
     Expr(Box<Expr>),
-    Block(Block),
     If {
         cond: Box<Expr>,
         then: Block,
         otherwise: Option<Block>,
     },
-    Loop(Block),
     Break,
     Continue,
     Return(Option<Box<Expr>>),
@@ -133,6 +96,24 @@ pub enum StatementKind {
 pub struct Block {
     pub id: NodeId,
     pub statements: Vec<Statement>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum BuiltinOp {
+    Or,
+    And,
+    Xor,
+    Not,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Equals,
+    NotEquals,
+    LessThan,
+    GreaterThan,
+    LessEquals,
+    GreaterEquals,
 }
 
 #[derive(Clone, Debug)]
@@ -146,21 +127,7 @@ pub enum ExprKind {
     IntLiteral(i64),
     BoolLiteral(bool),
     Identifier(Symbol),
-    UnaryOp {
-        op: UnaryOpKind,
-        e: Box<Expr>,
-    },
-    BinaryOp {
-        op: BinaryOpKind,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-    },
-    Call {
-        name: Name,
-        args: Vec<Expr>,
-    },
-    Cast {
-        ty: Type,
-        e: Box<Expr>,
-    },
+    BuiltinOp { op: BuiltinOp, args: Vec<Expr> },
+    Call { name: Name, args: Vec<Expr> },
+    Cast { ty: Type, e: Box<Expr> },
 }

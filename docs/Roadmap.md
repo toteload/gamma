@@ -34,6 +34,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 		- `int -> bool` : `0 -> false` and other values evaluate to `true`
 	- [x] `if`/`else`
 - [x] Add logical operators that only work for bools
+	- and or not
 	- `&&` `||` `!`
 	- [x] Add tokens
 	- [x] Add to parser and AST.
@@ -45,7 +46,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- [x] Add tokens
 	- [x] Add to parser and AST.
  - [x] Add bitwise operators
-	 - `!` `&` `|` xor
+	 - not and or xor
 	 - [x] Add tokens
 	 - [x] Add to parser and AST.
  - [ ] Add arithmetic operators
@@ -96,6 +97,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 
 ### Version 0.4
 - [ ] Add pointer type.
+	- `*T`
 	- [ ] Add dereferencing operator.
 	- [ ] Add operator to take the address of a variable.
 		- [ ] Taking the address of a function is illegal
@@ -104,8 +106,9 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- [ ] Add type casting of `u64` to a pointer and vice versa
 	- [ ] Add comparison operators
 - [ ] Add array type.
+	- `[128]T` or `[T:128]`. I prefer the first.
 	- [ ] Add indexing operator.
-	- [ ] Indexing is only allowed on arrays and pointers and can only be indexed by integers.
+	- [ ] Indexing is only allowed on arrays and pointers, and can only be indexed by integers.
 
 ### Version 0.5
 - [ ] Add modules

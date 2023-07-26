@@ -35,8 +35,6 @@ pub enum TypeError {
         received: (TypeToken, NodeId),
     },
     IfConditionMustBeBool(NodeId),
-    IllegalUnaryExpression(NodeId),
-    IllegalBinaryExpression(NodeId),
     InvalidCast,
     IncorrectReturnType,
 }
@@ -44,9 +42,6 @@ pub enum TypeError {
 struct TypeChecker<'a> {
     type_interner: &'a mut TypeInterner,
     types: &'a mut HashMap<NodeId, TypeToken>,
-
-    unary_ops: HashMap<(UnaryOpKind, TypeToken), TypeToken>,
-    binary_ops: HashMap<(BinaryOpKind, TypeToken, TypeToken), TypeToken>,
 
     // Set of type pairs that encodes allowed type casts. For example, from int to bool
     valid_casts: HashSet<(TypeToken, TypeToken)>,
@@ -70,42 +65,11 @@ impl TypeChecker<'_> {
         let int_type = type_interner.add(&Type::Int);
         let bool_type = type_interner.add(&Type::Bool);
 
-        use BinaryOpKind::*;
-        use UnaryOpKind::*;
-
-        let unary_ops = HashMap::from([
-            ((Negate, int_type), int_type),
-            ((Not, bool_type), bool_type),
-            ((Not, int_type), int_type),
-        ]);
-
-        let binary_ops = HashMap::from([
-            ((Add, int_type, int_type), int_type),
-            ((Sub, int_type, int_type), int_type),
-            ((Mul, int_type, int_type), int_type),
-            ((Div, int_type, int_type), int_type),
-            ((LessThan, int_type, int_type), bool_type),
-            ((LessEquals, int_type, int_type), bool_type),
-            ((GreaterThan, int_type, int_type), bool_type),
-            ((GreaterEquals, int_type, int_type), bool_type),
-            ((Equals, int_type, int_type), bool_type),
-            ((Equals, bool_type, bool_type), bool_type),
-            ((NotEquals, int_type, int_type), bool_type),
-            ((NotEquals, bool_type, bool_type), bool_type),
-            ((LogicalAnd, bool_type, bool_type), bool_type),
-            ((LogicalOr, bool_type, bool_type), bool_type),
-            ((BitwiseAnd, int_type, int_type), int_type),
-            ((BitwiseOr, int_type, int_type), int_type),
-            ((Xor, int_type, int_type), int_type),
-        ]);
-
         let valid_casts = HashSet::from([(int_type, bool_type), (bool_type, int_type)]);
 
         TypeChecker {
             type_interner,
             types,
-            unary_ops,
-            binary_ops,
             valid_casts,
             scopes: Vec::new(),
             type_errors: Vec::new(),
@@ -202,7 +166,8 @@ impl TypeChecker<'_> {
                 } => {
                     let return_type_token = *self.types.get(&return_type.id).unwrap();
 
-                    self.expected_return_type = Some(return_type_token).filter(|tt| *tt != self.void_type);
+                    self.expected_return_type =
+                        Some(return_type_token).filter(|tt| *tt != self.void_type);
 
                     self.visit_function(name, params, return_type, body);
                 }
@@ -272,6 +237,7 @@ impl TypeChecker<'_> {
                 self.scopes
                     .push(TypedScope::LetBinding(name.sym, type_of_ty));
             }
+            /*
             Assign { name, val } => {
                 let res = self.visit_expr(val);
 
@@ -287,12 +253,12 @@ impl TypeChecker<'_> {
                     });
                 }
             }
+            */
             Expr(e) => {
                 if let Err(err) = self.visit_expr(e) {
                     self.type_errors.push(err);
                 }
             }
-            Block(b) | Loop(b) => self.visit_block(b),
             If {
                 cond,
                 then,
@@ -312,23 +278,13 @@ impl TypeChecker<'_> {
                     self.visit_block(otherwise);
                 }
             }
-            Return(Some(e)) => {
-                match self.visit_expr(e) {
-                    Err(err) => self.type_errors.push(err),
-                    Ok(tt) => self.verify_return_type(Some(tt)),
-                }
-            }
-            Return(None) => { self.verify_return_type(None) }
-            Empty | Break | Continue => (),
+            Return(Some(e)) => match self.visit_expr(e) {
+                Err(err) => self.type_errors.push(err),
+                Ok(tt) => self.verify_return_type(Some(tt)),
+            },
+            Return(None) => self.verify_return_type(None),
+            Break | Continue => (),
         }
-    }
-
-    fn is_unary_op_legal(&self, op: &UnaryOpKind, ty: &TypeToken) -> bool {
-        self.unary_ops.get(&(*op, *ty)).is_some()
-    }
-
-    fn is_binary_op_legal(&self, op: &BinaryOpKind, lhs: &TypeToken, rhs: &TypeToken) -> bool {
-        self.binary_ops.get(&(*op, *lhs, *rhs)).is_some()
     }
 
     fn visit_expr(&mut self, expression: &Expr) -> Result<TypeToken, TypeError> {
@@ -348,6 +304,13 @@ impl TypeChecker<'_> {
 
                 cast_ty_token
             }
+            BuiltinOp { op, args } => match op {
+                crate::ast::BuiltinOp::Equals => {
+                    todo!()
+                }
+                _ => todo!(),
+            },
+            /*
             UnaryOp { op, e } => {
                 let ty = self.visit_expr(e)?;
 
@@ -386,6 +349,8 @@ impl TypeChecker<'_> {
 
                 *return_type
             }
+            */
+            _ => todo!(),
         };
 
         // Save the type for this AST node.

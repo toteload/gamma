@@ -72,4 +72,30 @@ fn fac(n: int) -> int {
 		set n = n - 1;
 	}
 }
+
+fn fac(n: int): int {
+	let res: int = 1
+	let n: int = n
+	
+	loop {
+		if (= n 0) {
+			return res
+		}
+
+		set res = (* res n)
+		set n = (- n 1)
+	}
+}
+
+fn fib(n: int): int {
+	if (or (= n 0) (= n 1)) {
+		return 1
+	} else {
+		 return (+ (fib (- n 1)) (fib (- n 2)))
+	}
+}
+
+fn main() -> int {
+	let x: bool = false let n: int = (cast []int x)
+}
 ```

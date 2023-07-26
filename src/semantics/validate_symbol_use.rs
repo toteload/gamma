@@ -93,12 +93,7 @@ impl Visitor for Analyser<'_> {
                 self.visit_expr(init);
                 self.scopes.last_mut().unwrap().insert(name.sym);
             }
-            Assign { name, val } => {
-                self.validate_sym(&name.sym, &stmt.id);
-                self.visit_expr(val);
-            }
             Expr(e) => self.visit_expr(e),
-            Block(b) => self.visit_block(b),
             If {
                 cond,
                 then,
@@ -110,9 +105,8 @@ impl Visitor for Analyser<'_> {
                     self.visit_block(otherwise);
                 }
             }
-            Loop(body) => self.visit_block(body),
             Return(Some(e)) => self.visit_expr(e),
-            Empty | Break | Continue | Return(None) => (),
+            Break | Continue | Return(None) => (),
         }
     }
 
@@ -122,11 +116,12 @@ impl Visitor for Analyser<'_> {
         match &e.kind {
             IntLiteral(_) | BoolLiteral(_) => (),
             Identifier(sym) => self.validate_sym(sym, &e.id),
-            UnaryOp { e, .. } | Cast { e, .. } => self.visit_expr(e),
-            BinaryOp { lhs, rhs, .. } => {
-                self.visit_expr(lhs);
-                self.visit_expr(rhs);
+            BuiltinOp { args, .. } => {
+                for arg in args {
+                    self.visit_expr(arg);
+                }
             }
+            Cast { e, .. } => self.visit_expr(e),
             Call { name, args } => {
                 self.validate_sym(&name.sym, &e.id);
 

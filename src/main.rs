@@ -62,10 +62,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let source = "
 fn main() -> int { 
-    if cast(int, false) == 0 {
-        return 1;
+    if (== (cast int false) 0) {
+        return 1
     } else {
-        return 0;
+        return 0
     }
 }";
 

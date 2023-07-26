@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::source_location::SourceSpan;
 use crate::string_interner::StringInterner;
-use crate::tokenizer::{Token, TokenKind, Tokenizer};
+use crate::tokenizer::{TokenKind, Tokenizer};
 use std::collections::HashMap;
 use std::iter::Peekable;
 
@@ -24,8 +24,6 @@ impl std::error::Error for ParseError {}
 pub struct Parser<'a> {
     tokens: Peekable<Tokenizer<'a>>,
     id_generator: &'a mut NodeIdGenerator,
-
-    binary_ops: HashMap<TokenKind, (u32, BinaryOpKind)>,
 
     // TODO: Use the `nohash-hasher` Hasher, if this turns out to be kinda slow.
     spans: &'a mut HashMap<NodeId, SourceSpan>,
@@ -55,30 +53,9 @@ impl Parser<'_> {
         id_generator: &'a mut NodeIdGenerator,
         spans: &'a mut HashMap<NodeId, SourceSpan>,
     ) -> Parser<'a> {
-        use TokenKind::*;
-
-        let binary_ops = HashMap::from([
-            (Star, (40, BinaryOpKind::Mul)),
-            (Div, (40, BinaryOpKind::Div)),
-            (Plus, (20, BinaryOpKind::Add)),
-            (Minus, (20, BinaryOpKind::Sub)),
-            (BitwiseAnd, (20, BinaryOpKind::BitwiseAnd)),
-            (BitwiseOr, (20, BinaryOpKind::BitwiseOr)),
-            (Xor, (20, BinaryOpKind::Xor)),
-            (CmpEq, (10, BinaryOpKind::Equals)),
-            (CmpNe, (10, BinaryOpKind::NotEquals)),
-            (CmpLt, (10, BinaryOpKind::LessThan)),
-            (CmpGt, (10, BinaryOpKind::GreaterThan)),
-            (CmpLe, (10, BinaryOpKind::LessEquals)),
-            (CmpGe, (10, BinaryOpKind::GreaterEquals)),
-            (LogicalAnd, (5, BinaryOpKind::LogicalAnd)),
-            (LogicalOr, (5, BinaryOpKind::LogicalOr)),
-        ]);
-
         Parser {
             tokens: Tokenizer::new(source, string_interner).peekable(),
             id_generator,
-            binary_ops,
             spans,
         }
     }
@@ -154,7 +131,10 @@ impl Parser<'_> {
     fn parse_type(&mut self) -> Result<Type> {
         use TokenKind::*;
 
-        let ty = expect_token!(self.tokens.next(), Identifier(_) | KeywordInt | KeywordVoid | KeywordBool)?;
+        let ty = expect_token!(
+            self.tokens.next(),
+            Identifier(_) | KeywordInt | KeywordVoid | KeywordBool
+        )?;
 
         let kind = match ty.kind {
             KeywordInt => TypeKind::Int,
@@ -240,10 +220,17 @@ impl Parser<'_> {
         use StatementKind::*;
         use TokenKind::*;
 
-        let tok = expect_token!(self.tokens.next(), _)?;
-
         let id = self.gen_node_id();
         let span: SourceSpan;
+
+        let tok = *expect_token!(self.tokens.peek(), _)?;
+
+        if matches!(
+            tok.kind,
+            KeywordLet | KeywordLoop | KeywordIf | KeywordBreak | KeywordContinue | KeywordReturn
+        ) {
+            self.tokens.next();
+        }
 
         let kind = match tok.kind {
             KeywordLet => {
@@ -261,7 +248,6 @@ impl Parser<'_> {
 
                 Let { name, ty, init }
             }
-            KeywordLoop => todo!(),
             KeywordIf => {
                 let cond: Box<_> = self.parse_expression()?.into();
 
@@ -297,7 +283,6 @@ impl Parser<'_> {
                 span = tok.span;
                 Continue
             }
-            Semicolon => { span = tok.span; Empty },
             KeywordReturn => {
                 let tok2 = expect_token!(self.tokens.peek(), _)?;
                 if matches!(tok2.kind, Semicolon) {
@@ -309,29 +294,119 @@ impl Parser<'_> {
                     Return(Some(return_value.into()))
                 }
             }
-            BraceOpen => todo!("Block statement"),
-            _ => todo!(),
+            _ => {
+                let e = self.parse_expression()?;
+                span = *self.spans.get(&e.id).unwrap();
+                Expr(e.into())
+            }
         };
 
         self.spans.insert(id, span);
-
-        let requires_semicolon = match kind {
-            If { .. } | Loop(_) => false,
-            _ => true,
-        };
-
-        if requires_semicolon {
-            expect_token!(self.tokens.next(), Semicolon)?;
-        }
 
         Ok(Statement { id, kind })
     }
 
     fn parse_expression(&mut self) -> Result<Expr> {
-        let lhs = self.parse_expression_element()?;
-        self.parse_binop_expression(0, lhs)
+        use TokenKind::*;
+
+        let id = self.gen_node_id();
+        let span: SourceSpan;
+
+        let tok = expect_token!(self.tokens.next(), _)?;
+
+        let kind = match tok.kind {
+            IntLiteral(x) => {
+                span = tok.span;
+                ExprKind::IntLiteral(x)
+            }
+            BoolLiteral(x) => {
+                span = tok.span;
+                ExprKind::BoolLiteral(x)
+            }
+            Identifier(sym) => todo!(),
+            ParenOpen => {
+                let start_span = tok.span;
+
+                let tok = expect_token!(self.tokens.next(), _)?;
+
+                let e = match tok.kind {
+                    KeywordCast => {
+                        let ty = self.parse_type()?;
+                        let e = self.parse_expression()?;
+                        ExprKind::Cast { ty, e: e.into() }
+                    }
+
+                    // Builtin operators that always need two operands
+                    op @ (KeywordOr | KeywordAnd | KeywordXor | Star | Div | CmpEq | CmpNe
+                    | CmpLt | CmpGt | CmpLe | CmpGe) => {
+                        let x = self.parse_expression()?;
+                        let y = self.parse_expression()?;
+
+                        let op = match op {
+                            CmpEq => BuiltinOp::Equals,
+                            _ => todo!(),
+                        };
+
+                        ExprKind::BuiltinOp {
+                            op,
+                            args: vec![x, y],
+                        }
+                    }
+
+                    KeywordNot => {
+                        let x = self.parse_expression()?;
+
+                        ExprKind::BuiltinOp {
+                            op: BuiltinOp::Not,
+                            args: vec![x],
+                        }
+                    }
+
+                    op @ (Minus | Plus) => {
+                        let x = self.parse_expression()?;
+
+                        let op = match op {
+                            Minus => BuiltinOp::Sub,
+                            Plus => BuiltinOp::Add,
+                            _ => unreachable!(),
+                        };
+
+                        let peeked = expect_token!(self.tokens.peek(), _)?;
+                        if matches!(peeked.kind, ParenClose) {
+                            ExprKind::BuiltinOp { op, args: vec![x] }
+                        } else {
+                            let y = self.parse_expression()?;
+                            ExprKind::BuiltinOp {
+                                op,
+                                args: vec![x, y],
+                            }
+                        }
+                    }
+
+                    // Function call
+                    Identifier(sym) => {
+                        todo!()
+                    }
+
+                    _ => todo!(),
+                };
+
+                let end_token = expect_token!(self.tokens.next(), ParenClose)?;
+
+                span = start_span.extend(&end_token.span);
+
+                e
+            }
+            _ => todo!(),
+        };
+
+        // TODO register the span for this expression
+        self.spans.insert(id, span);
+
+        Ok(Expr { id, kind })
     }
 
+    /*
     fn parse_expression_element(&mut self) -> Result<Expr> {
         use TokenKind::*;
 
@@ -490,7 +565,7 @@ impl Parser<'_> {
             };
         }
     }
+    */
 }
 
-mod tests {
-}
+mod tests {}

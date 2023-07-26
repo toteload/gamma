@@ -160,7 +160,6 @@ impl<'ctx> CodeGenerator<'ctx> {
                     }
                 }
             }
-            StatementKind::Empty => (),
             _ => todo!(),
         }
 
@@ -199,6 +198,14 @@ impl<'ctx> CodeGenerator<'ctx> {
                     _ => todo!(),
                 }
             }
+            ExprKind::BuiltinOp { op, args } => match op {
+                BuiltinOp::Not => {
+                    let x = self.gen_expr(env, &args[0])?;
+                    Ok(self.builder.build_not(x.into_int_value(), "").into())
+                }
+                _ => todo!(),
+            },
+            /*
             ExprKind::BinaryOp { op, lhs, rhs } => {
                 let lhs = self.gen_expr(env, lhs)?;
                 let rhs = self.gen_expr(env, rhs)?;
@@ -241,6 +248,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     _ => todo!(),
                 }
             }
+            */
             _ => todo!(),
         }
     }
