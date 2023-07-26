@@ -298,7 +298,7 @@ impl TypeChecker<'_> {
                     self.type_errors.push(err);
                 }
             }
-            Empty | Break | Continue | Trap | Return(None) => (),
+            Empty | Break | Continue | Return(None) => (),
         }
     }
 

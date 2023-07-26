@@ -279,12 +279,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 78,
+        line: 2,
+        col: 1,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 80,
+        line: 2,
+        col: 3,
       ),
     ),
     kind: KeywordInt,
@@ -292,12 +292,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 82,
+        line: 2,
+        col: 5,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 83,
+        line: 2,
+        col: 6,
       ),
     ),
     kind: LogicalAnd,
@@ -305,12 +305,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 84,
+        line: 2,
+        col: 7,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 84,
+        line: 2,
+        col: 7,
       ),
     ),
     kind: BitwiseAnd,
@@ -318,12 +318,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 86,
+        line: 2,
+        col: 9,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 87,
+        line: 2,
+        col: 10,
       ),
     ),
     kind: CmpEq,
@@ -331,12 +331,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 89,
+        line: 2,
+        col: 12,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 89,
+        line: 2,
+        col: 12,
       ),
     ),
     kind: Xor,
@@ -344,12 +344,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 91,
+        line: 2,
+        col: 14,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 91,
+        line: 2,
+        col: 14,
       ),
     ),
     kind: BitwiseAnd,
@@ -357,12 +357,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 93,
+        line: 2,
+        col: 16,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 93,
+        line: 2,
+        col: 16,
       ),
     ),
     kind: BitwiseOr,
@@ -370,12 +370,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 95,
+        line: 2,
+        col: 18,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 96,
+        line: 2,
+        col: 19,
       ),
     ),
     kind: LogicalOr,
@@ -383,12 +383,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 98,
+        line: 2,
+        col: 21,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 98,
+        line: 2,
+        col: 21,
       ),
     ),
     kind: Not,
@@ -396,12 +396,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 99,
+        line: 2,
+        col: 22,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 99,
+        line: 2,
+        col: 22,
       ),
     ),
     kind: Not,
@@ -409,12 +409,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 101,
+        line: 2,
+        col: 24,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 101,
+        line: 2,
+        col: 24,
       ),
     ),
     kind: Div,
@@ -422,12 +422,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 103,
+        line: 2,
+        col: 26,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 104,
+        line: 2,
+        col: 27,
       ),
     ),
     kind: CmpNe,
@@ -435,12 +435,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 106,
+        line: 2,
+        col: 29,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 107,
+        line: 2,
+        col: 30,
       ),
     ),
     kind: CmpGe,
@@ -448,12 +448,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 109,
+        line: 2,
+        col: 32,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 110,
+        line: 2,
+        col: 33,
       ),
     ),
     kind: CmpLe,
@@ -461,12 +461,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 112,
+        line: 2,
+        col: 35,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 112,
+        line: 2,
+        col: 35,
       ),
     ),
     kind: CmpLt,
@@ -474,12 +474,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 114,
+        line: 2,
+        col: 37,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 114,
+        line: 2,
+        col: 37,
       ),
     ),
     kind: CmpGt,
@@ -487,12 +487,12 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 116,
+        line: 2,
+        col: 39,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 119,
+        line: 2,
+        col: 42,
       ),
     ),
     kind: BoolLiteral(true),
@@ -500,14 +500,79 @@ expression: tokens
   Token(
     span: SourceSpan(
       start: SourceLocation(
-        line: 1,
-        col: 121,
+        line: 2,
+        col: 44,
       ),
       end: SourceLocation(
-        line: 1,
-        col: 125,
+        line: 2,
+        col: 48,
       ),
     ),
     kind: BoolLiteral(false),
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 2,
+        col: 50,
+      ),
+      end: SourceLocation(
+        line: 2,
+        col: 53,
+      ),
+    ),
+    kind: KeywordLoop,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 2,
+        col: 55,
+      ),
+      end: SourceLocation(
+        line: 2,
+        col: 59,
+      ),
+    ),
+    kind: KeywordBreak,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 2,
+        col: 61,
+      ),
+      end: SourceLocation(
+        line: 2,
+        col: 64,
+      ),
+    ),
+    kind: KeywordBool,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 2,
+        col: 66,
+      ),
+      end: SourceLocation(
+        line: 2,
+        col: 68,
+      ),
+    ),
+    kind: KeywordInt,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 2,
+        col: 70,
+      ),
+      end: SourceLocation(
+        line: 2,
+        col: 73,
+      ),
+    ),
+    kind: KeywordVoid,
   ),
 ]

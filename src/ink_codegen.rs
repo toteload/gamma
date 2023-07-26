@@ -2,7 +2,7 @@ use crate::ast::*;
 use crate::env::Env as GenericEnv;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::types::{Type, TypeInterner, TypeToken};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
@@ -14,6 +14,7 @@ use inkwell::{
     IntPredicate,
 };
 use std::collections::HashMap;
+use std::path::Path;
 
 type Env<'a, 'ctx> = GenericEnv<'a, Symbol, AnyValueEnum<'ctx>>;
 
@@ -24,7 +25,6 @@ pub struct CodeGenerator<'ctx> {
     current_function: Option<FunctionValue<'ctx>>,
 
     i64_t: IntType<'ctx>,
-    trap_intrinsic: FunctionValue<'ctx>,
 
     symbols: &'ctx StringInterner,
     node_types: &'ctx HashMap<NodeId, TypeToken>,
@@ -40,9 +40,6 @@ impl<'ctx> CodeGenerator<'ctx> {
     ) -> Self {
         let module = ctx.create_module("main");
 
-        let trap_function_type = ctx.void_type().fn_type(&[], false);
-        let trap_intrinsic = module.add_function("llvm.trap", trap_function_type, None);
-
         Self {
             ctx,
             builder: ctx.create_builder(),
@@ -50,7 +47,6 @@ impl<'ctx> CodeGenerator<'ctx> {
             current_function: None,
 
             i64_t: ctx.i64_type(),
-            trap_intrinsic,
 
             symbols,
             node_types,
@@ -96,15 +92,18 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
-    fn gen_block(&self, env: &Env, block: &Block) -> Result<()> {
+    fn gen_block(&self, env: &Env, block: &Block) -> Result<bool> {
         for statement in &block.statements {
-            self.gen_statement(&env, statement)?;
+            let is_return = self.gen_statement(&env, statement)?;
+            if is_return {
+                return Ok(true);
+            }
         }
 
-        Ok(())
+        Ok(false)
     }
 
-    fn gen_statement(&self, env: &Env, stmt: &Statement) -> Result<()> {
+    fn gen_statement(&self, env: &Env, stmt: &Statement) -> Result<bool> {
         match &stmt.kind {
             StatementKind::Return(Some(e)) => {
                 let val = self.gen_expr(env, e)?;
@@ -129,26 +128,43 @@ impl<'ctx> CodeGenerator<'ctx> {
                     otherwise_block,
                 );
 
+                let mut branch_return_count = 0u32;
+
                 self.builder.position_at_end(then_block);
-                self.gen_block(env, then)?;
-                self.builder.build_unconditional_branch(end_block);
+                let contained_return = self.gen_block(env, then)?;
+
+                if !contained_return {
+                    self.builder.build_unconditional_branch(end_block);
+                }
+
+                branch_return_count += contained_return as u32;
 
                 self.builder.position_at_end(otherwise_block);
                 if let Some(otherwise) = otherwise {
-                    self.gen_block(env, otherwise)?;
-                }
-                self.builder.build_unconditional_branch(end_block);
+                    let contained_return = self.gen_block(env, otherwise)?;
+                    if !contained_return {
+                        self.builder.build_unconditional_branch(end_block);
+                    }
 
-                self.builder.position_at_end(end_block);
+                    branch_return_count += contained_return as u32;
+                } else {
+                    self.builder.build_unconditional_branch(end_block);
+                }
+
+                if branch_return_count != 2 {
+                    self.builder.position_at_end(end_block);
+                } else {
+                    let res = unsafe { end_block.delete() };
+                    if let Err(_) = res {
+                        return Err(anyhow!("Error deleting basic block"));
+                    }
+                }
             }
             StatementKind::Empty => (),
-            StatementKind::Trap => {
-                self.builder.build_call(self.trap_intrinsic, &[], "");
-            },
             _ => todo!(),
         }
 
-        Ok(())
+        Ok(matches!(stmt.kind, StatementKind::Return(_)))
     }
 
     fn gen_expr(&self, env: &Env, e: &Expr) -> Result<BasicValueEnum> {
@@ -255,11 +271,33 @@ impl<'ctx> CodeGenerator<'ctx> {
             self.gen_item(&env, item)?;
         }
 
-        //self.module.verify()?;
+        if let Err(s) = self.module.verify() {
+            return Err(anyhow!(s.to_string()));
+        }
 
         let pass_manager: PassManager<Module<'_>> = PassManager::create(());
         pass_manager.add_promote_memory_to_register_pass();
         pass_manager.run_on(&self.module);
+
+        if let Err(s) = self.module.print_to_file(Path::new("./out.ll")) {
+            return Err(anyhow!(s.to_string()));
+        }
+
+        /*
+        Target::initialize_x86(&InitializationConfig::default());
+
+        let target = Target::from_name("x86-64").unwrap();
+        let target_machine = target.create_target_machine(
+            &TargetTriple::create("x86_64-pc-windows-msvc"),
+            "x86-64",
+            "",
+            OptimizationLevel::Default,
+            RelocMode::Default,
+            CodeModel::Default,
+        ).unwrap();
+
+        assert!(target_machine.write_to_file(&self.module, FileType::Object, Path::new("./out")).is_ok());
+        */
 
         Ok(self.module.to_string())
     }

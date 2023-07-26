@@ -112,7 +112,7 @@ impl Visitor for Analyser<'_> {
             }
             Loop(body) => self.visit_block(body),
             Return(Some(e)) => self.visit_expr(e),
-            Empty | Break | Continue | Trap | Return(None) => (),
+            Empty | Break | Continue | Return(None) => (),
         }
     }
 

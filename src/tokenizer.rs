@@ -27,8 +27,6 @@ pub enum TokenKind {
     KeywordInt,
     KeywordBool,
 
-    KeywordTrap,
-
     Identifier(Symbol),
 
     IntLiteral(i64),
@@ -174,7 +172,6 @@ impl<'a> Iterator for Tokenizer<'a> {
                     "bool"     => Token { span, kind: TokenKind::KeywordBool, },
                     "false"    => Token { span, kind: TokenKind::BoolLiteral(false), },
                     "true"     => Token { span, kind: TokenKind::BoolLiteral(true), },
-                    "trap"     => Token { span, kind: TokenKind::KeywordTrap, },
                     _ => {
                         let sym = self.str_interner.add(identifier);
                         Token {
@@ -323,8 +320,6 @@ impl<'a> Iterator for Tokenizer<'a> {
             }
             _ => todo!(),
         };
-
-        println!("{:?}", tok);
 
         Some(tok)
     }

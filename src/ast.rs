@@ -127,7 +127,6 @@ pub enum StatementKind {
     Break,
     Continue,
     Return(Option<Box<Expr>>),
-    Trap,
 }
 
 #[derive(Clone, Debug)]

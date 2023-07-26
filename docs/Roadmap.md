@@ -36,7 +36,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- `&&` `||` `!`
 	- [x] Add tokens
 	- [x] Add to parser and AST.
-- [ ] Add all signed and unsigned integer types. 
+- [x] Add all signed and unsigned integer types. 
 	- Maybe don't do this and only provide `int` at this stage?
 	- I am only allowing `int` at this point, which is a 64-bit signed integer.
 - [x] Add comparison operators
@@ -66,20 +66,25 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- [x] Check if `cast` usage is valid, only allowed to cast between `int` and `bool`
 - [x] Add type casting of int to bool
 	- [x] What kind of syntax?
-		- `cast(bool, 456)` or `456 as bool`. I choose `cast(bool, 456)`; the syntax is easier.
+		- `cast(bool, 456)` or `456 as bool`. I choose `cast(bool, 456)`; the syntax is easier. `(cast bool 456)`
+- [ ] Move tokenizer snapshot test to `tokenizer.rs`
 
 ### Version 0.3
 - [x] Add void.
 - [ ] Change all expressions to be of the form `(op ...)`. This way you don't have to do any operator precedence stuff. Also, there is a clear distinction between statements and expressions.
 - [x] Add `trap` statement to abort the program
 	- [x] Add to codegen
+	- [ ] Remove the `trap` statement
+- [ ] Add `exit` statement to exit the program with an exit code.
+	- [ ] This means the program has a small runtime, similar to C. On Windows `ExitProcess` needs to be called and on Linux `exit`.
+	- This can be used to create programs that check for conditions and exit with a specific code to signal that something is wrong. This can be used in a test suite.
 - [ ] Add user defined functions.
 - [ ] Add `loop`, `break` and `continue`
 	- [ ] Semantic check: `break` and `continue` can only be used inside a loop
 	- [ ] Add optional labels for `loop`. You can `break :label` or `continue :label`.
-- [ ] `main` function must be of the correct type `fn() -> void`.
+- [ ] `main` function must be of the correct type `fn() -> int`.
 - [ ] Add `let` statement.
-	- Variable initialization is optional.
+	- Variable initialization is optional. This can also be skipped, to keep the language simpler.
  - [ ] Add assignment operator
 	 - I am thinking something like `set x = ...;`. This makes parsing super easy, because it starts with a keyword.
 	 - This set syntax may be OK for a Lisp like language, but I don't like it for this C-like language.
@@ -112,6 +117,9 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [ ] Add struct type
 	- [ ] Add struct value syntax so that a struct can be properly initialized.
 - [ ] Add field selection syntax for structs and unions
+
+### Version 0.7
+- [ ] Add global variables
 - [ ] Add `f32` and `f64`
 	- [ ] Add casting between integers and floats.
 	- [ ] Add float constant lexing
@@ -119,16 +127,14 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	 - [ ] Dereferencing a function pointer is illegal.
 	 - [ ] Taking the address of a function is now legal? What is the syntax of getting the address of a function?
 
-### Version 0.7
-- [ ] Add global variables
-- [ ] Add string type
-
 ### Version 0.8
+- [ ] Add string type
 - [ ] Add IO functions to `std` module 
 	- [ ] Console reading and writing
 	- [ ] File reading and writing.
 
 ### Version 0.9
+- [ ] Add more integer types to allow interfacing over FFI
 - [ ] Add calling external functions (FFI).
 
 ### Version 1.0

@@ -298,7 +298,6 @@ impl Parser<'_> {
                 Continue
             }
             Semicolon => { span = tok.span; Empty },
-            KeywordTrap => { span = tok.span; Trap },
             KeywordReturn => {
                 let tok2 = expect_token!(self.tokens.peek(), _)?;
                 if matches!(tok2.kind, Semicolon) {
@@ -491,4 +490,7 @@ impl Parser<'_> {
             };
         }
     }
+}
+
+mod tests {
 }
