@@ -13,14 +13,12 @@ pub struct Token {
 #[derive(strum_macros::IntoStaticStr, Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize)]
 pub enum TokenKind {
     KeywordFn,
-
     KeywordIf,
     KeywordElse,
     KeywordLoop,
     KeywordBreak,
     KeywordContinue,
     KeywordReturn,
-
     KeywordLet,
     KeywordSet,
     KeywordCast,
@@ -29,6 +27,16 @@ pub enum TokenKind {
     KeywordAnd,
     KeywordNot,
     KeywordXor,
+
+    BitwiseOr,
+    BitwiseAnd,
+
+    Equal,
+    NotEqual,
+    LessEqual,
+    Less,
+    GreaterEqual,
+    Greater,
 
     KeywordVoid,
     KeywordInt,
@@ -58,13 +66,6 @@ pub enum TokenKind {
     Minus,
     Plus,
     Div,
-
-    CmpEq,
-    CmpNe,
-    CmpLt,
-    CmpGt,
-    CmpLe,
-    CmpGe,
 }
 
 pub struct Tokenizer<'a> {
@@ -164,13 +165,24 @@ impl<'a> Iterator for Tokenizer<'a> {
                     "let"      => Token { span, kind: TokenKind::KeywordLet, },
                     "set"      => Token { span, kind: TokenKind::KeywordSet, },
                     "cast"     => Token { span, kind: TokenKind::KeywordCast, },
+
                     "and"      => Token { span, kind: TokenKind::KeywordAnd, },
                     "or"       => Token { span, kind: TokenKind::KeywordOr, },
                     "not"      => Token { span, kind: TokenKind::KeywordNot, },
                     "xor"      => Token { span, kind: TokenKind::KeywordXor, },
+                    "bor"      => Token { span, kind: TokenKind::BitwiseOr, },
+                    "band"     => Token { span, kind: TokenKind::BitwiseAnd, },
+                    "eq"       => Token { span, kind: TokenKind::Equal, },
+                    "ne"       => Token { span, kind: TokenKind::NotEqual, },
+                    "le"       => Token { span, kind: TokenKind::LessEqual, },
+                    "lt"       => Token { span, kind: TokenKind::Less, },
+                    "ge"       => Token { span, kind: TokenKind::GreaterEqual, },
+                    "gt"       => Token { span, kind: TokenKind::Greater, },
+
                     "void"     => Token { span, kind: TokenKind::KeywordVoid, },
                     "int"      => Token { span, kind: TokenKind::KeywordInt, },
                     "bool"     => Token { span, kind: TokenKind::KeywordBool, },
+
                     "false"    => Token { span, kind: TokenKind::BoolLiteral(false), },
                     "true"     => Token { span, kind: TokenKind::BoolLiteral(true), },
                     _ => {
@@ -220,48 +232,12 @@ impl<'a> Iterator for Tokenizer<'a> {
 
             ',' => Token { span: SourceSpan::single(start), kind: TokenKind::Comma, },
 
-            '=' => {
-                if let Some('=') = self.iter.peek() {
-                    let (_, end, _) = self.advance().unwrap();
-                    Token {
-                        span: SourceSpan { start, end },
-                        kind: TokenKind::CmpEq,
-                    }
-                } else {
+            '=' => 
                     Token { span: SourceSpan::single(start), kind: TokenKind::Equals, }
-                }
-            },
+            ,
             '*' => Token { span: SourceSpan::single(start), kind: TokenKind::Star, },
             '+' => Token { span: SourceSpan::single(start), kind: TokenKind::Plus, },
             '/' => Token { span: SourceSpan::single(start), kind: TokenKind::Div, },
-            '>' => {
-                if let Some('=') = self.iter.peek() {
-                    let (_, end, _) = self.advance().unwrap();
-                    Token {
-                        span: SourceSpan { start, end },
-                        kind: TokenKind::CmpGe,
-                    }
-                } else {
-                    Token {
-                        span: SourceSpan::single(start),
-                        kind: TokenKind::CmpGt,
-                    }
-                }
-            },
-            '<' => {
-                if let Some('=') = self.iter.peek() {
-                    let (_, end, _) = self.advance().unwrap();
-                    Token {
-                        span: SourceSpan { start, end },
-                        kind: TokenKind::CmpLe,
-                    }
-                } else {
-                    Token {
-                        span: SourceSpan::single(start),
-                        kind: TokenKind::CmpLt,
-                    }
-                }
-            },
             '-' => {
                 if let Some('>') = self.iter.peek() {
                     let (_, end, _) = self.advance().unwrap();
@@ -276,18 +252,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     }
                 }
             }
-            '!' => {
-                if let Some('=') = self.iter.peek() {
-                    let (_, end, _) = self.advance().unwrap();
-                    Token {
-                        span: SourceSpan { start, end },
-                        kind: TokenKind::CmpNe,
-                    }
-                } else {
-                    todo!()
-                }
-            },
-            _ => todo!(),
+            _ => todo!("Character '{}' not recognized", c),
         };
 
         Some(tok)
@@ -303,7 +268,7 @@ mod tests {
     #[test]
     fn tokenizer_creates_the_expected_tokens() {
         let source = "fn if else + - * ; : { } ( ) void let voidlet 4687 continue return->,=       
-            int &&& == ^ & | || !! / != >= <= < > true false loop break bool int void ";
+            int eq / ne ge le lt gt true false loop break bool int void ";
 
         let mut symbols = StringInterner::new();
         let tokenizer = Tokenizer::new(source, &mut symbols);

@@ -1,0 +1,17 @@
+fn fac(n: int) -> int {
+    let acc: int
+    set acc 1
+
+    loop {
+        if (<= n 1) {
+            return acc
+        }
+
+        set acc (* acc n)
+        set n (- n 1)
+    }
+}
+
+fn main() -> int {
+    return (fac 10)
+}

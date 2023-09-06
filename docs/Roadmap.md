@@ -73,7 +73,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 
 ### Version 0.3
 - [x] Add void.
-- [ ] Change all expressions to be of the form `(op ...)`. This way you don't have to do any operator precedence stuff. Also, there is a clear distinction between statements and expressions.
+- [x] Change all expressions to be of the form `(op ...)`. This way you don't have to do any operator precedence stuff. Also, there is a clear distinction between statements and expressions.
 - [x] Add `trap` statement to abort the program
 	- [x] Add to codegen
 	- [x] Remove the `trap` statement

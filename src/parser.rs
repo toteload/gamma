@@ -337,13 +337,13 @@ impl Parser<'_> {
                     }
 
                     // Builtin operators that always need two operands
-                    op @ (KeywordOr | KeywordAnd | KeywordXor | Star | Div | CmpEq | CmpNe
-                    | CmpLt | CmpGt | CmpLe | CmpGe) => {
+                    op @ (KeywordOr | KeywordAnd | KeywordXor | Star | Div | Equal | NotEqual
+                    | Less | Greater | LessEqual | GreaterEqual) => {
                         let x = self.parse_expression()?;
                         let y = self.parse_expression()?;
 
                         let op = match op {
-                            CmpEq => BuiltinOp::Equals,
+                            Equal => BuiltinOp::Equals,
                             _ => todo!(),
                         };
 
