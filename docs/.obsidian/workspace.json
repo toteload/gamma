@@ -13,13 +13,26 @@
             "state": {
               "type": "markdown",
               "state": {
+                "file": "Index.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
+            "id": "ad126c23dd2dc277",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
                 "file": "Roadmap.md",
                 "mode": "source",
                 "source": false
               }
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -69,7 +82,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 200
   },
   "right": {
     "id": "9634869b335e3c84",
@@ -146,10 +159,10 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "50d97cb02104b8fc",
+  "active": "ad126c23dd2dc277",
   "lastOpenFiles": [
     "Index.md",
-    "Roadmap.md",
-    "Nice to haves.md"
+    "Nice to haves.md",
+    "Roadmap.md"
   ]
 }

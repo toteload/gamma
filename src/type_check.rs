@@ -35,6 +35,7 @@ pub enum TypeError {
         received: (TypeToken, NodeId),
     },
     IfConditionMustBeBool(NodeId),
+    ArgumentsMustHaveIdenticalType(NodeId),
     InvalidCast,
     IncorrectReturnType,
 }
@@ -306,7 +307,14 @@ impl TypeChecker<'_> {
             }
             BuiltinOp { op, args } => match op {
                 crate::ast::BuiltinOp::Equals => {
-                    todo!()
+                    let arg_types = args.iter().map(|arg| self.visit_expr(arg)).collect::<Result<Vec<_>, _>>()?;
+                    let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
+
+                    if !args_are_of_same_type {
+                        return Err(TypeError::ArgumentsMustHaveIdenticalType(expression.id));
+                    }
+
+                    self.bool_type
                 }
                 _ => todo!(),
             },

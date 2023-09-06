@@ -203,6 +203,14 @@ impl<'ctx> CodeGenerator<'ctx> {
                     let x = self.gen_expr(env, &args[0])?;
                     Ok(self.builder.build_not(x.into_int_value(), "").into())
                 }
+                BuiltinOp::Equals => {
+                    // For now only support two operands at a time
+                    assert_eq!(args.len(), 2);
+
+                    let x = self.gen_expr(env, &args[0])?;
+                    let y = self.gen_expr(env, &args[1])?;
+                    Ok(self.builder.build_int_compare(IntPredicate::EQ, x.into_int_value(), y.into_int_value(), "").into())
+                },
                 _ => todo!(),
             },
             /*

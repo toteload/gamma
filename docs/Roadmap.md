@@ -56,7 +56,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	 - [ ] Add modulo
 - Semantics checker 
 	- [x] Verify that all used names are defined.
-	- [ ] Disallow functions with the same name. This is more of a nice to have.
+	- [ ] Disallow functions with the same name. This is away from the happy flow :) so not important now
 - [x] Add `if`/`else` statement.
 - [x] Type check return type.
 - [ ] Add control flow analysis.
@@ -84,13 +84,14 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [ ] Add `loop`, `break` and `continue`
 	- [ ] Semantic check: `break` and `continue` can only be used inside a loop
 	- [ ] Add optional labels for `loop`. You can `break :label` or `continue :label`.
+	- `loop :main { break :main }`
 - [ ] `main` function must be of the correct type `fn() -> int`.
 - [ ] Add `let` statement.
-	- Variable initialization is optional. This can also be skipped, to keep the language simpler.
+	- Variable initialization is optional. This can also be skipped entirely, to keep the language simpler.
  - [ ] Add assignment operator
 	 - I am thinking something like `set x = ...;`. This makes parsing super easy, because it starts with a keyword.
 	 - This set syntax may be OK for a Lisp like language, but I don't like it for this C-like language.
-	 - And when I think about it now; I do like it again!
+	 - And when I think about it now; I do like it again! This way all statements start with a unique keyword
 - [ ] `void` can only be used as the return type of a function
 - Testing
 	- [ ] Set up a way to run generated programs and compare output.
@@ -109,6 +110,10 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- `[128]T` or `[T:128]`. I prefer the first.
 	- [ ] Add indexing operator.
 	- [ ] Indexing is only allowed on arrays and pointers, and can only be indexed by integers.
+
+### Version 0.4.1
+- [ ] Start development of Tetris game in parallel to the compiler. Let the needs of the game steer the development direction of the compiler.
+- [ ] Add functionality for calling externally defined C functions.
 
 ### Version 0.5
 - [ ] Add modules

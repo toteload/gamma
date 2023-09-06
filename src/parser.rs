@@ -385,7 +385,7 @@ impl Parser<'_> {
 
                     // Function call
                     Identifier(sym) => {
-                        todo!()
+                        todo!("Function calls are not implemented yet")
                     }
 
                     _ => todo!(),
