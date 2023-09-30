@@ -15,11 +15,14 @@
 - Bitwise operators:
 	- `band`
 	- `bor`
-	- `xor`
-	- `not`
+	- `bxor`
+	- `bnot`
 - Arithmetic operators:
 	- `-`
 	- `+`
 	- `*`
 	- `/`
- 
+ - Pointer and array operators
+	 - Taking address of `x` is `(& x)`
+	 - Dereferencing a pointer `p` is `(@ p)`
+	 - Indexing an array is `xs` at index 8 is `(@ xs 8)`

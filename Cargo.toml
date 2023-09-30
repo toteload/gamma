@@ -22,6 +22,3 @@ opt-level = 3
 
 [profile.dev.package.similar]
 opt-level = 3
-
-[profile.dev.package.inkwell]
-opt-level = 3

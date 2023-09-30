@@ -31,6 +31,7 @@ pub enum TokenKind {
     BitwiseOr,
     BitwiseAnd,
 
+    // TODO call these keywords?
     Equal,
     NotEqual,
     LessEqual,
@@ -60,7 +61,7 @@ pub enum TokenKind {
 
     Comma,
 
-    Equals,
+    EqualSign,
 
     Star,
     Minus,
@@ -107,7 +108,9 @@ impl<'a> Tokenizer<'a> {
 
     fn skip_whitespace(&mut self) {
         loop {
-            let Some(c) = self.iter.peek() else { break; };
+            let Some(c) = self.iter.peek() else {
+                break;
+            };
 
             if !c.is_whitespace() {
                 break;
@@ -232,9 +235,8 @@ impl<'a> Iterator for Tokenizer<'a> {
 
             ',' => Token { span: SourceSpan::single(start), kind: TokenKind::Comma, },
 
-            '=' => 
-                    Token { span: SourceSpan::single(start), kind: TokenKind::Equals, }
-            ,
+            '=' => Token { span: SourceSpan::single(start), kind: TokenKind::EqualSign, },
+
             '*' => Token { span: SourceSpan::single(start), kind: TokenKind::Star, },
             '+' => Token { span: SourceSpan::single(start), kind: TokenKind::Plus, },
             '/' => Token { span: SourceSpan::single(start), kind: TokenKind::Div, },

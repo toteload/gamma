@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::compiler::{Context, PrintableError};
 use crate::source_location::SourceSpan;
 use crate::string_interner::StringInterner;
 use crate::tokenizer::{TokenKind, Tokenizer};
@@ -13,13 +14,20 @@ pub enum ParseError {
     UnexpectedToken(SourceSpan, &'static str),
 }
 
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+impl PrintableError for ParseError {
+    fn print(&self, contetx: &Context) {
+        match *self {
+            ParseError::UnexpectedEnd => {
+                println!("ERROR: Unexpected end of source during parsing.")
+            }
+            ParseError::UnexpectedToken(span, s) => {
+                let line = span.start.line;
+                let col = span.start.col;
+                println!("ERROR: Unexpected token encountered: \"{s}\" at {line}:{col}.")
+            }
+        }
     }
 }
-
-impl std::error::Error for ParseError {}
 
 pub struct Parser<'a> {
     tokens: Peekable<Tokenizer<'a>>,
@@ -83,7 +91,10 @@ impl Parser<'_> {
         use TokenKind::*;
 
         let name_token = expect_token!(self.tokens.next(), Identifier(_))?;
-        let Identifier(sym) = name_token.kind else { unreachable!() };
+
+        let Identifier(sym) = name_token.kind else {
+            unreachable!()
+        };
 
         let id = self.id_generator.gen_id();
 
@@ -225,30 +236,36 @@ impl Parser<'_> {
 
         let tok = *expect_token!(self.tokens.peek(), _)?;
 
-        if matches!(
-            tok.kind,
-            KeywordLet | KeywordLoop | KeywordIf | KeywordBreak | KeywordContinue | KeywordReturn
-        ) {
-            self.tokens.next();
-        }
-
         let kind = match tok.kind {
             KeywordLet => {
+                self.tokens.next();
+
                 let name = self.parse_name()?;
 
                 expect_token!(self.tokens.next(), Colon)?;
 
                 let ty = self.parse_type()?;
 
-                expect_token!(self.tokens.next(), Equals)?;
+                span = tok.span.extend(self.spans.get(&ty.id).unwrap());
 
-                let init: Box<_> = self.parse_expression()?.into();
+                Let { name, ty }
+            }
+            KeywordSet => {
+                self.tokens.next();
 
-                span = tok.span.extend(self.spans.get(&init.id).unwrap());
+                let dst: Box<_> = self.parse_expression()?.into();
 
-                Let { name, ty, init }
+                expect_token!(self.tokens.next(), EqualSign)?;
+
+                let val: Box<_> = self.parse_expression()?.into();
+
+                span = tok.span.extend(self.spans.get(&val.id).unwrap());
+
+                Set { dst, val }
             }
             KeywordIf => {
+                self.tokens.next();
+
                 let cond: Box<_> = self.parse_expression()?.into();
 
                 let then = self.parse_block()?;
@@ -276,14 +293,18 @@ impl Parser<'_> {
                 }
             }
             KeywordBreak => {
+                self.tokens.next();
                 span = tok.span;
                 Break
             }
             KeywordContinue => {
+                self.tokens.next();
                 span = tok.span;
                 Continue
             }
             KeywordReturn => {
+                self.tokens.next();
+
                 let tok2 = expect_token!(self.tokens.peek(), _)?;
                 if matches!(tok2.kind, Semicolon) {
                     span = tok.span;
@@ -293,6 +314,15 @@ impl Parser<'_> {
                     span = tok.span.extend(self.spans.get(&return_value.id).unwrap());
                     Return(Some(return_value.into()))
                 }
+            }
+            KeywordLoop => {
+                self.tokens.next();
+
+                let body = self.parse_block()?;
+
+                span = tok.span.extend(self.spans.get(&body.id).unwrap());
+
+                Loop(body)
             }
             _ => {
                 let e = self.parse_expression()?;
@@ -323,7 +353,10 @@ impl Parser<'_> {
                 span = tok.span;
                 ExprKind::BoolLiteral(x)
             }
-            Identifier(sym) => todo!(),
+            Identifier(sym) => {
+                span = tok.span;
+                ExprKind::Identifier(sym)
+            }
             ParenOpen => {
                 let start_span = tok.span;
 
@@ -343,8 +376,10 @@ impl Parser<'_> {
                         let y = self.parse_expression()?;
 
                         let op = match op {
-                            Equal => BuiltinOp::Equals,
-                            _ => todo!(),
+                            Equal => BuiltinOpKind::Equals,
+                            Star => BuiltinOpKind::Mul,
+                            Div => BuiltinOpKind::Div,
+                            _ => todo!("Token {:?}", op),
                         };
 
                         ExprKind::BuiltinOp {
@@ -357,30 +392,31 @@ impl Parser<'_> {
                         let x = self.parse_expression()?;
 
                         ExprKind::BuiltinOp {
-                            op: BuiltinOp::Not,
+                            op: BuiltinOpKind::Not,
                             args: vec![x],
                         }
                     }
 
+                    // Builtin operators that require one or more operands
                     op @ (Minus | Plus) => {
-                        let x = self.parse_expression()?;
+                        let mut args = vec![self.parse_expression()?];
+
+                        loop {
+                            let peeked = expect_token!(self.tokens.peek(), _)?;
+                            if matches!(peeked.kind, ParenClose) {
+                                break;
+                            }
+
+                            args.push(self.parse_expression()?);
+                        }
 
                         let op = match op {
-                            Minus => BuiltinOp::Sub,
-                            Plus => BuiltinOp::Add,
+                            Minus => BuiltinOpKind::Sub,
+                            Plus => BuiltinOpKind::Add,
                             _ => unreachable!(),
                         };
 
-                        let peeked = expect_token!(self.tokens.peek(), _)?;
-                        if matches!(peeked.kind, ParenClose) {
-                            ExprKind::BuiltinOp { op, args: vec![x] }
-                        } else {
-                            let y = self.parse_expression()?;
-                            ExprKind::BuiltinOp {
-                                op,
-                                args: vec![x, y],
-                            }
-                        }
+                        ExprKind::BuiltinOp { op, args }
                     }
 
                     // Function call
@@ -397,7 +433,7 @@ impl Parser<'_> {
 
                 e
             }
-            _ => todo!(),
+            _ => todo!("Token \"{:?}\"", tok),
         };
 
         // TODO register the span for this expression

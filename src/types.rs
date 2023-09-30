@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::ops::Deref;
 use strum_macros::EnumDiscriminants;
 
 #[derive(Clone, Debug, Eq, EnumDiscriminants)]
@@ -105,9 +104,8 @@ impl PartialEq for Type {
 pub struct TypeToken(u32);
 
 pub struct TypeInterner {
-    tokens: HashMap<&'static Type, TypeToken>,
-    #[allow(clippy::vec_box)]
-    types: Vec<Box<Type>>,
+    tokens: HashMap<Type, TypeToken>,
+    types: Vec<Type>,
 }
 
 impl TypeInterner {
@@ -118,22 +116,22 @@ impl TypeInterner {
         }
     }
 
-    pub fn add(&mut self, ty: &Type) -> TypeToken {
-        if let Some(tok) = self.tokens.get(ty) {
+    pub fn add(&mut self, ty: Type) -> TypeToken {
+        if let Some(tok) = self.tokens.get(&ty) {
             return *tok;
         }
 
         let tok = TypeToken(self.types.len() as u32);
 
-        let storage: Box<Type> = Box::new(ty.clone());
+        self.types.push(ty.clone());
 
-        let type_ref = unsafe { &*(storage.deref() as *const Type) };
-
-        self.types.push(storage);
-
-        self.tokens.insert(type_ref, tok);
+        self.tokens.insert(ty, tok);
 
         tok
+    }
+
+    pub fn get_for_type(&self, ty: &Type) -> Option<TypeToken> {
+        self.tokens.get(&ty).copied()
     }
 
     pub fn get(&self, tok: &TypeToken) -> &Type {

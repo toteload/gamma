@@ -24,6 +24,7 @@ pub struct Name {
     pub sym: Symbol,
 }
 
+// Item has an associated TypeToken if it is a function
 #[derive(Debug)]
 pub struct Item {
     pub id: NodeId,
@@ -48,6 +49,7 @@ pub enum ItemKind {
     },
 }
 
+// Type has an associated TypeToken
 #[derive(Clone, Debug)]
 pub struct Type {
     pub id: NodeId,
@@ -61,6 +63,7 @@ pub enum TypeKind {
     Bool,
 }
 
+// Param has an associated TypeToken
 #[derive(Clone, Debug)]
 pub struct Param {
     pub id: NodeId,
@@ -79,7 +82,10 @@ pub enum StatementKind {
     Let {
         name: Name,
         ty: Type,
-        init: Box<Expr>,
+    },
+    Set {
+        dst: Box<Expr>,
+        val: Box<Expr>,
     },
     Expr(Box<Expr>),
     If {
@@ -90,6 +96,7 @@ pub enum StatementKind {
     Break,
     Continue,
     Return(Option<Box<Expr>>),
+    Loop(Block),
 }
 
 #[derive(Clone, Debug)]
@@ -99,7 +106,7 @@ pub struct Block {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum BuiltinOp {
+pub enum BuiltinOpKind {
     Or,
     And,
     Xor,
@@ -116,6 +123,7 @@ pub enum BuiltinOp {
     GreaterEquals,
 }
 
+// Expr always has an associated TypeToken
 #[derive(Clone, Debug)]
 pub struct Expr {
     pub id: NodeId,
@@ -127,7 +135,7 @@ pub enum ExprKind {
     IntLiteral(i64),
     BoolLiteral(bool),
     Identifier(Symbol),
-    BuiltinOp { op: BuiltinOp, args: Vec<Expr> },
+    BuiltinOp { op: BuiltinOpKind, args: Vec<Expr> },
     Call { name: Name, args: Vec<Expr> },
     Cast { ty: Type, e: Box<Expr> },
 }

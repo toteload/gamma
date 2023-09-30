@@ -1,0 +1,14 @@
+fn main() -> int {
+    let s: int
+    set s = 0
+
+    loop {
+        if (eq s 10) {
+            break
+        }
+
+        set s = (+ s 1)
+    }
+
+    return s
+}

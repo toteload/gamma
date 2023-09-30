@@ -1,14 +1,34 @@
 use crate::ast::*;
 use crate::ast_visitor::Visitor;
-use crate::semantics::{SemanticAnalyser, SemanticError};
-use crate::string_interner::{StringInterner, Symbol};
+use crate::compiler::{Context, PrintableError};
+use crate::semantics::SemanticProver;
+use crate::string_interner::Symbol;
 
-pub struct Analyser {
+struct NoMainFunctionError {}
+
+impl PrintableError for NoMainFunctionError {
+    fn print(&self, _: &Context) {
+        println!("Error: Program has no main function.");
+    }
+}
+
+pub struct Prover {
     main_symbol: Option<Symbol>,
     found_main_function: bool,
 }
 
-impl Visitor for Analyser {
+impl Prover {
+    pub fn new(_context: &Context) -> Self {
+        let main_symbol = _context.symbols.find_symbol("main");
+
+        Self {
+            main_symbol,
+            found_main_function: false,
+        }
+    }
+}
+
+impl Visitor for Prover {
     fn visit_function(
         &mut self,
         name: &Name,
@@ -22,35 +42,18 @@ impl Visitor for Analyser {
     }
 }
 
-impl Analyser {
-    pub fn new(symbols: &StringInterner) -> Self {
-        let main_symbol = symbols.find_symbol("main");
-
-        Self {
-            main_symbol,
-            found_main_function: false,
-        }
-    }
-}
-
-struct NoMainFunctionError {}
-
-impl SemanticError for NoMainFunctionError {
-    fn print(&self, symbols: &StringInterner) {
-        println!("ERROR: Program has no main function.");
-    }
-}
-
-impl SemanticAnalyser for Analyser {
-    fn check_for_error(&mut self, items: &[Item]) -> Option<Box<dyn SemanticError>> {
-        let Some(main_symbol) = self.main_symbol else { return Some(Box::new(NoMainFunctionError{})); };
+impl SemanticProver for Prover {
+    fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Box<dyn PrintableError>>> {
+        let Some(main_symbol) = self.main_symbol else {
+            return Err(vec![Box::new(NoMainFunctionError {})]);
+        };
 
         self.visit_items(items);
 
         if !self.found_main_function {
-            return Some(Box::new(NoMainFunctionError {}));
+            return Err(vec![Box::new(NoMainFunctionError {})]);
         }
 
-        None
+        Ok(())
     }
 }

@@ -79,28 +79,28 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- [x] Remove the `trap` statement
 - [ ] Add `exit` statement to exit the program with an exit code.
 	- [ ] This means the program has a small runtime, similar to C. On Windows `ExitProcess` needs to be called and on Linux `exit`.
-	- This can be used to create programs that check for conditions and exit with a specific code to signal that something is wrong. This can be used in a test suite.
-- [ ] Add user defined functions.
-- [ ] Add `loop`, `break` and `continue`
-	- [ ] Semantic check: `break` and `continue` can only be used inside a loop
-	- [ ] Add optional labels for `loop`. You can `break :label` or `continue :label`.
-	- `loop :main { break :main }`
-- [ ] `main` function must be of the correct type `fn() -> int`.
-- [ ] Add `let` statement.
+	- This can be used to create programs that check for conditions and exit with a specific code to signal that something is wrong. This can be used in a test suite, where the programs are compiled and ran, and the return code is verified.
+- [ ] `main` function must be of the correct type `fn(): void`.
+- [x] Add `let` statement.
 	- Variable initialization is optional. This can also be skipped entirely, to keep the language simpler.
- - [ ] Add assignment operator
+	- This could be added, and implemented with a small AST transform where the `let` with initializer get transformed into a `let` without initializer and a `set`.
+ - [x] Add assignment operator
 	 - I am thinking something like `set x = ...;`. This makes parsing super easy, because it starts with a keyword.
 	 - This set syntax may be OK for a Lisp like language, but I don't like it for this C-like language.
 	 - And when I think about it now; I do like it again! This way all statements start with a unique keyword
 - [ ] `void` can only be used as the return type of a function
 - Testing
-	- [ ] Set up a way to run generated programs and compare output.
+	- [x] Set up a way to run sample programs and compare output.
+### Version 0.3.1
+- [ ] Switch syntax to use `end` instead of using braces.
+- [ ] Remove arrow from function syntax
 
 ### Version 0.4
 - [ ] Add pointer type.
 	- `*T`
 	- [ ] Add dereferencing operator.
-	- [ ] Add operator to take the address of a variable.
+		- `(@ p)`
+	- [ ] Add operator to take the address of a variable. `(& x)`
 		- [ ] Taking the address of a function is illegal
 	- [ ] Add pointer arithmetic.
 	- [ ] Add type casting of one pointer type to another pointer type
@@ -108,14 +108,26 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- [ ] Add comparison operators
 - [ ] Add array type.
 	- `[128]T` or `[T:128]`. I prefer the first.
-	- [ ] Add indexing operator.
+	- [ ] Add indexing operator. `(@ p 12)`
 	- [ ] Indexing is only allowed on arrays and pointers, and can only be indexed by integers.
 
 ### Version 0.4.1
 - [ ] Start development of Tetris game in parallel to the compiler. Let the needs of the game steer the development direction of the compiler.
 - [ ] Add functionality for calling externally defined C functions.
+	- [ ] Syntax for declaring externally defined functions.
+	- [ ] C types:
+		- [ ] Integers
+		- [ ] structs
+			- Struct indexing syntax `player.name`
+		- [ ] pointers
+		- [ ] ...
 
 ### Version 0.5
+- [ ] Add user defined functions.
+- [ ] Add `loop`, `break` and `continue`
+	- [ ] Semantic check: `break` and `continue` can only be used inside a loop
+	- [ ] Add optional labels for `loop`. You can `break :label` or `continue :label`. A label has to start with a colon.
+	- `loop :main { break :main }`
 - [ ] Add modules
 - [ ] Add `alloc` and `free` functions for dynamic memory allocations, to a module called `std`
 	- [ ] The `std` module will be a special hard coded module (?)

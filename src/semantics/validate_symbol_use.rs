@@ -1,11 +1,10 @@
 use crate::ast::*;
 use crate::ast_visitor::Visitor;
-use crate::semantics::{SemanticAnalyser, SemanticError};
+use crate::compiler::{Context, PrintableError};
+use crate::semantics::SemanticProver;
 use crate::source_location::SourceSpan;
-use crate::string_interner::{StringInterner, Symbol};
-use std::collections::{HashMap, HashSet};
-
-// This should check for unused symbols and items with the same name.
+use crate::string_interner::Symbol;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Copy)]
 pub struct UndefinedSymbolAtLocation {
@@ -13,18 +12,27 @@ pub struct UndefinedSymbolAtLocation {
     pub sym: Symbol,
 }
 
-pub struct Analyser<'a> {
-    scopes: Vec<HashSet<Symbol>>,
-    undefined_symbols: Vec<UndefinedSymbolAtLocation>,
-    spans: &'a HashMap<NodeId, SourceSpan>,
+impl PrintableError for UndefinedSymbolAtLocation {
+    fn print(&self, context: &Context) {
+        let line = self.span.start.line;
+        let col = self.span.start.col;
+        let name = context.symbols.get_str(self.sym);
+        println!("Error: <source>:{line}:{col} Use of undefined variable \"{name}\"");
+    }
 }
 
-impl<'a> Analyser<'a> {
-    pub fn new(spans: &'a HashMap<NodeId, SourceSpan>) -> Analyser<'a> {
+pub struct Prover<'a> {
+    scopes: Vec<HashSet<Symbol>>,
+    undefined_symbols: Vec<UndefinedSymbolAtLocation>,
+    context: &'a Context,
+}
+
+impl<'a> Prover<'a> {
+    pub fn new(context: &'a Context) -> Self {
         Self {
             scopes: Vec::new(),
             undefined_symbols: Vec::new(),
-            spans,
+            context,
         }
     }
 
@@ -40,14 +48,14 @@ impl<'a> Analyser<'a> {
 
     fn validate_sym(&mut self, sym: &Symbol, id: &NodeId) {
         if !self.is_sym_defined(sym) {
-            let span = *self.spans.get(id).unwrap();
+            let span = *self.context.ast_spans.get(id).unwrap();
             self.undefined_symbols
                 .push(UndefinedSymbolAtLocation { span, sym: *sym });
         }
     }
 }
 
-impl Visitor for Analyser<'_> {
+impl Visitor for Prover<'_> {
     fn visit_items(&mut self, items: &[Item]) {
         // TODO: Check for items with the same name.
 
@@ -86,12 +94,12 @@ impl Visitor for Analyser<'_> {
         use StatementKind::*;
 
         match &stmt.kind {
-            Let { name, init, .. } => {
-                // Make sure all variables used in the initialization expression are defined.
-                // This must be called before we add the variable to the scope, otherwise you could
-                // define the variable in terms of itself, which is not allowed.
-                self.visit_expr(init);
+            Let { name, .. } => {
                 self.scopes.last_mut().unwrap().insert(name.sym);
+            }
+            Set { dst, val } => {
+                self.visit_expr(dst);
+                self.visit_expr(val);
             }
             Expr(e) => self.visit_expr(e),
             If {
@@ -106,6 +114,9 @@ impl Visitor for Analyser<'_> {
                 }
             }
             Return(Some(e)) => self.visit_expr(e),
+            Loop(body) => {
+                self.visit_block(body);
+            }
             Break | Continue | Return(None) => (),
         }
     }
@@ -133,31 +144,22 @@ impl Visitor for Analyser<'_> {
     }
 }
 
-impl SemanticAnalyser for Analyser<'_> {
-    fn check_for_error(&mut self, items: &[Item]) -> Option<Box<dyn SemanticError>> {
+impl SemanticProver for Prover<'_> {
+    fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Box<dyn PrintableError>>> {
         self.visit_items(items);
 
         if !self.undefined_symbols.is_empty() {
-            return Some(Box::new(UndefinedSymbolsError {
-                undefined_symbols: self.undefined_symbols.clone(),
-            }));
+            return Err(self
+                .undefined_symbols
+                .iter()
+                .copied()
+                .map(|x| {
+                    let y: Box<dyn PrintableError> = Box::new(x);
+                    y
+                })
+                .collect::<Vec<Box<dyn PrintableError>>>());
         }
 
-        None
-    }
-}
-
-struct UndefinedSymbolsError {
-    undefined_symbols: Vec<UndefinedSymbolAtLocation>,
-}
-
-impl SemanticError for UndefinedSymbolsError {
-    fn print(&self, symbols: &StringInterner) {
-        for sym in self.undefined_symbols.iter() {
-            let line = sym.span.start.line;
-            let col = sym.span.start.col;
-            let name = symbols.get_str(sym.sym);
-            println!("ERROR: <source>:{line}:{col} Undefined variable \"{name}\"");
-        }
+        Ok(())
     }
 }

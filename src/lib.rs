@@ -2,8 +2,10 @@
 
 pub mod ast;
 pub mod ast_visitor;
-pub mod env;
+pub mod compiler;
+pub mod ink_codegen;
 pub mod parser;
+pub mod scope_stack;
 pub mod semantics;
 pub mod source_location;
 pub mod string_interner;

@@ -34,11 +34,7 @@ pub trait Visitor {
         }
     }
 
-    fn visit_statement(&mut self, stmt: &Statement) {
-        todo!();
-    }
+    fn visit_statement(&mut self, stmt: &Statement) {}
 
-    fn visit_expr(&mut self, e: &Expr) {
-        todo!();
-    }
+    fn visit_expr(&mut self, e: &Expr) {}
 }

@@ -1,12 +1,11 @@
 use serde::Serialize;
 use std::collections::HashMap;
-use std::ops::Deref;
 
 #[derive(PartialEq, Debug, Clone, Copy, Hash, Eq, Serialize)]
 pub struct Symbol(u32);
 
 pub struct StringInterner {
-    symbols: HashMap<&'static str, Symbol>,
+    symbols: HashMap<Box<str>, Symbol>,
     strings: Vec<Box<str>>,
 }
 
@@ -28,15 +27,11 @@ impl StringInterner {
 
         let sym = Symbol(self.strings.len() as u32);
 
-        let storage = name.to_string().into_boxed_str();
+        let s = name.to_string().into_boxed_str();
 
-        // Giving the string a 'static lifetime is safe, because the strings
-        // can only be accessed while the StringInterner is alive.
-        let string: &'static str = unsafe { &*(storage.deref() as *const str) };
+        self.strings.push(s.clone());
 
-        self.strings.push(storage);
-
-        self.symbols.insert(string, sym);
+        self.symbols.insert(s, sym);
 
         sym
     }

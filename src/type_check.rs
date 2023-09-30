@@ -1,34 +1,12 @@
+use crate::ast::BuiltinOpKind;
 use crate::ast::*;
+use crate::compiler::{Context, PrintableError};
+use crate::scope_stack::ScopeStack;
 use crate::string_interner::Symbol;
 use crate::types::{Type, TypeInterner, TypeToken};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-enum TypedScope {
-    Parameters(HashMap<Symbol, TypeToken>),
-    LetBinding(Symbol, TypeToken),
-    Block,
-    Global(HashMap<Symbol, TypeToken>),
-}
-
-impl TypedScope {
-    fn get(&self, sym: &Symbol) -> Option<&TypeToken> {
-        use TypedScope::*;
-
-        match self {
-            Parameters(map) | Global(map) => map.get(sym),
-            LetBinding(name, ty) => {
-                if name == sym {
-                    Some(ty)
-                } else {
-                    None
-                }
-            }
-            Block => None,
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum TypeError {
     TypeMismatch {
         expected: (TypeToken, NodeId),
@@ -38,23 +16,28 @@ pub enum TypeError {
     ArgumentsMustHaveIdenticalType(NodeId),
     InvalidCast,
     IncorrectReturnType,
+    InvalidSetDestination(NodeId),
+}
+
+impl PrintableError for TypeError {
+    fn print(&self, context: &Context) {
+        match self {
+            _ => println!("Type checking error: {:?}", self),
+        }
+    }
 }
 
 struct TypeChecker<'a> {
     type_interner: &'a mut TypeInterner,
     types: &'a mut HashMap<NodeId, TypeToken>,
 
-    // Set of type pairs that encodes allowed type casts. For example, from int to bool
-    valid_casts: HashSet<(TypeToken, TypeToken)>,
-
-    scopes: Vec<TypedScope>,
+    scopes: ScopeStack<Symbol, TypeToken>,
     type_errors: Vec<TypeError>,
 
-    expected_return_type: Option<TypeToken>,
-
-    void_type: TypeToken,
-    int_type: TypeToken,
-    bool_type: TypeToken,
+    // This gets set to the declared return type of a function.
+    // When we encounter a return statement in the function, the type of the returned value is
+    // checked against this.
+    declared_return_type: Option<TypeToken>,
 }
 
 impl TypeChecker<'_> {
@@ -62,62 +45,44 @@ impl TypeChecker<'_> {
         type_interner: &'a mut TypeInterner,
         types: &'a mut HashMap<NodeId, TypeToken>,
     ) -> TypeChecker<'a> {
-        let void_type = type_interner.add(&Type::Void);
-        let int_type = type_interner.add(&Type::Int);
-        let bool_type = type_interner.add(&Type::Bool);
-
-        let valid_casts = HashSet::from([(int_type, bool_type), (bool_type, int_type)]);
-
         TypeChecker {
             type_interner,
             types,
-            valid_casts,
-            scopes: Vec::new(),
+            scopes: ScopeStack::new(),
             type_errors: Vec::new(),
-            expected_return_type: None,
-            void_type,
-            int_type,
-            bool_type,
+            declared_return_type: None,
         }
     }
 
-    fn verify_return_type(&mut self, found_return_type: Option<TypeToken>) {
-        if found_return_type != self.expected_return_type {
+    fn is_valid_set_destination(&self, e: &Expr) -> bool {
+        matches!(e.kind, ExprKind::Identifier(_))
+    }
+
+    // Check that the found return type matches the declared return type of the function.
+    fn check_return_type(&mut self, found_return_type: Option<TypeToken>) {
+        if found_return_type != self.declared_return_type {
             self.type_errors.push(TypeError::IncorrectReturnType);
         }
     }
 
-    fn is_valid_type_cast(&self, from: TypeToken, to: TypeToken) -> bool {
-        self.valid_casts.contains(&(from, to))
-    }
-
-    fn get_type_token_of(&self, sym: &Symbol) -> &TypeToken {
-        // This should never fail, because the name validation pass should have caught all cases
-        // where an undefined symbol is used.
-
-        for scope in self.scopes.iter().rev() {
-            if let Some(token) = scope.get(sym) {
-                return token;
-            }
+    fn get_type_token_of_type_node_kind(&mut self, kind: &TypeKind) -> TypeToken {
+        match kind {
+            TypeKind::Int => self.type_interner.add(Type::Int),
+            TypeKind::Void => self.type_interner.add(Type::Void),
+            TypeKind::Bool => self.type_interner.add(Type::Bool),
         }
-
-        panic!("Tried to find the type of an undefined symbol. This should never happen.");
     }
 
-    fn get_type_of(&self, sym: &Symbol) -> &Type {
-        return self.type_interner.get(self.get_type_token_of(sym));
+    fn get_type_token_of_sym(&self, sym: &Symbol) -> TypeToken {
+        *self.scopes.get(sym).expect("")
     }
 
-    fn get_type_token_for_type_node(&mut self, type_kind: &TypeKind) -> TypeToken {
-        match type_kind {
-            TypeKind::Int => self.type_interner.add(&Type::Int),
-            TypeKind::Void => self.type_interner.add(&Type::Void),
-            TypeKind::Bool => self.type_interner.add(&Type::Bool),
-        }
+    fn is_valid_type_cast(&self, expr: TypeToken, castType: TypeToken) -> bool {
+        todo!()
     }
 
     fn visit_items(&mut self, items: &[Item]) {
-        let mut global_scope_map = HashMap::new();
+        let mut top_scope = HashMap::new();
 
         for item in items {
             match &item.kind {
@@ -129,16 +94,20 @@ impl TypeChecker<'_> {
                 } => {
                     let param_type_tokens = param_nodes
                         .iter()
-                        .map(|p| self.get_type_token_for_type_node(&p.ty.kind))
+                        .map(|p| self.get_type_token_of_type_node_kind(&p.ty.kind))
                         .collect::<Vec<_>>();
 
                     let return_type_token =
-                        self.get_type_token_for_type_node(&return_type_node.kind);
+                        self.get_type_token_of_type_node_kind(&return_type_node.kind);
 
                     for (param_node, type_token) in param_nodes.iter().zip(&param_type_tokens) {
+                        // Type annotate the parameter nodes and their type nodes
                         self.types.insert(param_node.id, *type_token);
+                        self.types.insert(param_node.name.id, *type_token);
+                        self.types.insert(param_node.ty.id, *type_token);
                     }
 
+                    // Type annotate node for the function's return type
                     self.types.insert(return_type_node.id, return_type_token);
 
                     let function_type = Type::Function {
@@ -146,16 +115,17 @@ impl TypeChecker<'_> {
                         return_type: return_type_token,
                     };
 
-                    let function_type_token = self.type_interner.add(&function_type);
+                    let function_type_token = self.type_interner.add(function_type);
 
+                    // Type annotate the function
                     self.types.insert(item.id, function_type_token);
 
-                    global_scope_map.insert(name.sym, function_type_token);
+                    top_scope.insert(name.sym, function_type_token);
                 }
             }
         }
 
-        self.scopes.push(TypedScope::Global(global_scope_map));
+        self.scopes.push_scope(top_scope);
 
         for item in items {
             match &item.kind {
@@ -167,8 +137,8 @@ impl TypeChecker<'_> {
                 } => {
                     let return_type_token = *self.types.get(&return_type.id).unwrap();
 
-                    self.expected_return_type =
-                        Some(return_type_token).filter(|tt| *tt != self.void_type);
+                    self.declared_return_type = Some(return_type_token)
+                        .filter(|tt| *tt != self.type_interner.add(Type::Void));
 
                     self.visit_function(name, params, return_type, body);
                 }
@@ -183,14 +153,21 @@ impl TypeChecker<'_> {
         _return_type: &crate::ast::Type,
         body: &Block,
     ) {
-        let Type::Function{ params: param_type_tokens, return_type } = self.get_type_of(&name.sym) else { todo!();};
+        let function_type_token = self.get_type_token_of_sym(&name.sym);
+        let Type::Function {
+            params: param_type_tokens,
+            return_type,
+        } = self.type_interner.get(&function_type_token)
+        else {
+            todo!()
+        };
 
         let param_symbols = params.iter().map(|p| p.name.sym);
         let param_scope_map = param_symbols
             .zip(param_type_tokens.iter().copied())
             .collect::<HashMap<_, _>>();
 
-        self.scopes.push(TypedScope::Parameters(param_scope_map));
+        self.scopes.push_scope(param_scope_map);
 
         self.visit_block(&body);
 
@@ -198,17 +175,10 @@ impl TypeChecker<'_> {
     }
 
     fn visit_block(&mut self, block: &Block) {
-        self.scopes.push(TypedScope::Block);
+        self.scopes.push_empty_scope();
 
         for statement in &block.statements {
             self.visit_statement(statement);
-        }
-
-        // This pops of all the let bindings that were introduced in this block.
-        loop {
-            if let Some(TypedScope::Block) = self.scopes.pop() {
-                break;
-            }
         }
     }
 
@@ -216,45 +186,40 @@ impl TypeChecker<'_> {
         use StatementKind::*;
 
         match &statement.kind {
-            Let { name, ty, init } => {
-                let type_of_ty = self.get_type_token_for_type_node(&ty.kind);
-                self.types.insert(ty.id, type_of_ty);
+            Let { name, ty } => {
+                let type_token = self.get_type_token_of_type_node_kind(&ty.kind);
+                self.types.insert(ty.id, type_token);
+                self.scopes.insert(name.sym, type_token);
+            }
+            Set { dst, val } => {
+                // The types of `val` and `dst` should match. However, `dst` should also be an
+                // "L-value". Something like `set 0 = 1` would type check, but should not be valid.
+                if !self.is_valid_set_destination(dst) {
+                    self.type_errors
+                        .push(TypeError::InvalidSetDestination(statement.id));
+                }
 
-                // If this expression does not type check, then how do we continue?
-                // A decent solution could be to report the error and assume that the variable
-                // should have the declared type. This way we can continue type checking pretending
-                // as if everything went right.
-                match self.visit_expr(init) {
-                    Ok(type_of_init) if type_of_ty != type_of_init => {
+                let dst_result = self.visit_expr(dst);
+                let val_result = self.visit_expr(val);
+
+                if let Err(e) = dst_result {
+                    self.type_errors.push(e);
+                }
+
+                if let Err(e) = val_result {
+                    self.type_errors.push(e);
+                }
+
+                match (dst_result, val_result) {
+                    (Ok(dst_type), Ok(val_type)) if dst_type != val_type => {
                         self.type_errors.push(TypeError::TypeMismatch {
-                            expected: (type_of_ty, ty.id),
-                            received: (type_of_init, init.id),
+                            expected: (dst_type, dst.id),
+                            received: (val_type, val.id),
                         });
                     }
-                    Err(err) => self.type_errors.push(err),
-                    Ok(_) => (),
-                }
-
-                self.scopes
-                    .push(TypedScope::LetBinding(name.sym, type_of_ty));
-            }
-            /*
-            Assign { name, val } => {
-                let res = self.visit_expr(val);
-
-                assert!(res.is_ok());
-
-                let sym_type_tok = *self.get_type_token_of(&name.sym);
-                let val_type_tok = *self.types.get(&val.id).unwrap();
-
-                if sym_type_tok != val_type_tok {
-                    self.type_errors.push(TypeError::TypeMismatch {
-                        expected: (sym_type_tok, name.id),
-                        received: (val_type_tok, val.id),
-                    });
+                    _ => {}
                 }
             }
-            */
             Expr(e) => {
                 if let Err(err) = self.visit_expr(e) {
                     self.type_errors.push(err);
@@ -266,7 +231,7 @@ impl TypeChecker<'_> {
                 otherwise,
             } => {
                 match self.visit_expr(cond) {
-                    Ok(ty) if ty != self.bool_type => {
+                    Ok(ty) if ty != self.type_interner.add(Type::Bool) => {
                         self.type_errors
                             .push(TypeError::IfConditionMustBeBool(cond.id));
                     }
@@ -281,9 +246,10 @@ impl TypeChecker<'_> {
             }
             Return(Some(e)) => match self.visit_expr(e) {
                 Err(err) => self.type_errors.push(err),
-                Ok(tt) => self.verify_return_type(Some(tt)),
+                Ok(tt) => self.check_return_type(Some(tt)),
             },
-            Return(None) => self.verify_return_type(None),
+            Return(None) => self.check_return_type(None),
+            Loop(body) => self.visit_block(body),
             Break | Continue => (),
         }
     }
@@ -292,12 +258,12 @@ impl TypeChecker<'_> {
         use ExprKind::*;
 
         let ty = match &expression.kind {
-            IntLiteral(_) => self.int_type,
-            BoolLiteral(_) => self.bool_type,
-            Identifier(sym) => *self.get_type_token_of(sym),
+            IntLiteral(_) => self.type_interner.add(Type::Int),
+            BoolLiteral(_) => self.type_interner.add(Type::Bool),
+            Identifier(sym) => self.get_type_token_of_sym(sym),
             Cast { ty, e } => {
                 let expr_ty_token = self.visit_expr(e)?;
-                let cast_ty_token = self.get_type_token_for_type_node(&ty.kind);
+                let cast_ty_token = self.get_type_token_of_type_node_kind(&ty.kind);
 
                 if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
                     return Err(TypeError::InvalidCast);
@@ -306,58 +272,39 @@ impl TypeChecker<'_> {
                 cast_ty_token
             }
             BuiltinOp { op, args } => match op {
-                crate::ast::BuiltinOp::Equals => {
-                    let arg_types = args.iter().map(|arg| self.visit_expr(arg)).collect::<Result<Vec<_>, _>>()?;
+                BuiltinOpKind::Equals => {
+                    let arg_types = args
+                        .iter()
+                        .map(|arg| self.visit_expr(arg))
+                        .collect::<Result<Vec<_>, _>>()?;
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
 
                     if !args_are_of_same_type {
                         return Err(TypeError::ArgumentsMustHaveIdenticalType(expression.id));
                     }
 
-                    self.bool_type
+                    self.type_interner.add(Type::Bool)
                 }
-                _ => todo!(),
+                BuiltinOpKind::Mul
+                | BuiltinOpKind::Add
+                | BuiltinOpKind::Div
+                | BuiltinOpKind::Sub => {
+                    // TODO: Also check that they are of type int. Right now it is only checked if
+                    // they are all the same, but they could all be bools.
+                    let arg_types = args
+                        .iter()
+                        .map(|arg| self.visit_expr(arg))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
+
+                    if !args_are_of_same_type {
+                        return Err(TypeError::ArgumentsMustHaveIdenticalType(expression.id));
+                    }
+
+                    self.type_interner.add(Type::Int)
+                }
+                _ => todo!("Operator \"{:?}\"", op),
             },
-            /*
-            UnaryOp { op, e } => {
-                let ty = self.visit_expr(e)?;
-
-                let Some(result_type) = self.unary_ops.get(&(*op, ty)) else {
-                    return Err(TypeError::IllegalUnaryExpression(expression.id));
-                };
-
-                *result_type
-            }
-            BinaryOp { op, lhs, rhs } => {
-                let lty = self.visit_expr(lhs)?;
-                let rty = self.visit_expr(rhs)?;
-
-                let Some(result_type) = self.binary_ops.get(&(*op, lty, rty)) else {
-                    return Err(TypeError::IllegalBinaryExpression(expression.id));
-                };
-
-                *result_type
-            }
-            Call { name, args } => {
-                // First we annotate all the argument nodes with their types.
-                for arg in args {
-                    self.visit_expr(arg)?;
-                }
-
-                let Type::Function{ params, return_type } = self.get_type_of(&name.sym) else { panic!("This should really be a function type."); };
-
-                let arg_types = args.iter().map(|e| self.types.get(&e.id).unwrap());
-                let param_types = params.iter();
-
-                let do_arg_and_param_types_match = arg_types.eq(param_types);
-
-                if !do_arg_and_param_types_match {
-                    todo!();
-                }
-
-                *return_type
-            }
-            */
             _ => todo!(),
         };
 
@@ -372,8 +319,14 @@ pub fn type_check(
     items: &[Item],
     type_interner: &mut TypeInterner,
     types: &mut HashMap<NodeId, TypeToken>,
-) -> Vec<TypeError> {
+) -> Result<(), Vec<TypeError>> {
     let mut type_checker = TypeChecker::new(type_interner, types);
+
     type_checker.visit_items(items);
-    type_checker.type_errors
+
+    if !type_checker.type_errors.is_empty() {
+        Err(type_checker.type_errors)
+    } else {
+        Ok(())
+    }
 }

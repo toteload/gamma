@@ -2,34 +2,29 @@ mod has_main;
 mod validate_symbol_use;
 
 use crate::ast::*;
-use crate::source_location::SourceSpan;
-use crate::string_interner::StringInterner;
-use std::collections::HashMap;
+use crate::compiler::{Context, PrintableError};
 
-pub trait SemanticError {
-    fn print(&self, symbols: &StringInterner);
+pub trait SemanticProver {
+    fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Box<dyn PrintableError>>>;
 }
 
-pub trait SemanticAnalyser {
-    fn check_for_error(&mut self, items: &[Item]) -> Option<Box<dyn SemanticError>>;
-}
+pub fn validate_semantics(context: &Context, items: &[Item]) -> Result<(), Vec<Box<dyn PrintableError>>> {
+    let x: Box<dyn SemanticProver> = Box::new(has_main::Prover::new(&context));
+    let y: Box<dyn SemanticProver> = Box::new(validate_symbol_use::Prover::new(&context));
 
-pub fn validate_all(
-    symbols: &StringInterner,
-    spans: &HashMap<NodeId, SourceSpan>,
-    items: &[Item],
-) -> Vec<Box<dyn SemanticError>> {
-    let mut errors = Vec::new();
+    let mut provers = vec![x, y];
 
-    if let Some(error) = has_main::Analyser::new(symbols).check_for_error(items) {
-        errors.push(error);
+    let errors: Vec<Box<dyn PrintableError>> = provers
+        .iter_mut()
+        .filter_map(|prover| prover.verify(items).err())
+        .flatten()
+        .collect();
+
+    if !errors.is_empty() {
+        return Err(errors);
     }
 
-    if let Some(error) = validate_symbol_use::Analyser::new(spans).check_for_error(items) {
-        errors.push(error);
-    }
-
-    errors
+    Ok(())
 }
 
 /*

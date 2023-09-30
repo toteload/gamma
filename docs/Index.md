@@ -73,9 +73,9 @@ fn fac(n: int) -> int {
 	}
 }
 
-fn fac(n int) int
-	let res int = 1
-	let n   int = n
+fn fac(n: int): int
+	let res: int
+	let n:  int
 	
 	loop
 		if (= n 0)
@@ -96,6 +96,7 @@ fn fib(n: int): int
 end
 
 fn main(): int
-	let x: bool = false let n: int = (cast []int x)
+	let x: bool = false 
+	let n: int = (cast *int x)
 end
 ```
