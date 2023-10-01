@@ -10,7 +10,7 @@ use inkwell::{
     module::Module,
     passes::PassManager,
     types::{BasicTypeEnum, IntType},
-    values::{AnyValue, AnyValueEnum, BasicValueEnum, FunctionValue},
+    values::{BasicValueEnum, FunctionValue, PointerValue},
     IntPredicate,
 };
 use std::collections::HashMap;
@@ -26,14 +26,23 @@ impl PrintableError for CodegenError {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum Variable<'ctx> {
+    Stack(PointerValue<'ctx>),
+    Parameter(BasicValueEnum<'ctx>),
+}
+
 pub struct CodeGenerator<'ctx> {
     ctx: &'ctx Context,
     builder: Builder<'ctx>,
     module: Module<'ctx>,
 
     current_function: Option<FunctionValue<'ctx>>,
+    current_basic_block: Option<BasicBlock<'ctx>>,
+    loop_end_blocks: Vec<BasicBlock<'ctx>>,
 
-    scopes: ScopeStack<Symbol, AnyValueEnum<'ctx>>,
+    functions: HashMap<Symbol, FunctionValue<'ctx>>,
+    scopes: ScopeStack<Symbol, (BasicTypeEnum<'ctx>, Variable<'ctx>)>,
 
     i64_t: IntType<'ctx>,
     typetoken_to_inktype: HashMap<TypeToken, BasicTypeEnum<'ctx>>,
@@ -57,6 +66,9 @@ impl<'ctx> CodeGenerator<'ctx> {
             builder: ctx.create_builder(),
             module,
             current_function: None,
+            current_basic_block: None,
+            loop_end_blocks: Vec::new(),
+            functions: HashMap::new(),
             scopes: ScopeStack::new(),
 
             i64_t: ctx.i64_type(),
@@ -92,7 +104,12 @@ impl<'ctx> CodeGenerator<'ctx> {
 
     fn add_basic_block(&self, name: &str) -> BasicBlock<'ctx> {
         self.ctx
-            .append_basic_block(self.current_function.unwrap(), name)
+            .insert_basic_block_after(self.current_basic_block.unwrap(), name)
+    }
+
+    fn position_builder_at_end_of(&mut self, basic_block: BasicBlock<'ctx>) {
+        self.current_basic_block = Some(basic_block);
+        self.builder.position_at_end(basic_block);
     }
 
     fn gen_item(&mut self, item: &Item) -> Result<(), CodegenError> {
@@ -100,21 +117,23 @@ impl<'ctx> CodeGenerator<'ctx> {
             ItemKind::Function {
                 name, body, params, ..
             } => {
-                let f: FunctionValue = self.scopes.get(&name.sym).unwrap().into_function_value();
+                let f: FunctionValue = *self
+                    .functions
+                    .get(&name.sym)
+                    .expect("Function should be known");
 
                 self.scopes.push_empty_scope();
 
                 self.current_function = Some(f);
 
                 for (i, param) in params.iter().enumerate() {
-                    self.scopes.insert(
-                        param.name.sym,
-                        f.get_nth_param(i as u32).unwrap().as_any_value_enum(),
-                    );
+                    let val = f.get_nth_param(i as u32).unwrap();
+                    self.scopes
+                        .insert(param.name.sym, (val.get_type(), Variable::Parameter(val)));
                 }
 
-                let entry = self.add_basic_block("entry");
-                self.builder.position_at_end(entry);
+                let entry = self.ctx.append_basic_block(f, "entry");
+                self.position_builder_at_end_of(entry);
 
                 self.gen_block(&body)?;
 
@@ -131,8 +150,8 @@ impl<'ctx> CodeGenerator<'ctx> {
         self.scopes.push_empty_scope();
 
         for statement in &block.statements {
-            let is_return = self.gen_statement(statement)?;
-            if is_return {
+            let has_terminator = self.gen_statement(statement)?;
+            if has_terminator {
                 return Ok(true);
             }
         }
@@ -153,11 +172,9 @@ impl<'ctx> CodeGenerator<'ctx> {
             } => {
                 let cond_val = self.gen_expr(cond)?;
 
-                let then_block = self.add_basic_block("then");
-
+                let end_block = self.add_basic_block("endif");
                 let otherwise_block = self.add_basic_block("otherwise");
-
-                let end_block = self.add_basic_block("end");
+                let then_block = self.add_basic_block("then");
 
                 self.builder.build_conditional_branch(
                     cond_val.into_int_value(),
@@ -165,56 +182,92 @@ impl<'ctx> CodeGenerator<'ctx> {
                     otherwise_block,
                 );
 
-                let mut branch_return_count = 0u32;
+                let mut branch_terminator_count = 0u32;
 
-                self.builder.position_at_end(then_block);
-                let contained_return = self.gen_block(then)?;
+                self.position_builder_at_end_of(then_block);
+                let then_has_terminator = self.gen_block(then)?;
 
-                if !contained_return {
+                if !then_has_terminator {
                     self.builder.build_unconditional_branch(end_block);
+                    branch_terminator_count += 1;
                 }
 
-                branch_return_count += contained_return as u32;
-
-                self.builder.position_at_end(otherwise_block);
+                self.position_builder_at_end_of(otherwise_block);
                 if let Some(otherwise) = otherwise {
-                    let contained_return = self.gen_block(otherwise)?;
-                    if !contained_return {
+                    let otherwise_has_terminator = self.gen_block(otherwise)?;
+                    if !otherwise_has_terminator {
                         self.builder.build_unconditional_branch(end_block);
+                        branch_terminator_count += 1;
                     }
-
-                    branch_return_count += contained_return as u32;
                 } else {
                     self.builder.build_unconditional_branch(end_block);
                 }
 
-                if branch_return_count != 2 {
-                    self.builder.position_at_end(end_block);
+                if branch_terminator_count != 2 {
+                    self.position_builder_at_end_of(end_block);
                 } else {
                     let res = unsafe { end_block.delete() };
                     if let Err(_) = res {
-                        //return Err(anyhow!("Error deleting basic block"));
                         todo!()
                     }
                 }
             }
             StatementKind::Loop(body) => {
+                let end_block = self.add_basic_block("endloop");
                 let body_block = self.add_basic_block("loop");
+
+                self.loop_end_blocks.push(end_block);
+
+                self.builder.build_unconditional_branch(body_block);
+
+                self.position_builder_at_end_of(body_block);
 
                 self.gen_block(body)?;
 
                 self.builder.build_unconditional_branch(body_block);
+
+                self.loop_end_blocks.pop();
+
+                self.position_builder_at_end_of(end_block);
             }
             StatementKind::Let { name, ty } => {
                 let basic_type = self.get_inktype_of_node(ty.id);
-                let storage = self.builder.build_alloca(basic_type, "");
+                let ptr = self.builder.build_alloca(basic_type, "");
 
-                self.scopes.insert(name.sym, storage.into());
+                self.scopes
+                    .insert(name.sym, (basic_type, Variable::Stack(ptr)));
+            }
+            StatementKind::Set { dst, val } => {
+                let p = self.get_dst_ptr(dst)?;
+                let x = self.gen_expr(val)?;
+                self.builder.build_store(p, x);
+            }
+            StatementKind::Break => {
+                self.builder.build_unconditional_branch(
+                    *self
+                        .loop_end_blocks
+                        .last()
+                        .expect("There should be a basic block after a loop"),
+                );
             }
             _ => todo!("Statement \"{:?}\"", stmt.kind),
         }
 
-        Ok(matches!(stmt.kind, StatementKind::Return(_)))
+        let is_terminator = matches!(stmt.kind, StatementKind::Return(_) | StatementKind::Break);
+        Ok(is_terminator)
+    }
+
+    fn get_dst_ptr(&self, e: &Expr) -> Result<PointerValue, CodegenError> {
+        match &e.kind {
+            ExprKind::Identifier(sym) => {
+                let (ty, var) = self.scopes.get(&sym).expect("Identifier should exist");
+                let Variable::Stack(ptr) = var else {
+                    panic!("Tried to get dst of non-stack variable")
+                };
+                Ok(*ptr)
+            }
+            _ => todo!("Get pointer for expression"),
+        }
     }
 
     fn gen_expr(&self, e: &Expr) -> Result<BasicValueEnum, CodegenError> {
@@ -338,7 +391,14 @@ impl<'ctx> CodeGenerator<'ctx> {
                 }
                 _ => todo!("BuiltinOpKind \"{:?}\" not yet implemented", op),
             },
-            _ => todo!(),
+            ExprKind::Identifier(sym) => {
+                let (ty, var) = *self.scopes.get(&sym).expect("Identifer should exist");
+                match var {
+                    Variable::Stack(ptr) => Ok(self.builder.build_load(ty, ptr, "")),
+                    _ => todo!("Retrieve value from variable"),
+                }
+            }
+            _ => todo!("{:?}", e.kind),
         }
     }
 
@@ -359,7 +419,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                         None,
                     );
 
-                    self.scopes.insert(name.sym, f.into());
+                    self.functions.insert(name.sym, f.into());
                 }
             }
         }
@@ -371,7 +431,9 @@ impl<'ctx> CodeGenerator<'ctx> {
         self.scopes.pop();
 
         if let Err(s) = self.module.verify() {
-            todo!()
+            print!("{}", s.to_str().unwrap());
+            print!("{}", self.module.to_string());
+            todo!("Handle error properly")
         }
 
         if optimize {

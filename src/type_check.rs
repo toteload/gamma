@@ -77,7 +77,7 @@ impl TypeChecker<'_> {
         *self.scopes.get(sym).expect("")
     }
 
-    fn is_valid_type_cast(&self, expr: TypeToken, castType: TypeToken) -> bool {
+    fn is_valid_type_cast(&self, expr: TypeToken, cast_type: TypeToken) -> bool {
         todo!()
     }
 

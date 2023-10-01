@@ -1,0 +1,35 @@
+---
+source: tests/valid_samples.rs
+expression: output
+---
+; ModuleID = 'main'
+source_filename = "main"
+
+define i64 @main() {
+entry:
+  %0 = alloca i64, align 8
+  store i64 0, ptr %0, align 4
+  br label %loop
+
+loop:                                             ; preds = %endif, %entry
+  %1 = load i64, ptr %0, align 4
+  %2 = icmp eq i64 %1, 10
+  br i1 %2, label %then, label %otherwise
+
+then:                                             ; preds = %loop
+  br label %endloop
+
+otherwise:                                        ; preds = %loop
+  br label %endif
+
+endif:                                            ; preds = %otherwise
+  %3 = load i64, ptr %0, align 4
+  %4 = add i64 %3, 1
+  store i64 %4, ptr %0, align 4
+  br label %loop
+
+endloop:                                          ; preds = %then
+  %5 = load i64, ptr %0, align 4
+  ret i64 %5
+}
+

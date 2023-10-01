@@ -8,7 +8,10 @@ pub trait SemanticProver {
     fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Box<dyn PrintableError>>>;
 }
 
-pub fn validate_semantics(context: &Context, items: &[Item]) -> Result<(), Vec<Box<dyn PrintableError>>> {
+pub fn validate_semantics(
+    context: &Context,
+    items: &[Item],
+) -> Result<(), Vec<Box<dyn PrintableError>>> {
     let x: Box<dyn SemanticProver> = Box::new(has_main::Prover::new(&context));
     let y: Box<dyn SemanticProver> = Box::new(validate_symbol_use::Prover::new(&context));
 
