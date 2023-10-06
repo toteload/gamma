@@ -274,7 +274,7 @@ expression: tokens
         col: 70,
       ),
     ),
-    kind: Equals,
+    kind: EqualSign,
   ),
   Token(
     span: SourceSpan(

@@ -1,5 +1,4 @@
 mod valid_samples {
-
     use gamma::compiler::{Context, Options};
     use insta::assert_snapshot;
     use std::fs;
@@ -48,6 +47,29 @@ mod valid_samples {
         };
 
         assert_snapshot!("basic_main", output);
+    }
+
+    #[test]
+    fn nested_loop() {
+        let contents = fs::read_to_string("tests/valid_samples/nested_loop.gamma").unwrap();
+
+        let mut context = Context::new();
+        let result = context.compile(&contents, &Options { optimize: false });
+
+        let Ok(output) = result else {
+            let Err(errors) = result else { unreachable!() };
+
+            for e in &errors {
+                e.print(&context);
+            }
+
+            panic!(
+                "Compilation of sample \"nested_loop\" resulted in {} error(s)",
+                errors.len()
+            );
+        };
+
+        assert_snapshot!("nested_loop", output);
     }
 
     #[test]

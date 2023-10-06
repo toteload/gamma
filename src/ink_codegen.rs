@@ -1,12 +1,12 @@
 use crate::ast::*;
 use crate::compiler::{Context as CompilerContext, PrintableError};
-use crate::scope_stack::ScopeStack;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::types::{Type, TypeInterner, TypeToken};
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
+    intrinsics::Intrinsic,
     module::Module,
     passes::PassManager,
     types::{BasicTypeEnum, IntType},
@@ -27,9 +27,29 @@ impl PrintableError for CodegenError {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum Variable<'ctx> {
+enum VariableValue<'ctx> {
     Stack(PointerValue<'ctx>),
     Parameter(BasicValueEnum<'ctx>),
+}
+
+struct Variable<'ctx> {
+    ty: BasicTypeEnum<'ctx>,
+    val: VariableValue<'ctx>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum ScopeKind {
+    Block,
+    Loop,
+    Parameter,
+    Function,
+    Global,
+}
+
+struct Scope<'ctx> {
+    kind: ScopeKind,
+    stack_restorepoint: Option<BasicValueEnum<'ctx>>,
+    variables: HashMap<Symbol, Variable<'ctx>>,
 }
 
 pub struct CodeGenerator<'ctx> {
@@ -42,7 +62,10 @@ pub struct CodeGenerator<'ctx> {
     loop_end_blocks: Vec<BasicBlock<'ctx>>,
 
     functions: HashMap<Symbol, FunctionValue<'ctx>>,
-    scopes: ScopeStack<Symbol, (BasicTypeEnum<'ctx>, Variable<'ctx>)>,
+    scopes: Vec<Scope<'ctx>>,
+
+    llvm_stacksave: FunctionValue<'ctx>,
+    llvm_stackrestore: FunctionValue<'ctx>,
 
     i64_t: IntType<'ctx>,
     typetoken_to_inktype: HashMap<TypeToken, BasicTypeEnum<'ctx>>,
@@ -61,15 +84,32 @@ impl<'ctx> CodeGenerator<'ctx> {
     ) -> Self {
         let module = ctx.create_module("main");
 
+        let llvm_stacksave = {
+            let intrinsic =
+                Intrinsic::find("llvm.stacksave").expect("llvm.stacksave should be present");
+            intrinsic.get_declaration(&module, &[]).unwrap()
+        };
+
+        let llvm_stackrestore = {
+            let intrinsic =
+                Intrinsic::find("llvm.stackrestore").expect("llvm.stackrestore should be present");
+            intrinsic.get_declaration(&module, &[]).unwrap()
+        };
+
         Self {
             ctx,
             builder: ctx.create_builder(),
             module,
+
             current_function: None,
             current_basic_block: None,
             loop_end_blocks: Vec::new(),
+
             functions: HashMap::new(),
-            scopes: ScopeStack::new(),
+            scopes: Vec::new(),
+
+            llvm_stacksave,
+            llvm_stackrestore,
 
             i64_t: ctx.i64_type(),
 
@@ -112,6 +152,43 @@ impl<'ctx> CodeGenerator<'ctx> {
         self.builder.position_at_end(basic_block);
     }
 
+    fn add_to_current_scope(&mut self, name: Symbol, var: Variable<'ctx>) {
+        self.scopes
+            .last_mut()
+            .expect("There should be a scope present")
+            .variables
+            .insert(name, var);
+    }
+
+    fn current_scope(&self) -> &Scope {
+        self.scopes.last().expect("There should always be a scope")
+    }
+
+    fn get_variable(&self, name: &Symbol) -> Option<&Variable<'ctx>> {
+        for scope in self.scopes.iter().rev() {
+            if let result @ Some(_) = scope.variables.get(name) {
+                return result;
+            }
+        }
+
+        None
+    }
+
+    fn push_scope_with_stack_restore_point(&mut self, kind: ScopeKind) {
+        let restore_point = self
+            .builder
+            .build_call(self.llvm_stacksave, &[], "")
+            .try_as_basic_value()
+            .left()
+            .expect("llvm.stacksave should return a basic value");
+
+        self.scopes.push(Scope {
+            kind,
+            stack_restorepoint: Some(restore_point),
+            variables: HashMap::new(),
+        });
+    }
+
     fn gen_item(&mut self, item: &Item) -> Result<(), CodegenError> {
         match &item.kind {
             ItemKind::Function {
@@ -122,20 +199,32 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .get(&name.sym)
                     .expect("Function should be known");
 
-                self.scopes.push_empty_scope();
+                self.scopes.push(Scope {
+                    kind: ScopeKind::Parameter,
+                    stack_restorepoint: None,
+                    variables: HashMap::new(),
+                });
 
                 self.current_function = Some(f);
 
                 for (i, param) in params.iter().enumerate() {
                     let val = f.get_nth_param(i as u32).unwrap();
-                    self.scopes
-                        .insert(param.name.sym, (val.get_type(), Variable::Parameter(val)));
+                    self.add_to_current_scope(
+                        param.name.sym,
+                        Variable {
+                            ty: val.get_type(),
+                            val: VariableValue::Parameter(val),
+                        },
+                    );
                 }
 
                 let entry = self.ctx.append_basic_block(f, "entry");
+
                 self.position_builder_at_end_of(entry);
 
+                self.push_scope_with_stack_restore_point(ScopeKind::Function);
                 self.gen_block(&body)?;
+                self.scopes.pop();
 
                 self.current_function = None;
 
@@ -147,11 +236,9 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     fn gen_block(&mut self, block: &Block) -> Result<bool, CodegenError> {
-        self.scopes.push_empty_scope();
-
         for statement in &block.statements {
-            let has_terminator = self.gen_statement(statement)?;
-            if has_terminator {
+            let terminated = self.gen_statement(statement)?;
+            if terminated {
                 return Ok(true);
             }
         }
@@ -162,7 +249,18 @@ impl<'ctx> CodeGenerator<'ctx> {
     fn gen_statement(&mut self, stmt: &Statement) -> Result<bool, CodegenError> {
         match &stmt.kind {
             StatementKind::Return(Some(e)) => {
+                let function_scope = self
+                    .scopes
+                    .iter()
+                    .rev()
+                    .find(|scope| scope.kind == ScopeKind::Function)
+                    .expect("There should exist a function scope");
+                let restore_point = function_scope
+                    .stack_restorepoint
+                    .expect("The function should have a stack restore point");
                 let val = self.gen_expr(e)?;
+                self.builder
+                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "");
                 self.builder.build_return(Some(&val));
             }
             StatementKind::If {
@@ -185,17 +283,39 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let mut branch_terminator_count = 0u32;
 
                 self.position_builder_at_end_of(then_block);
-                let then_has_terminator = self.gen_block(then)?;
+                self.push_scope_with_stack_restore_point(ScopeKind::Block);
+                let has_terminator = self.gen_block(then)?;
 
-                if !then_has_terminator {
+                if !has_terminator {
+                    let restore_point = self
+                        .current_scope()
+                        .stack_restorepoint
+                        .expect("Blocks should have a stack restore point");
+                    self.builder
+                        .build_call(self.llvm_stackrestore, &[restore_point.into()], "");
+
                     self.builder.build_unconditional_branch(end_block);
                     branch_terminator_count += 1;
                 }
 
+                self.scopes.pop();
+
                 self.position_builder_at_end_of(otherwise_block);
                 if let Some(otherwise) = otherwise {
-                    let otherwise_has_terminator = self.gen_block(otherwise)?;
-                    if !otherwise_has_terminator {
+                    self.push_scope_with_stack_restore_point(ScopeKind::Block);
+                    let has_terminator = self.gen_block(otherwise)?;
+
+                    if !has_terminator {
+                        let restore_point = self
+                            .current_scope()
+                            .stack_restorepoint
+                            .expect("Blocks should have a stack restore point");
+                        self.builder.build_call(
+                            self.llvm_stackrestore,
+                            &[restore_point.into()],
+                            "",
+                        );
+
                         self.builder.build_unconditional_branch(end_block);
                         branch_terminator_count += 1;
                     }
@@ -222,9 +342,18 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.position_builder_at_end_of(body_block);
 
+                self.push_scope_with_stack_restore_point(ScopeKind::Loop);
                 self.gen_block(body)?;
 
+                let restore_point = self
+                    .current_scope()
+                    .stack_restorepoint
+                    .expect("Loop scopes should have a stack restore point");
+                self.builder
+                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "");
+
                 self.builder.build_unconditional_branch(body_block);
+                self.scopes.pop();
 
                 self.loop_end_blocks.pop();
 
@@ -234,8 +363,13 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let basic_type = self.get_inktype_of_node(ty.id);
                 let ptr = self.builder.build_alloca(basic_type, "");
 
-                self.scopes
-                    .insert(name.sym, (basic_type, Variable::Stack(ptr)));
+                self.add_to_current_scope(
+                    name.sym,
+                    Variable {
+                        ty: basic_type,
+                        val: VariableValue::Stack(ptr),
+                    },
+                );
             }
             StatementKind::Set { dst, val } => {
                 let p = self.get_dst_ptr(dst)?;
@@ -243,11 +377,24 @@ impl<'ctx> CodeGenerator<'ctx> {
                 self.builder.build_store(p, x);
             }
             StatementKind::Break => {
+                let loop_scope = self
+                    .scopes
+                    .iter()
+                    .rev()
+                    .find(|scope| scope.kind == ScopeKind::Loop)
+                    .expect("There should exist a loop scope");
+
+                let restore_point = loop_scope
+                    .stack_restorepoint
+                    .expect("The loop should have a stack restore point");
+
+                self.builder
+                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "");
                 self.builder.build_unconditional_branch(
                     *self
                         .loop_end_blocks
                         .last()
-                        .expect("There should be a basic block after a loop"),
+                        .expect("There should be a basic block present after a loop"),
                 );
             }
             _ => todo!("Statement \"{:?}\"", stmt.kind),
@@ -260,8 +407,8 @@ impl<'ctx> CodeGenerator<'ctx> {
     fn get_dst_ptr(&self, e: &Expr) -> Result<PointerValue, CodegenError> {
         match &e.kind {
             ExprKind::Identifier(sym) => {
-                let (ty, var) = self.scopes.get(&sym).expect("Identifier should exist");
-                let Variable::Stack(ptr) = var else {
+                let Variable { ty, val } = self.get_variable(sym).expect("Identifier should exist");
+                let VariableValue::Stack(ptr) = val else {
                     panic!("Tried to get dst of non-stack variable")
                 };
                 Ok(*ptr)
@@ -392,9 +539,9 @@ impl<'ctx> CodeGenerator<'ctx> {
                 _ => todo!("BuiltinOpKind \"{:?}\" not yet implemented", op),
             },
             ExprKind::Identifier(sym) => {
-                let (ty, var) = *self.scopes.get(&sym).expect("Identifer should exist");
-                match var {
-                    Variable::Stack(ptr) => Ok(self.builder.build_load(ty, ptr, "")),
+                let Variable { ty, val } = *self.get_variable(sym).expect("Identifer should exist");
+                match val {
+                    VariableValue::Stack(ptr) => Ok(self.builder.build_load(ty, ptr, "")),
                     _ => todo!("Retrieve value from variable"),
                 }
             }
@@ -403,7 +550,11 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     pub fn compile(&mut self, items: &[Item], optimize: bool) -> Result<String, CodegenError> {
-        self.scopes.push_empty_scope();
+        self.scopes.push(Scope {
+            kind: ScopeKind::Global,
+            stack_restorepoint: None,
+            variables: HashMap::new(),
+        });
 
         for item in items {
             match &item.kind {

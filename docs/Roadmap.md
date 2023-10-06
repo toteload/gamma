@@ -92,8 +92,9 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - Testing
 	- [x] Set up a way to run sample programs and compare output.
 ### Version 0.3.1
-- [ ] Switch syntax to use `end` instead of using braces.
-- [ ] Remove arrow from function syntax
+- [ ] Change syntax
+	- [ ] Use `end` instead of using braces.
+	- [ ] Remove arrow from function syntax
 
 ### Version 0.4
 - [ ] Add pointer type.
