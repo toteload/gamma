@@ -1,14 +1,14 @@
-fn main() -> int {
+fn main(): int
     let s: int
     set s = 0
 
-    loop {
-        if (eq s 10) {
+    loop
+        if (eq s 10)
             break
-        }
+        end
 
         set s = (+ s 1)
-    }
+    end
 
     return s
-}
+end

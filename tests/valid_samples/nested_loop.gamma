@@ -1,25 +1,25 @@
-fn main() -> int {
+fn main(): int
     let i: int
     set i = 0
 
-    loop {
-        if (eq i 10) {
+    loop
+        if (eq i 10)
             break
-        }
+        end
 
         let j: int
         set j = 0
 
-        loop {
-            if (eq j 10) {
+        loop
+            if (eq j 10)
                 break
-            }
+            end
 
             set j = (+ j 1)
-        }
+        end
 
         set i = (+ i 1)
-    }
+    end
 
     return 0
-}
+end

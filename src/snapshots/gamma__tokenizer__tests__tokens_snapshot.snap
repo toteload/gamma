@@ -245,20 +245,20 @@ expression: tokens
       ),
       end: SourceLocation(
         line: 1,
-        col: 68,
+        col: 67,
       ),
     ),
-    kind: Arrow,
+    kind: Minus,
   ),
   Token(
     span: SourceSpan(
       start: SourceLocation(
         line: 1,
-        col: 69,
+        col: 68,
       ),
       end: SourceLocation(
         line: 1,
-        col: 69,
+        col: 68,
       ),
     ),
     kind: Comma,
@@ -267,11 +267,11 @@ expression: tokens
     span: SourceSpan(
       start: SourceLocation(
         line: 1,
-        col: 70,
+        col: 69,
       ),
       end: SourceLocation(
         line: 1,
-        col: 70,
+        col: 69,
       ),
     ),
     kind: EqualSign,
@@ -470,5 +470,18 @@ expression: tokens
       ),
     ),
     kind: KeywordVoid,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 2,
+        col: 73,
+      ),
+      end: SourceLocation(
+        line: 2,
+        col: 75,
+      ),
+    ),
+    kind: KeywordEnd,
   ),
 ]

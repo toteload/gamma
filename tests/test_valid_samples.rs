@@ -1,4 +1,4 @@
-use gamma::compiler::{{Context, Options}};
+use gamma::compiler::{Context, Options};
 use insta::assert_snapshot;
 use std::fs;
 
@@ -16,7 +16,10 @@ fn basic_arithmetic() {
             e.print(&context);
         }
 
-        panic!("Compilation of sample \"basic_arithmetic\" resulted in {} error(s)", errors.len()); 
+        panic!(
+            "Compilation of sample \"basic_arithmetic\" resulted in {} error(s)",
+            errors.len()
+        );
     };
 
     assert_snapshot!("basic_arithmetic", output);
@@ -36,7 +39,10 @@ fn basic_main() {
             e.print(&context);
         }
 
-        panic!("Compilation of sample \"basic_main\" resulted in {} error(s)", errors.len()); 
+        panic!(
+            "Compilation of sample \"basic_main\" resulted in {} error(s)",
+            errors.len()
+        );
     };
 
     assert_snapshot!("basic_main", output);
@@ -56,7 +62,10 @@ fn nested_loop() {
             e.print(&context);
         }
 
-        panic!("Compilation of sample \"nested_loop\" resulted in {} error(s)", errors.len()); 
+        panic!(
+            "Compilation of sample \"nested_loop\" resulted in {} error(s)",
+            errors.len()
+        );
     };
 
     assert_snapshot!("nested_loop", output);
@@ -76,7 +85,10 @@ fn sum_loop() {
             e.print(&context);
         }
 
-        panic!("Compilation of sample \"sum_loop\" resulted in {} error(s)", errors.len()); 
+        panic!(
+            "Compilation of sample \"sum_loop\" resulted in {} error(s)",
+            errors.len()
+        );
     };
 
     assert_snapshot!("sum_loop", output);
@@ -95,7 +107,10 @@ fn basic_arithmetic_optimized() {
             e.print(&context);
         }
 
-        panic!("Compilation of sample \"basic_arithmetic_optimized\" resulted in {} error(s)", errors.len()); 
+        panic!(
+            "Compilation of sample \"basic_arithmetic_optimized\" resulted in {} error(s)",
+            errors.len()
+        );
     };
 
     assert_snapshot!("basic_arithmetic_optimized", output);
@@ -115,7 +130,10 @@ fn basic_main_optimized() {
             e.print(&context);
         }
 
-        panic!("Compilation of sample \"basic_main_optimized\" resulted in {} error(s)", errors.len()); 
+        panic!(
+            "Compilation of sample \"basic_main_optimized\" resulted in {} error(s)",
+            errors.len()
+        );
     };
 
     assert_snapshot!("basic_main_optimized", output);
@@ -135,7 +153,10 @@ fn nested_loop_optimized() {
             e.print(&context);
         }
 
-        panic!("Compilation of sample \"nested_loop_optimized\" resulted in {} error(s)", errors.len()); 
+        panic!(
+            "Compilation of sample \"nested_loop_optimized\" resulted in {} error(s)",
+            errors.len()
+        );
     };
 
     assert_snapshot!("nested_loop_optimized", output);
@@ -155,9 +176,11 @@ fn sum_loop_optimized() {
             e.print(&context);
         }
 
-        panic!("Compilation of sample \"sum_loop_optimized\" resulted in {} error(s)", errors.len()); 
+        panic!(
+            "Compilation of sample \"sum_loop_optimized\" resulted in {} error(s)",
+            errors.len()
+        );
     };
 
     assert_snapshot!("sum_loop_optimized", output);
 }
-

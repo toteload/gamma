@@ -49,8 +49,6 @@ pub enum TokenKind {
     IntLiteral(i64),
     BoolLiteral(bool),
 
-    Arrow,
-
     BraceOpen,
     BraceClose,
 
@@ -169,6 +167,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     "let"      => Token { span, kind: TokenKind::KeywordLet, },
                     "set"      => Token { span, kind: TokenKind::KeywordSet, },
                     "cast"     => Token { span, kind: TokenKind::KeywordCast, },
+                    "end"      => Token { span, kind: TokenKind::KeywordEnd, },
 
                     "and"      => Token { span, kind: TokenKind::KeywordAnd, },
                     "or"       => Token { span, kind: TokenKind::KeywordOr, },
@@ -241,20 +240,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             '*' => Token { span: SourceSpan::single(start), kind: TokenKind::Star, },
             '+' => Token { span: SourceSpan::single(start), kind: TokenKind::Plus, },
             '/' => Token { span: SourceSpan::single(start), kind: TokenKind::Div, },
-            '-' => {
-                if let Some('>') = self.iter.peek() {
-                    let (_, end, _) = self.advance().unwrap();
-                    Token {
-                        span: SourceSpan { start, end },
-                        kind: TokenKind::Arrow,
-                    }
-                } else {
-                    Token {
-                        span: SourceSpan::single(start),
-                        kind: TokenKind::Minus,
-                    }
-                }
-            }
+            '-' => Token { span: SourceSpan::single(start), kind: TokenKind::Minus, },
             _ => todo!("Character '{}' not recognized", c),
         };
 
@@ -270,8 +256,8 @@ mod tests {
 
     #[test]
     fn tokenizer_creates_the_expected_tokens() {
-        let source = "fn if else + - * ; : { } ( ) void let voidlet 4687 continue return->,=       
-            int eq / ne ge le lt gt true false loop break bool int void ";
+        let source = "fn if else + - * ; : { } ( ) void let voidlet 4687 continue return-,=       
+            int eq / ne ge le lt gt true false loop break bool int void end";
 
         let mut symbols = StringInterner::new();
         let tokenizer = Tokenizer::new(source, &mut symbols);

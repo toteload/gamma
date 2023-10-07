@@ -114,7 +114,7 @@ impl Parser<'_> {
 
         let params = self.parse_params()?;
 
-        expect_token!(self.tokens.next(), Arrow)?;
+        expect_token!(self.tokens.next(), Colon)?;
 
         let return_type = self.parse_type()?;
 
@@ -203,13 +203,11 @@ impl Parser<'_> {
     fn parse_block(&mut self) -> Result<Block> {
         use TokenKind::*;
 
-        let open_brace = expect_token!(self.tokens.next(), BraceOpen)?;
-
         let mut statements = Vec::new();
 
         loop {
             let peeked = expect_token!(self.tokens.peek(), _)?;
-            if matches!(peeked.kind, BraceClose) {
+            if matches!(peeked.kind, KeywordEnd) {
                 break;
             }
 
@@ -217,10 +215,33 @@ impl Parser<'_> {
             statements.push(statement);
         }
 
-        let close_brace = expect_token!(self.tokens.next(), BraceClose)?;
+        let end = expect_token!(self.tokens.next(), KeywordEnd)?;
 
         let id = self.gen_node_id();
-        let span = open_brace.span.extend(&close_brace.span);
+
+        let span = match statements.as_slice() {
+            [first, .., last] => {
+                let first = self
+                    .spans
+                    .get(&first.id)
+                    .expect("Statement should have a span saved");
+
+                let last = self
+                    .spans
+                    .get(&last.id)
+                    .expect("Statement should have a span saved");
+
+                first.extend(&last)
+            }
+            [statement] => *self
+                .spans
+                .get(&statement.id)
+                .expect("Statement should have a span saved"),
+
+            // TODO(david) This should return an empty span, but that is currently not possible
+            // because the end of a SourceSpan is inclusive...
+            [] => SourceSpan::single(end.span.start),
+        };
 
         self.spans.insert(id, span);
 

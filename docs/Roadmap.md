@@ -93,10 +93,12 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - Testing
 	- [x] Set up a way to run sample programs and compare output.
 - [ ] Add data layout to LLVM module
+- [ ] Make end of `SourceSpan` exclusive so that you can have empty spans.
 ### Version 0.3.1
 - [ ] Change syntax
-	- [ ] Use `end` instead of using braces.
-	- [ ] Remove arrow from function syntax
+	- [x] Use `end` instead of using braces.
+	- [ ] The `end` for an if-statement could be optional if there is an else afterwards
+	- [x] Remove arrow from function syntax
 
 ### Version 0.4
 - [ ] Add pointer type.
