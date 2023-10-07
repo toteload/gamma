@@ -92,6 +92,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [ ] `void` can only be used as the return type of a function
 - Testing
 	- [x] Set up a way to run sample programs and compare output.
+- [ ] Add data layout to LLVM module
 ### Version 0.3.1
 - [ ] Change syntax
 	- [ ] Use `end` instead of using braces.

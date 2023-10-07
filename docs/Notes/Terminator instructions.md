@@ -1,3 +1,4 @@
+```
 // Terminator Instructions - These instructions are used to terminate a basic
 // block of the program.   Every basic block must end with one of these
 // instructions for it to be a well formed basic block.
@@ -15,3 +16,4 @@ HANDLE_TERM_INST  ( 9, CatchRet      , CatchReturnInst)
 HANDLE_TERM_INST  (10, CatchSwitch   , CatchSwitchInst)
 HANDLE_TERM_INST  (11, CallBr        , CallBrInst) // A call-site terminator
   LAST_TERM_INST  (11)
+```
