@@ -22,6 +22,7 @@ pub enum TokenKind {
     KeywordLet,
     KeywordSet,
     KeywordCast,
+    KeywordEnd,
 
     KeywordOr,
     KeywordAnd,

@@ -77,10 +77,11 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [x] Add `trap` statement to abort the program
 	- [x] Add to codegen
 	- [x] Remove the `trap` statement
+- [ ] A function must have a `return` statement, even functions that return `void`.
 - [ ] Add `exit` statement to exit the program with an exit code.
 	- [ ] This means the program has a small runtime, similar to C. On Windows `ExitProcess` needs to be called and on Linux `exit`.
 	- This can be used to create programs that check for conditions and exit with a specific code to signal that something is wrong. This can be used in a test suite, where the programs are compiled and ran, and the return code is verified.
-- [ ] `main` function must be of the correct type `fn(): void`.
+- [ ] `main` function must be of the correct type `fn(): void` or `fn(): int` ?? Not sure which one to choose.
 - [x] Add `let` statement.
 	- Variable initialization is optional. This can also be skipped entirely, to keep the language simpler.
 	- This could be added, and implemented with a small AST transform where the `let` with initializer get transformed into a `let` without initializer and a `set`.
@@ -125,7 +126,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 
 ### Version 0.5
 - [ ] Add user defined functions.
-- [ ] Add `loop`, `break` and `continue`
+- [x] Add `loop`, `break` and `continue`
 	- [ ] Semantic check: `break` and `continue` can only be used inside a loop
 	- [ ] Add optional labels for `loop`. You can `break :label` or `continue :label`. A label has to start with a colon.
 	- `loop :main { break :main }`
@@ -151,12 +152,3 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 
 ### Version 0.8
 - [ ] Add string type
-- [ ] Add IO functions to `std` module 
-	- [ ] Console reading and writing
-	- [ ] File reading and writing.
-
-### Version 0.9
-- [ ] Add more integer types to allow interfacing over FFI
-- [ ] Add calling external functions (FFI).
-
-### Version 1.0
