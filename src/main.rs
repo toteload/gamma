@@ -14,38 +14,25 @@ mod type_check;
 mod types;
 
 use anyhow::Result;
-use compiler::{Context, Options};
+
+/*
+fn print_targets() {
+    Target::initialize_all(&InitializationConfig::default());
+
+    let mut current = Target::get_first();
+
+    while let Some(target) = current {
+        let name = target.get_name();
+        let description = target.get_description();
+
+        println!("{:?} => {:?}", name, description);
+
+        current = target.get_next();
+    }
+}
+*/
 
 fn main() -> Result<()> {
-    let source = "fn main() -> int {
-    let s: int
-    set s = 0
-    loop {
-        if (= s 10) {
-            break
-        }
-
-        set s = (+ s 1)
-    }
-
-    return s
-}";
-
-    let mut context = Context::new();
-    let result = context.compile(source, &Options { optimize: false });
-
-    let Ok(output) = result else {
-        let Err(errors) = result else { unreachable!() };
-
-        for e in &errors {
-            e.print(&context);
-        }
-
-        panic!("Compilation resulted in {} error(s)", errors.len());
-    };
-
-    print!("{}", output);
-
     /*
         println!("Gamma compiler version 0.2\n");
 

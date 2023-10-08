@@ -92,14 +92,26 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [ ] `void` can only be used as the return type of a function
 - Testing
 	- [x] Set up a way to run sample programs and compare output.
-- [ ] Add data layout to LLVM module
+- [x] Add data layout to LLVM module
+	- I don't do this.
 - [ ] Make end of `SourceSpan` exclusive so that you can have empty spans.
+- [ ] Track down what causes the random errors. Sometimes the compiler encounters even though the input is the same `todo`.
+	- [ ] Serialize the AST and all the corresponding data, like spans. This way you can check that these are all consistent across compilations.
 ### Version 0.3.1
 - [ ] Change syntax
 	- [x] Use `end` instead of using braces.
 	- [ ] The `end` for an if-statement could be optional if there is an else afterwards
 	- [x] Remove arrow from function syntax
-
+### Version 0.4.1
+- [ ] Start development of Tetris game in parallel to the compiler. Let the needs of the game steer the development direction of the compiler.
+- [ ] Add functionality for calling externally defined C functions.
+	- [ ] Syntax for declaring externally defined functions.
+	- [ ] C types:
+		- [ ] Integers
+		- [ ] structs
+			- Struct indexing syntax `player.name`
+		- [ ] pointers
+		- [ ] ...
 ### Version 0.4
 - [ ] Add pointer type.
 	- `*T`
@@ -115,18 +127,6 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 	- `[128]T` or `[T:128]`. I prefer the first.
 	- [ ] Add indexing operator. `(@ p 12)`
 	- [ ] Indexing is only allowed on arrays and pointers, and can only be indexed by integers.
-
-### Version 0.4.1
-- [ ] Start development of Tetris game in parallel to the compiler. Let the needs of the game steer the development direction of the compiler.
-- [ ] Add functionality for calling externally defined C functions.
-	- [ ] Syntax for declaring externally defined functions.
-	- [ ] C types:
-		- [ ] Integers
-		- [ ] structs
-			- Struct indexing syntax `player.name`
-		- [ ] pointers
-		- [ ] ...
-
 ### Version 0.5
 - [ ] Add user defined functions.
 - [x] Add `loop`, `break` and `continue`

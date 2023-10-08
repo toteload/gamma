@@ -1,6 +1,6 @@
 use crate::{
     ast::{NodeId, NodeIdGenerator},
-    ink_codegen::CodeGenerator,
+    ink_codegen::{CodeGenerator},
     parser::Parser,
     semantics::validate_semantics,
     source_location::SourceSpan,
@@ -10,12 +10,10 @@ use crate::{
 };
 use std::collections::HashMap;
 
+pub use crate::ink_codegen::{Options, OutputTarget};
+
 pub trait PrintableError {
     fn print(&self, context: &Context);
-}
-
-pub struct Options {
-    pub optimize: bool,
 }
 
 pub struct Context {
@@ -66,7 +64,7 @@ impl Context {
 
         let ctx = inkwell::context::Context::create();
         let mut codegen = CodeGenerator::new(&ctx, &self.symbols, &self.ast_types, &self.types);
-        let output = codegen.compile(&items, options.optimize).map_err(|e| {
+        let output = codegen.compile(&items, options).map_err(|e| {
             let err = Box::new(e) as Box<dyn PrintableError>;
             vec![err]
         })?;

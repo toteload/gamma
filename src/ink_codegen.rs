@@ -9,9 +9,10 @@ use inkwell::{
     intrinsics::Intrinsic,
     module::Module,
     passes::PassManager,
+    targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
     types::{BasicTypeEnum, IntType},
     values::{BasicValueEnum, FunctionValue, PointerValue},
-    IntPredicate,
+    IntPredicate, OptimizationLevel,
 };
 use std::collections::HashMap;
 
@@ -50,6 +51,16 @@ struct Scope<'ctx> {
     kind: ScopeKind,
     stack_restorepoint: Option<BasicValueEnum<'ctx>>,
     variables: HashMap<Symbol, Variable<'ctx>>,
+}
+
+pub struct Options {
+    pub optimize: bool,
+    pub output: OutputTarget,
+}
+
+pub enum OutputTarget {
+    LlvmIr,
+    Assembly,
 }
 
 pub struct CodeGenerator<'ctx> {
@@ -549,7 +560,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
-    pub fn compile(&mut self, items: &[Item], optimize: bool) -> Result<String, CodegenError> {
+    pub fn compile(&mut self, items: &[Item], options: &Options) -> Result<String, CodegenError> {
         self.scopes.push(Scope {
             kind: ScopeKind::Global,
             stack_restorepoint: None,
@@ -587,35 +598,52 @@ impl<'ctx> CodeGenerator<'ctx> {
             todo!("Handle error properly")
         }
 
-        if optimize {
+        if options.optimize {
             let pass_manager: PassManager<Module<'_>> = PassManager::create(());
             pass_manager.add_promote_memory_to_register_pass();
+            pass_manager.add_cfg_simplification_pass();
+            pass_manager.add_instruction_combining_pass();
+            pass_manager.add_instruction_simplify_pass();
+            pass_manager.add_aggressive_dce_pass();
             pass_manager.run_on(&self.module);
         }
 
-        /*
-        if let Err(s) = self.module.print_to_file(Path::new("./out.ll")) {
-            //return Err(anyhow!(s.to_string()));
-            todo!()
+        match options.output {
+            OutputTarget::LlvmIr => Ok(self.module.to_string()),
+            OutputTarget::Assembly => {
+                Target::initialize_x86(&InitializationConfig::default());
+
+                let triple = TargetTriple::create("x86_64-pc-windows-msvc");
+                let target = Target::from_triple(&triple)
+                    .expect("Should be able to get target from initialized triple");
+                let features = "";
+                let target_machine = target
+                    .create_target_machine(
+                        &triple,
+                        "",
+                        features,
+                        OptimizationLevel::Default,
+                        RelocMode::Default,
+                        CodeModel::Default,
+                    )
+                    .expect("Should be able to create target machine");
+                let target_data = target_machine.get_target_data();
+                let data_layout = target_data.get_data_layout();
+
+                self.module.set_data_layout(&data_layout);
+
+                let result =
+                    target_machine.write_to_memory_buffer(&self.module, FileType::Assembly);
+
+                match result {
+                    Err(msg) => todo!("Handle error: {}", msg.to_string()),
+                    Ok(buffer) => {
+                        let s = std::str::from_utf8(buffer.as_slice())
+                            .expect("Buffer should contain valid UTF-8");
+                        Ok(s.into())
+                    }
+                }
+            }
         }
-        */
-
-        /*
-        Target::initialize_x86(&InitializationConfig::default());
-
-        let target = Target::from_name("x86-64").unwrap();
-        let target_machine = target.create_target_machine(
-            &TargetTriple::create("x86_64-pc-windows-msvc"),
-            "x86-64",
-            "",
-            OptimizationLevel::Default,
-            RelocMode::Default,
-            CodeModel::Default,
-        ).unwrap();
-
-        assert!(target_machine.write_to_file(&self.module, FileType::Object, Path::new("./out")).is_ok());
-        */
-
-        Ok(self.module.to_string())
     }
 }
