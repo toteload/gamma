@@ -1,13 +1,14 @@
 use crate::ast::*;
-use crate::compiler::{Context, PrintableError};
+use crate::error::*;
 use crate::source_location::SourceSpan;
 use crate::string_interner::StringInterner;
 use crate::tokenizer::{TokenKind, Tokenizer};
 use std::collections::HashMap;
 use std::iter::Peekable;
 
-type Result<T> = std::result::Result<T, ParseError>;
+type Result<T> = std::result::Result<T, Error>;
 
+/*
 #[derive(Debug)]
 pub enum ParseError {
     UnexpectedEnd,
@@ -28,6 +29,7 @@ impl PrintableError for ParseError {
         }
     }
 }
+*/
 
 pub struct Parser<'a> {
     tokens: Peekable<Tokenizer<'a>>,
@@ -44,12 +46,20 @@ macro_rules! expect_token {
         if let Some(tok) = $token {
             let token_matches_pattern = matches!(tok.kind, $( $pattern )|+ $( if $guard )?);
             if !token_matches_pattern {
-                Err(ParseError::UnexpectedToken(tok.span, tok.kind.into()))
+                Err(Error {
+                    kind: ErrorKind::Parse,
+                    span: Some(tok.span),
+                    info: vec![ErrorInfo::Text("Encountered unexpected token "), ErrorInfo::SourceText(tok.span)],
+                })
             } else {
                 Ok(tok)
             }
         } else {
-            Err(ParseError::UnexpectedEnd)
+            Err(Error {
+                kind: ErrorKind::Parse,
+                span: None,
+                info: vec![ErrorInfo::Text("Unexpected end of source")],
+            })
         }
     };
 }
@@ -267,9 +277,30 @@ impl Parser<'_> {
 
                 let ty = self.parse_type()?;
 
-                span = tok.span.extend(self.spans.get(&ty.id).unwrap());
+                let peeked = expect_token!(self.tokens.peek(), _)?;
 
-                Let { name, ty }
+                if matches!(peeked.kind, EqualSign) {
+                    // Eat the '='
+                    self.tokens.next();
+
+                    let val: Box<_> = self.parse_expression()?.into();
+
+                    span = tok.span.extend(self.spans.get(&val.id).unwrap());
+
+                    Let {
+                        name,
+                        ty,
+                        init: Some(val),
+                    }
+                } else {
+                    span = tok.span.extend(self.spans.get(&ty.id).unwrap());
+
+                    Let {
+                        name,
+                        ty,
+                        init: None,
+                    }
+                }
             }
             KeywordSet => {
                 self.tokens.next();
@@ -462,167 +493,6 @@ impl Parser<'_> {
 
         Ok(Expr { id, kind })
     }
-
-    /*
-    fn parse_expression_element(&mut self) -> Result<Expr> {
-        use TokenKind::*;
-
-        let tok = expect_token!(self.tokens.next(), _)?;
-
-        if matches!(tok.kind, ParenOpen) {
-            let inner = self.parse_expression()?;
-            expect_token!(self.tokens.next(), ParenClose)?;
-            return Ok(inner);
-        }
-
-        let id = self.gen_node_id();
-        let span: SourceSpan;
-
-        let kind = match tok.kind {
-            Minus => {
-                let e = self.parse_expression()?.into();
-                span = tok.span;
-                ExprKind::UnaryOp {
-                    op: UnaryOpKind::Negate,
-                    e,
-                }
-            }
-            IntLiteral(x) => {
-                span = tok.span;
-                ExprKind::IntLiteral(x)
-            }
-            BoolLiteral(x) => {
-                span = tok.span;
-                ExprKind::BoolLiteral(x)
-            }
-            KeywordCast => {
-                expect_token!(self.tokens.next(), ParenOpen)?;
-
-                let ty = self.parse_type()?;
-
-                expect_token!(self.tokens.next(), Comma)?;
-
-                let e = self.parse_expression()?;
-
-                let last_token = expect_token!(self.tokens.next(), ParenClose)?;
-
-                span = tok.span.extend(&last_token.span);
-
-                ExprKind::Cast { ty, e: e.into() }
-            }
-            Identifier(sym) => {
-                if let Some(Token {
-                    kind: ParenOpen, ..
-                }) = self.tokens.peek()
-                {
-                    self.tokens.next(); // Eat the `(`
-
-                    let name = {
-                        let id = self.id_generator.gen_id();
-                        let span = tok.span;
-
-                        self.spans.insert(id, span);
-
-                        Name { id, sym }
-                    };
-
-                    let mut args = Vec::new();
-                    loop {
-                        let peeked = expect_token!(self.tokens.peek(), _)?;
-                        if matches!(peeked.kind, ParenClose) {
-                            span = tok.span.extend(&peeked.span);
-                            self.tokens.next();
-                            break;
-                        }
-
-                        let arg = self.parse_expression()?;
-                        args.push(arg);
-
-                        let peeked = expect_token!(self.tokens.peek(), Comma | ParenClose)?;
-                        if matches!(peeked.kind, Comma) {
-                            self.tokens.next();
-                        }
-                    }
-
-                    ExprKind::Call { name, args }
-                } else {
-                    span = tok.span;
-                    ExprKind::Identifier(sym)
-                }
-            }
-
-            _ => todo!(),
-        };
-
-        self.spans.insert(id, span);
-
-        Ok(Expr { id, kind })
-    }
-
-    fn parse_binop_expression(&mut self, precedence: u32, mut lhs: Expr) -> Result<Expr> {
-        loop {
-            let Some(&tok) = self.tokens.peek() else { return Ok(lhs); };
-
-            let Some((op_precedence, op)) = self.binary_ops.get(&tok.kind) else {
-                return Ok(lhs);
-            };
-
-            let (op_precedence, op) = (*op_precedence, *op);
-
-            // Eat the operator
-            self.tokens.next();
-
-            if op_precedence < precedence {
-                return Ok(lhs);
-            }
-
-            let mut rhs = self.parse_expression_element()?;
-
-            // Check if we have another operator
-            let peeked = self.tokens.peek();
-            let has_next_operator = match peeked {
-                Some(tok) if self.binary_ops.get(&tok.kind).is_some() => true,
-                _ => false,
-            };
-
-            // There is no next token or the next token is not an operator, so we are done.
-            if !has_next_operator {
-                let id = self.gen_node_id();
-                self.spans.insert(id, tok.span);
-                return Ok(Expr {
-                    id,
-                    kind: ExprKind::BinaryOp {
-                        op,
-                        lhs: lhs.into(),
-                        rhs: rhs.into(),
-                    },
-                });
-            };
-
-            // We previously already found out that there is another token and that the token is
-            // a binary operator.
-            let Some(peeked) = self.tokens.peek() else { unreachable!() };
-            let Some((next_op_precedence, _)) = self.binary_ops.get(&peeked.kind) else { unreachable!() };
-
-            let next_op_precedence = *next_op_precedence;
-
-            if next_op_precedence > op_precedence {
-                rhs = self.parse_binop_expression(next_op_precedence, rhs)?;
-            }
-
-            let id = self.gen_node_id();
-            self.spans.insert(id, tok.span);
-            lhs = Expr {
-                id,
-                kind: ExprKind::BinaryOp {
-                    op,
-                    lhs: lhs.into(),
-                    rhs: rhs.into(),
-                },
-            };
-        }
-    }
-    */
 }
 
 mod tests {}

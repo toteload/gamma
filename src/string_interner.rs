@@ -4,6 +4,7 @@ use std::collections::HashMap;
 #[derive(PartialEq, Debug, Clone, Copy, Hash, Eq, Serialize)]
 pub struct Symbol(u32);
 
+#[derive(Serialize)]
 pub struct StringInterner {
     symbols: HashMap<Box<str>, Symbol>,
     strings: Vec<Box<str>>,

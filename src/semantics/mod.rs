@@ -2,22 +2,28 @@ mod has_main;
 mod validate_symbol_use;
 
 use crate::ast::*;
-use crate::compiler::{Context, PrintableError};
+use crate::compiler::Context;
+use crate::error::Error;
+use crate::source_location::SourceSpan;
+use crate::string_interner::StringInterner;
+use std::collections::HashMap;
 
-pub trait SemanticProver {
-    fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Box<dyn PrintableError>>>;
+pub struct SemanticContext<'a> {
+    pub symbols: &'a StringInterner,
+    pub spans: &'a HashMap<NodeId, SourceSpan>,
 }
 
-pub fn validate_semantics(
-    context: &Context,
-    items: &[Item],
-) -> Result<(), Vec<Box<dyn PrintableError>>> {
+pub trait SemanticProver {
+    fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Error>>;
+}
+
+pub fn validate_semantics(context: &SemanticContext, items: &[Item]) -> Result<(), Vec<Error>> {
     let x: Box<dyn SemanticProver> = Box::new(has_main::Prover::new(&context));
     let y: Box<dyn SemanticProver> = Box::new(validate_symbol_use::Prover::new(&context));
 
     let mut provers = vec![x, y];
 
-    let errors: Vec<Box<dyn PrintableError>> = provers
+    let errors: Vec<_> = provers
         .iter_mut()
         .filter_map(|prover| prover.verify(items).err())
         .flatten()

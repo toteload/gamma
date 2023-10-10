@@ -1,6 +1,7 @@
 use crate::string_interner::Symbol;
+use serde::Serialize;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct NodeId(u32);
 
 pub struct NodeIdGenerator {
@@ -18,14 +19,14 @@ impl NodeIdGenerator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub struct Name {
     pub id: NodeId,
     pub sym: Symbol,
 }
 
 // Item has an associated TypeToken if it is a function
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Item {
     pub id: NodeId,
     pub kind: ItemKind,
@@ -39,7 +40,7 @@ impl Item {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum ItemKind {
     Function {
         return_type: Type,
@@ -50,13 +51,13 @@ pub enum ItemKind {
 }
 
 // Type has an associated TypeToken
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Copy)]
 pub struct Type {
     pub id: NodeId,
     pub kind: TypeKind,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub enum TypeKind {
     Int,
     Void,
@@ -64,24 +65,25 @@ pub enum TypeKind {
 }
 
 // Param has an associated TypeToken
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct Param {
     pub id: NodeId,
     pub name: Name,
     pub ty: Type,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Statement {
     pub id: NodeId,
     pub kind: StatementKind,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum StatementKind {
     Let {
         name: Name,
         ty: Type,
+        init: Option<Box<Expr>>,
     },
     Set {
         dst: Box<Expr>,
@@ -99,13 +101,13 @@ pub enum StatementKind {
     Loop(Block),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Block {
     pub id: NodeId,
     pub statements: Vec<Statement>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub enum BuiltinOpKind {
     Or,
     And,
@@ -124,13 +126,13 @@ pub enum BuiltinOpKind {
 }
 
 // Expr always has an associated TypeToken
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Expr {
     pub id: NodeId,
     pub kind: ExprKind,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum ExprKind {
     IntLiteral(i64),
     BoolLiteral(bool),

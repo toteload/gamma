@@ -3,6 +3,7 @@
 mod ast;
 mod ast_visitor;
 mod compiler;
+mod error;
 mod ink_codegen;
 mod parser;
 mod scope_stack;
@@ -14,6 +15,15 @@ mod type_check;
 mod types;
 
 use anyhow::Result;
+use ast::NodeIdGenerator;
+use parser::Parser;
+use semantics::validate_semantics;
+use semantics::SemanticContext;
+use std::collections::HashMap;
+use std::fs;
+use string_interner::StringInterner;
+use type_check::type_check;
+use types::TypeInterner;
 
 /*
 fn print_targets() {
@@ -33,6 +43,51 @@ fn print_targets() {
 */
 
 fn main() -> Result<()> {
+    let source = fs::read_to_string("tests/valid_samples/nested_loop.gamma").unwrap();
+
+    for i in 0..1000 {
+        print!(".");
+        let mut id_generator = NodeIdGenerator::new();
+        let mut symbols = StringInterner::new();
+        let mut types = TypeInterner::new();
+        let mut ast_spans = HashMap::new();
+        let mut ast_types = HashMap::new();
+
+        let mut parser = Parser::new(&source, &mut symbols, &mut id_generator, &mut ast_spans);
+
+        let items_result = parser.parse_items().map_err(|e| vec![e]);
+
+        let Ok(items) = items_result else {
+            unreachable!()
+        };
+
+        let semantics_result = {
+            let context = SemanticContext {
+                symbols: &symbols,
+                spans: &ast_spans,
+            };
+            validate_semantics(&context, &items)
+        };
+
+        assert!(semantics_result.is_ok());
+
+        let type_check_result = type_check(&items, &mut types, &mut ast_types);
+
+        assert!(type_check_result.is_ok());
+    }
+
+    /*
+    println!("{}", ron::ser::to_string(&symbols).expect(""));
+    println!("{}", ron::ser::to_string(&ast_spans).expect(""));
+
+    if let Ok(items) = items_result {
+        println!(
+            "{}",
+            ron::ser::to_string(&items).expect("Should be serializable")
+        );
+    }
+    */
+
     /*
         println!("Gamma compiler version 0.2\n");
 

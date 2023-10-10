@@ -3,6 +3,7 @@
 pub mod ast;
 pub mod ast_visitor;
 pub mod compiler;
+pub mod error;
 pub mod ink_codegen;
 pub mod parser;
 pub mod scope_stack;

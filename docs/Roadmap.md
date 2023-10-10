@@ -95,13 +95,25 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [x] Add data layout to LLVM module
 	- I don't do this.
 - [ ] Make end of `SourceSpan` exclusive so that you can have empty spans.
-- [ ] Track down what causes the random errors. Sometimes the compiler encounters even though the input is the same `todo`.
+- [x] Track down what causes the random errors. Sometimes the compiler encounters even though the input is the same `todo`.
 	- [ ] Serialize the AST and all the corresponding data, like spans. This way you can check that these are all consistent across compilations.
-### Version 0.3.1
+	- The problem turned out to be in the implementation of `PartialEq` for `Type`. It was a very lame mistake... The last line should be `let y = other.tag`, but I was using `self` on both lines...
+```rust
+impl PartialEq for Type {
+    fn eq(&self, other: &Type) -> bool {
+        use Type::*;
+        let x = self.tag();
+        let y = self.tag(); 
+		...
+```
 - [ ] Change syntax
 	- [x] Use `end` instead of using braces.
 	- [ ] The `end` for an if-statement could be optional if there is an else afterwards
 	- [x] Remove arrow from function syntax
+- [x] Use the compiler error setup described in this blog post https://borretti.me/article/lessons-writing-compiler#err
+- [ ] Add optional initializer to `let` statement. This could be implemented with an AST modification.
+- [ ] Add script to list all TODO
+- [ ] Add script to generate sample tests from root
 ### Version 0.4.1
 - [ ] Start development of Tetris game in parallel to the compiler. Let the needs of the game steer the development direction of the compiler.
 - [ ] Add functionality for calling externally defined C functions.

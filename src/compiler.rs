@@ -1,8 +1,9 @@
 use crate::{
     ast::{NodeId, NodeIdGenerator},
-    ink_codegen::{CodeGenerator},
+    error::Error,
+    ink_codegen::CodeGenerator,
     parser::Parser,
-    semantics::validate_semantics,
+    semantics::{validate_semantics, SemanticContext},
     source_location::SourceSpan,
     string_interner::StringInterner,
     type_check::type_check,
@@ -11,10 +12,6 @@ use crate::{
 use std::collections::HashMap;
 
 pub use crate::ink_codegen::{Options, OutputTarget};
-
-pub trait PrintableError {
-    fn print(&self, context: &Context);
-}
 
 pub struct Context {
     pub id_generator: NodeIdGenerator,
@@ -37,11 +34,7 @@ impl Context {
         }
     }
 
-    pub fn compile(
-        &mut self,
-        source: &str,
-        options: &Options,
-    ) -> Result<String, Vec<Box<dyn PrintableError>>> {
+    pub fn compile(&mut self, source: &str, options: &Options) -> Result<String, Vec<Error>> {
         let mut parser = Parser::new(
             source,
             &mut self.symbols,
@@ -49,25 +42,19 @@ impl Context {
             &mut self.ast_spans,
         );
 
-        let items = parser.parse_items().map_err(|e| {
-            let err = Box::new(e) as Box<dyn PrintableError>;
-            vec![err]
-        })?;
+        let items = parser.parse_items().map_err(|e| vec![e])?;
 
-        validate_semantics(&self, &items)?;
+        let semantic_context = SemanticContext {
+            symbols: &self.symbols,
+            spans: &self.ast_spans,
+        };
+        validate_semantics(&semantic_context, &items)?;
 
-        type_check(&items, &mut self.types, &mut self.ast_types).map_err(|errs| {
-            errs.into_iter()
-                .map(|e| Box::new(e) as Box<dyn PrintableError>)
-                .collect::<Vec<Box<dyn PrintableError>>>()
-        })?;
+        type_check(&items, &mut self.types, &mut self.ast_types)?;
 
         let ctx = inkwell::context::Context::create();
         let mut codegen = CodeGenerator::new(&ctx, &self.symbols, &self.ast_types, &self.types);
-        let output = codegen.compile(&items, options).map_err(|e| {
-            let err = Box::new(e) as Box<dyn PrintableError>;
-            vec![err]
-        })?;
+        let output = codegen.compile(&items, options).map_err(|e| vec![e])?;
 
         Ok(output)
     }

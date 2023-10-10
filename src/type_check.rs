@@ -1,38 +1,18 @@
 use crate::ast::BuiltinOpKind;
 use crate::ast::*;
-use crate::compiler::{Context, PrintableError};
+use crate::compiler::Context;
+use crate::error::*;
 use crate::scope_stack::ScopeStack;
 use crate::string_interner::Symbol;
 use crate::types::{Type, TypeInterner, TypeToken};
 use std::collections::HashMap;
-
-#[derive(Debug, Clone, Copy)]
-pub enum TypeError {
-    TypeMismatch {
-        expected: (TypeToken, NodeId),
-        received: (TypeToken, NodeId),
-    },
-    IfConditionMustBeBool(NodeId),
-    ArgumentsMustHaveIdenticalType(NodeId),
-    InvalidCast,
-    IncorrectReturnType,
-    InvalidSetDestination(NodeId),
-}
-
-impl PrintableError for TypeError {
-    fn print(&self, context: &Context) {
-        match self {
-            _ => println!("Type checking error: {:?}", self),
-        }
-    }
-}
 
 struct TypeChecker<'a> {
     type_interner: &'a mut TypeInterner,
     types: &'a mut HashMap<NodeId, TypeToken>,
 
     scopes: ScopeStack<Symbol, TypeToken>,
-    type_errors: Vec<TypeError>,
+    errors: Vec<Error>,
 
     // This gets set to the declared return type of a function.
     // When we encounter a return statement in the function, the type of the returned value is
@@ -49,7 +29,7 @@ impl TypeChecker<'_> {
             type_interner,
             types,
             scopes: ScopeStack::new(),
-            type_errors: Vec::new(),
+            errors: Vec::new(),
             declared_return_type: None,
         }
     }
@@ -61,7 +41,11 @@ impl TypeChecker<'_> {
     // Check that the found return type matches the declared return type of the function.
     fn check_return_type(&mut self, found_return_type: Option<TypeToken>) {
         if found_return_type != self.declared_return_type {
-            self.type_errors.push(TypeError::IncorrectReturnType);
+            self.errors.push(Error {
+                kind: ErrorKind::Type,
+                span: None,
+                info: vec![ErrorInfo::Text("Return types do not match")],
+            });
         }
     }
 
@@ -159,7 +143,7 @@ impl TypeChecker<'_> {
             return_type,
         } = self.type_interner.get(&function_type_token)
         else {
-            todo!()
+            todo!("Type should be a function")
         };
 
         let param_symbols = params.iter().map(|p| p.name.sym);
@@ -186,43 +170,59 @@ impl TypeChecker<'_> {
         use StatementKind::*;
 
         match &statement.kind {
-            Let { name, ty } => {
+            Let { name, ty, init } => {
                 let type_token = self.get_type_token_of_type_node_kind(&ty.kind);
                 self.types.insert(ty.id, type_token);
                 self.scopes.insert(name.sym, type_token);
+
+                if let Some(init) = init {
+                    todo!("Type check the init value");
+                }
             }
             Set { dst, val } => {
                 // The types of `val` and `dst` should match. However, `dst` should also be an
                 // "L-value". Something like `set 0 = 1` would type check, but should not be valid.
                 if !self.is_valid_set_destination(dst) {
-                    self.type_errors
-                        .push(TypeError::InvalidSetDestination(statement.id));
+                    self.errors.push(Error {
+                        kind: ErrorKind::Type,
+                        span: None,
+                        info: vec![ErrorInfo::Text(
+                            "Invalid expression for destination in set statement",
+                        )],
+                    });
                 }
 
                 let dst_result = self.visit_expr(dst);
                 let val_result = self.visit_expr(val);
 
-                if let Err(e) = dst_result {
-                    self.type_errors.push(e);
+                if let Err(e) = &dst_result {
+                    self.errors.push(e.clone());
                 }
 
-                if let Err(e) = val_result {
-                    self.type_errors.push(e);
+                if let Err(e) = &val_result {
+                    self.errors.push(e.clone());
                 }
 
-                match (dst_result, val_result) {
+                match (&dst_result, &val_result) {
                     (Ok(dst_type), Ok(val_type)) if dst_type != val_type => {
-                        self.type_errors.push(TypeError::TypeMismatch {
+                        self.errors.push(Error {
+                            kind: ErrorKind::Type,
+                            span: None,
+                            info: vec![ErrorInfo::Text("Type mismatch in set statement."),],
+                        });
+                        /*
+                        self.errors.push(TypeError::TypeMismatch {
                             expected: (dst_type, dst.id),
                             received: (val_type, val.id),
                         });
+                        */
                     }
                     _ => {}
                 }
             }
             Expr(e) => {
                 if let Err(err) = self.visit_expr(e) {
-                    self.type_errors.push(err);
+                    self.errors.push(err);
                 }
             }
             If {
@@ -232,10 +232,15 @@ impl TypeChecker<'_> {
             } => {
                 match self.visit_expr(cond) {
                     Ok(ty) if ty != self.type_interner.add(Type::Bool) => {
-                        self.type_errors
-                            .push(TypeError::IfConditionMustBeBool(cond.id));
+                        self.errors.push(Error {
+                            kind: ErrorKind::Type,
+                            span: None,
+                            info: vec![ErrorInfo::Text(
+                                "Type of condition in if statement must be bool.",
+                            )],
+                        });
                     }
-                    Err(err) => self.type_errors.push(err),
+                    Err(err) => self.errors.push(err),
                     Ok(_) => (),
                 }
 
@@ -245,7 +250,7 @@ impl TypeChecker<'_> {
                 }
             }
             Return(Some(e)) => match self.visit_expr(e) {
-                Err(err) => self.type_errors.push(err),
+                Err(err) => self.errors.push(err),
                 Ok(tt) => self.check_return_type(Some(tt)),
             },
             Return(None) => self.check_return_type(None),
@@ -254,7 +259,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn visit_expr(&mut self, expression: &Expr) -> Result<TypeToken, TypeError> {
+    fn visit_expr(&mut self, expression: &Expr) -> Result<TypeToken, Error> {
         use ExprKind::*;
 
         let ty = match &expression.kind {
@@ -266,7 +271,11 @@ impl TypeChecker<'_> {
                 let cast_ty_token = self.get_type_token_of_type_node_kind(&ty.kind);
 
                 if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
-                    return Err(TypeError::InvalidCast);
+                    return Err(Error {
+                        kind: ErrorKind::Type,
+                        span: None,
+                        info: vec![ErrorInfo::Text("Invalid cast.")],
+                    });
                 }
 
                 cast_ty_token
@@ -280,7 +289,11 @@ impl TypeChecker<'_> {
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
 
                     if !args_are_of_same_type {
-                        return Err(TypeError::ArgumentsMustHaveIdenticalType(expression.id));
+                        return Err(Error {
+                            kind: ErrorKind::Type,
+                            span: None,
+                            info: vec![ErrorInfo::Text("Arguments must have the same type.")],
+                        });
                     }
 
                     self.type_interner.add(Type::Bool)
@@ -298,7 +311,11 @@ impl TypeChecker<'_> {
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
 
                     if !args_are_of_same_type {
-                        return Err(TypeError::ArgumentsMustHaveIdenticalType(expression.id));
+                        return Err(Error {
+                            kind: ErrorKind::Type,
+                            span: None,
+                            info: vec![ErrorInfo::Text("Arguments must have the same type.")],
+                        });
                     }
 
                     self.type_interner.add(Type::Int)
@@ -319,13 +336,13 @@ pub fn type_check(
     items: &[Item],
     type_interner: &mut TypeInterner,
     types: &mut HashMap<NodeId, TypeToken>,
-) -> Result<(), Vec<TypeError>> {
+) -> Result<(), Vec<Error>> {
     let mut type_checker = TypeChecker::new(type_interner, types);
 
     type_checker.visit_items(items);
 
-    if !type_checker.type_errors.is_empty() {
-        Err(type_checker.type_errors)
+    if !type_checker.errors.is_empty() {
+        Err(type_checker.errors)
     } else {
         Ok(())
     }

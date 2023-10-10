@@ -1,37 +1,21 @@
 use crate::ast::*;
 use crate::ast_visitor::Visitor;
-use crate::compiler::{Context, PrintableError};
-use crate::semantics::SemanticProver;
-use crate::source_location::SourceSpan;
+use crate::error::*;
+use crate::semantics::{SemanticContext, SemanticProver};
 use crate::string_interner::Symbol;
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, Copy)]
-pub struct UndefinedSymbolAtLocation {
-    pub span: SourceSpan,
-    pub sym: Symbol,
-}
-
-impl PrintableError for UndefinedSymbolAtLocation {
-    fn print(&self, context: &Context) {
-        let line = self.span.start.line;
-        let col = self.span.start.col;
-        let name = context.symbols.get_str(self.sym);
-        println!("Error: <source>:{line}:{col} Use of undefined variable \"{name}\"");
-    }
-}
-
 pub struct Prover<'a> {
     scopes: Vec<HashSet<Symbol>>,
-    undefined_symbols: Vec<UndefinedSymbolAtLocation>,
-    context: &'a Context,
+    errors: Vec<Error>,
+    context: &'a SemanticContext<'a>,
 }
 
 impl<'a> Prover<'a> {
-    pub fn new(context: &'a Context) -> Self {
+    pub fn new(context: &'a SemanticContext) -> Self {
         Self {
             scopes: Vec::new(),
-            undefined_symbols: Vec::new(),
+            errors: Vec::new(),
             context,
         }
     }
@@ -48,9 +32,14 @@ impl<'a> Prover<'a> {
 
     fn validate_sym(&mut self, sym: &Symbol, id: &NodeId) {
         if !self.is_sym_defined(sym) {
-            let span = *self.context.ast_spans.get(id).unwrap();
-            self.undefined_symbols
-                .push(UndefinedSymbolAtLocation { span, sym: *sym });
+            use ErrorInfo::*;
+
+            let span = *self.context.spans.get(id).unwrap();
+            self.errors.push(Error {
+                kind: ErrorKind::Semantic,
+                span: Some(span),
+                info: vec![Text("Undefined identifier used "), Identifier(*sym)],
+            });
         }
     }
 }
@@ -145,19 +134,11 @@ impl Visitor for Prover<'_> {
 }
 
 impl SemanticProver for Prover<'_> {
-    fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Box<dyn PrintableError>>> {
+    fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Error>> {
         self.visit_items(items);
 
-        if !self.undefined_symbols.is_empty() {
-            return Err(self
-                .undefined_symbols
-                .iter()
-                .copied()
-                .map(|x| {
-                    let y: Box<dyn PrintableError> = Box::new(x);
-                    y
-                })
-                .collect::<Vec<Box<dyn PrintableError>>>());
+        if !self.errors.is_empty() {
+            return Err(self.errors.clone());
         }
 
         Ok(())

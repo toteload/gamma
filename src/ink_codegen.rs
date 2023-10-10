@@ -1,5 +1,6 @@
 use crate::ast::*;
-use crate::compiler::{Context as CompilerContext, PrintableError};
+use crate::compiler::Context as CompilerContext;
+use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::types::{Type, TypeInterner, TypeToken};
 use inkwell::{
@@ -15,17 +16,6 @@ use inkwell::{
     IntPredicate, OptimizationLevel,
 };
 use std::collections::HashMap;
-
-#[derive(Debug)]
-pub enum CodegenError {
-    InkwellError,
-}
-
-impl PrintableError for CodegenError {
-    fn print(&self, context: &CompilerContext) {
-        println!("ERROR: Codegen error...");
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 enum VariableValue<'ctx> {
@@ -200,7 +190,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         });
     }
 
-    fn gen_item(&mut self, item: &Item) -> Result<(), CodegenError> {
+    fn gen_item(&mut self, item: &Item) -> Result<(), Error> {
         match &item.kind {
             ItemKind::Function {
                 name, body, params, ..
@@ -246,7 +236,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
-    fn gen_block(&mut self, block: &Block) -> Result<bool, CodegenError> {
+    fn gen_block(&mut self, block: &Block) -> Result<bool, Error> {
         for statement in &block.statements {
             let terminated = self.gen_statement(statement)?;
             if terminated {
@@ -257,7 +247,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         Ok(false)
     }
 
-    fn gen_statement(&mut self, stmt: &Statement) -> Result<bool, CodegenError> {
+    fn gen_statement(&mut self, stmt: &Statement) -> Result<bool, Error> {
         match &stmt.kind {
             StatementKind::Return(Some(e)) => {
                 let function_scope = self
@@ -370,9 +360,13 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.position_builder_at_end_of(end_block);
             }
-            StatementKind::Let { name, ty } => {
+            StatementKind::Let { name, ty, init } => {
                 let basic_type = self.get_inktype_of_node(ty.id);
                 let ptr = self.builder.build_alloca(basic_type, "");
+
+                if let Some(init) = init {
+                    todo!("Initialize value");
+                }
 
                 self.add_to_current_scope(
                     name.sym,
@@ -415,7 +409,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         Ok(is_terminator)
     }
 
-    fn get_dst_ptr(&self, e: &Expr) -> Result<PointerValue, CodegenError> {
+    fn get_dst_ptr(&self, e: &Expr) -> Result<PointerValue, Error> {
         match &e.kind {
             ExprKind::Identifier(sym) => {
                 let Variable { ty, val } = self.get_variable(sym).expect("Identifier should exist");
@@ -428,7 +422,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
-    fn gen_expr(&self, e: &Expr) -> Result<BasicValueEnum, CodegenError> {
+    fn gen_expr(&self, e: &Expr) -> Result<BasicValueEnum, Error> {
         match &e.kind {
             ExprKind::IntLiteral(x) => Ok(self.i64_t.const_int(*x as u64, false).into()),
             ExprKind::BoolLiteral(x) => {
@@ -560,7 +554,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
-    pub fn compile(&mut self, items: &[Item], options: &Options) -> Result<String, CodegenError> {
+    pub fn compile(&mut self, items: &[Item], options: &Options) -> Result<String, Error> {
         self.scopes.push(Scope {
             kind: ScopeKind::Global,
             stack_restorepoint: None,
