@@ -111,9 +111,11 @@ impl PartialEq for Type {
 	- [ ] The `end` for an if-statement could be optional if there is an else afterwards
 	- [x] Remove arrow from function syntax
 - [x] Use the compiler error setup described in this blog post https://borretti.me/article/lessons-writing-compiler#err
-- [ ] Add optional initializer to `let` statement. This could be implemented with an AST modification.
+- [x] Add optional initializer to `let` statement. This could be implemented with an AST modification.
 - [ ] Add script to list all TODO
-- [ ] Add script to generate sample tests from root
+- [x] Add script to generate sample tests from root
+- [ ] Add error printing function
+- [ ] Verify arity of builtin functions
 ### Version 0.4.1
 - [ ] Start development of Tetris game in parallel to the compiler. Let the needs of the game steer the development direction of the compiler.
 - [ ] Add functionality for calling externally defined C functions.
@@ -126,10 +128,10 @@ impl PartialEq for Type {
 		- [ ] ...
 ### Version 0.4
 - [ ] Add pointer type.
-	- `*T`
-	- [ ] Add dereferencing operator.
+	- `^T`
+	- [x] Add dereferencing operator.
 		- `(@ p)`
-	- [ ] Add operator to take the address of a variable. `(& x)`
+	- [x] Add operator to take the address of a variable. `(& x)`
 		- [ ] Taking the address of a function is illegal
 	- [ ] Add pointer arithmetic.
 	- [ ] Add type casting of one pointer type to another pointer type

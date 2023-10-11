@@ -8,8 +8,9 @@ use crate::types::{Type, TypeInterner, TypeToken};
 use std::collections::HashMap;
 
 struct TypeChecker<'a> {
-    type_interner: &'a mut TypeInterner,
+    type_tokens: &'a mut TypeInterner,
     types: &'a mut HashMap<NodeId, TypeToken>,
+    type_table: &'a HashMap<Symbol, TypeToken>,
 
     scopes: ScopeStack<Symbol, TypeToken>,
     errors: Vec<Error>,
@@ -22,12 +23,14 @@ struct TypeChecker<'a> {
 
 impl TypeChecker<'_> {
     fn new<'a>(
-        type_interner: &'a mut TypeInterner,
+        type_tokens: &'a mut TypeInterner,
         types: &'a mut HashMap<NodeId, TypeToken>,
+        type_table: &'a mut HashMap<Symbol, TypeToken>,
     ) -> TypeChecker<'a> {
         TypeChecker {
-            type_interner,
+            type_tokens,
             types,
+            type_table,
             scopes: ScopeStack::new(),
             errors: Vec::new(),
             declared_return_type: None,
@@ -49,11 +52,20 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn get_type_token_of_type_node_kind(&mut self, kind: &TypeKind) -> TypeToken {
+    fn get_type_token_of_type_node_kind(&mut self, kind: &TypeKind) -> Result<TypeToken, Error> {
         match kind {
-            TypeKind::Int => self.type_interner.add(Type::Int),
-            TypeKind::Void => self.type_interner.add(Type::Void),
-            TypeKind::Bool => self.type_interner.add(Type::Bool),
+            TypeKind::Identifier(sym) => self.type_table.get(sym).copied().ok_or(Error {
+                kind: ErrorKind::Type,
+                span: None,
+                info: vec![
+                    ErrorInfo::Text("Undefined type identifier encountered: "),
+                    ErrorInfo::Identifier(*sym),
+                ],
+            }),
+            TypeKind::Pointer(inner) => {
+                let inner = self.get_type_token_of_type_node_kind(inner)?;
+                Ok(self.type_tokens.add(Type::Pointer(inner)))
+            }
         }
     }
 
@@ -79,10 +91,18 @@ impl TypeChecker<'_> {
                     let param_type_tokens = param_nodes
                         .iter()
                         .map(|p| self.get_type_token_of_type_node_kind(&p.ty.kind))
-                        .collect::<Vec<_>>();
+                        .collect::<Result<Vec<_>, _>>();
+
+                    let Ok(param_type_tokens) = param_type_tokens else {
+                        todo!()
+                    };
 
                     let return_type_token =
                         self.get_type_token_of_type_node_kind(&return_type_node.kind);
+
+                    let Ok(return_type_token) = return_type_token else {
+                        todo!()
+                    };
 
                     for (param_node, type_token) in param_nodes.iter().zip(&param_type_tokens) {
                         // Type annotate the parameter nodes and their type nodes
@@ -99,7 +119,7 @@ impl TypeChecker<'_> {
                         return_type: return_type_token,
                     };
 
-                    let function_type_token = self.type_interner.add(function_type);
+                    let function_type_token = self.type_tokens.add(function_type);
 
                     // Type annotate the function
                     self.types.insert(item.id, function_type_token);
@@ -122,7 +142,7 @@ impl TypeChecker<'_> {
                     let return_type_token = *self.types.get(&return_type.id).unwrap();
 
                     self.declared_return_type = Some(return_type_token)
-                        .filter(|tt| *tt != self.type_interner.add(Type::Void));
+                        .filter(|tt| *tt != self.type_tokens.add(Type::Void));
 
                     self.visit_function(name, params, return_type, body);
                 }
@@ -141,7 +161,7 @@ impl TypeChecker<'_> {
         let Type::Function {
             params: param_type_tokens,
             return_type,
-        } = self.type_interner.get(&function_type_token)
+        } = self.type_tokens.get(&function_type_token)
         else {
             todo!("Type should be a function")
         };
@@ -172,14 +192,42 @@ impl TypeChecker<'_> {
         match &statement.kind {
             Let { name, ty, init } => {
                 let type_token = self.get_type_token_of_type_node_kind(&ty.kind);
+
+                let type_token = match type_token {
+                    Ok(x) => x,
+                    Err(e) => {
+                        self.errors.push(e);
+                        return;
+                    }
+                };
+
                 self.types.insert(ty.id, type_token);
                 self.scopes.insert(name.sym, type_token);
 
                 if let Some(init) = init {
-                    todo!("Type check the init value");
+                    let init_type_token = match self.visit_expr(init) {
+                        Ok(x) => x,
+                        Err(e) => {
+                            self.errors.push(e);
+                            return;
+                        }
+                    };
+
+                    if type_token != init_type_token {
+                        self.errors.push(Error {
+                            kind: ErrorKind::Type,
+                            span: None,
+                            info: vec![
+                                ErrorInfo::Text("Type mismatch between declared type and type of initializer in set statement"),
+                            ],
+                        });
+                    }
                 }
             }
             Set { dst, val } => {
+                let dst_result = self.visit_expr(dst);
+                let val_result = self.visit_expr(val);
+
                 // The types of `val` and `dst` should match. However, `dst` should also be an
                 // "L-value". Something like `set 0 = 1` would type check, but should not be valid.
                 if !self.is_valid_set_destination(dst) {
@@ -191,9 +239,6 @@ impl TypeChecker<'_> {
                         )],
                     });
                 }
-
-                let dst_result = self.visit_expr(dst);
-                let val_result = self.visit_expr(val);
 
                 if let Err(e) = &dst_result {
                     self.errors.push(e.clone());
@@ -208,14 +253,8 @@ impl TypeChecker<'_> {
                         self.errors.push(Error {
                             kind: ErrorKind::Type,
                             span: None,
-                            info: vec![ErrorInfo::Text("Type mismatch in set statement."),],
+                            info: vec![ErrorInfo::Text("Type mismatch in set statement.")],
                         });
-                        /*
-                        self.errors.push(TypeError::TypeMismatch {
-                            expected: (dst_type, dst.id),
-                            received: (val_type, val.id),
-                        });
-                        */
                     }
                     _ => {}
                 }
@@ -231,7 +270,7 @@ impl TypeChecker<'_> {
                 otherwise,
             } => {
                 match self.visit_expr(cond) {
-                    Ok(ty) if ty != self.type_interner.add(Type::Bool) => {
+                    Ok(ty) if ty != self.type_tokens.add(Type::Bool) => {
                         self.errors.push(Error {
                             kind: ErrorKind::Type,
                             span: None,
@@ -263,12 +302,12 @@ impl TypeChecker<'_> {
         use ExprKind::*;
 
         let ty = match &expression.kind {
-            IntLiteral(_) => self.type_interner.add(Type::Int),
-            BoolLiteral(_) => self.type_interner.add(Type::Bool),
+            IntLiteral(_) => self.type_tokens.add(Type::Int),
+            BoolLiteral(_) => self.type_tokens.add(Type::Bool),
             Identifier(sym) => self.get_type_token_of_sym(sym),
             Cast { ty, e } => {
                 let expr_ty_token = self.visit_expr(e)?;
-                let cast_ty_token = self.get_type_token_of_type_node_kind(&ty.kind);
+                let cast_ty_token = self.get_type_token_of_type_node_kind(&ty.kind)?;
 
                 if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
                     return Err(Error {
@@ -296,7 +335,7 @@ impl TypeChecker<'_> {
                         });
                     }
 
-                    self.type_interner.add(Type::Bool)
+                    self.type_tokens.add(Type::Bool)
                 }
                 BuiltinOpKind::Mul
                 | BuiltinOpKind::Add
@@ -318,7 +357,20 @@ impl TypeChecker<'_> {
                         });
                     }
 
-                    self.type_interner.add(Type::Int)
+                    self.type_tokens.add(Type::Int)
+                }
+                BuiltinOpKind::AddressOf => {
+                    let arg_type_token = self.visit_expr(&args[0])?;
+                    self.type_tokens.add(Type::Pointer(arg_type_token))
+                }
+                BuiltinOpKind::At => {
+                    let arg_type_token = self.visit_expr(&args[0])?;
+                    let ty = self.type_tokens.get(&arg_type_token);
+
+                    match ty {
+                        Type::Pointer(t) => *t,
+                        _ => todo!(),
+                    }
                 }
                 _ => todo!("Operator \"{:?}\"", op),
             },
@@ -334,10 +386,11 @@ impl TypeChecker<'_> {
 
 pub fn type_check(
     items: &[Item],
-    type_interner: &mut TypeInterner,
+    type_tokens: &mut TypeInterner,
     types: &mut HashMap<NodeId, TypeToken>,
+    type_table: &mut HashMap<Symbol, TypeToken>,
 ) -> Result<(), Vec<Error>> {
-    let mut type_checker = TypeChecker::new(type_interner, types);
+    let mut type_checker = TypeChecker::new(type_tokens, types, type_table);
 
     type_checker.visit_items(items);
 

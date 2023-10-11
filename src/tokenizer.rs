@@ -13,15 +13,19 @@ pub struct Token {
 #[derive(strum_macros::IntoStaticStr, Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize)]
 pub enum TokenKind {
     KeywordFn,
+
     KeywordIf,
     KeywordElse,
     KeywordLoop,
     KeywordBreak,
     KeywordContinue,
     KeywordReturn,
+
     KeywordLet,
     KeywordSet,
+
     KeywordCast,
+
     KeywordEnd,
 
     KeywordOr,
@@ -29,8 +33,8 @@ pub enum TokenKind {
     KeywordNot,
     KeywordXor,
 
-    BitwiseOr,
-    BitwiseAnd,
+    KeywordBor,
+    KeywordBand,
 
     // TODO call these keywords?
     Equal,
@@ -39,10 +43,6 @@ pub enum TokenKind {
     Less,
     GreaterEqual,
     Greater,
-
-    KeywordVoid,
-    KeywordInt,
-    KeywordBool,
 
     Identifier(Symbol),
 
@@ -62,6 +62,10 @@ pub enum TokenKind {
 
     EqualSign,
 
+    Ampersand,
+    At,
+
+    Hat,
     Star,
     Minus,
     Plus,
@@ -173,18 +177,14 @@ impl<'a> Iterator for Tokenizer<'a> {
                     "or"       => Token { span, kind: TokenKind::KeywordOr, },
                     "not"      => Token { span, kind: TokenKind::KeywordNot, },
                     "xor"      => Token { span, kind: TokenKind::KeywordXor, },
-                    "bor"      => Token { span, kind: TokenKind::BitwiseOr, },
-                    "band"     => Token { span, kind: TokenKind::BitwiseAnd, },
+                    "bor"      => Token { span, kind: TokenKind::KeywordBor, },
+                    "band"     => Token { span, kind: TokenKind::KeywordBand, },
                     "eq"       => Token { span, kind: TokenKind::Equal, },
                     "ne"       => Token { span, kind: TokenKind::NotEqual, },
                     "le"       => Token { span, kind: TokenKind::LessEqual, },
                     "lt"       => Token { span, kind: TokenKind::Less, },
                     "ge"       => Token { span, kind: TokenKind::GreaterEqual, },
                     "gt"       => Token { span, kind: TokenKind::Greater, },
-
-                    "void"     => Token { span, kind: TokenKind::KeywordVoid, },
-                    "int"      => Token { span, kind: TokenKind::KeywordInt, },
-                    "bool"     => Token { span, kind: TokenKind::KeywordBool, },
 
                     "false"    => Token { span, kind: TokenKind::BoolLiteral(false), },
                     "true"     => Token { span, kind: TokenKind::BoolLiteral(true), },
@@ -241,6 +241,10 @@ impl<'a> Iterator for Tokenizer<'a> {
             '+' => Token { span: SourceSpan::single(start), kind: TokenKind::Plus, },
             '/' => Token { span: SourceSpan::single(start), kind: TokenKind::Div, },
             '-' => Token { span: SourceSpan::single(start), kind: TokenKind::Minus, },
+            '^' => Token { span: SourceSpan::single(start), kind: TokenKind::Hat, },
+            '&' => Token { span: SourceSpan::single(start), kind: TokenKind::Ampersand, },
+            '@' => Token { span: SourceSpan::single(start), kind: TokenKind::At, },
+
             _ => todo!("Character '{}' not recognized", c),
         };
 

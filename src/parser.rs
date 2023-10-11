@@ -2,34 +2,11 @@ use crate::ast::*;
 use crate::error::*;
 use crate::source_location::SourceSpan;
 use crate::string_interner::StringInterner;
-use crate::tokenizer::{TokenKind, Tokenizer};
+use crate::tokenizer::{Token, TokenKind, Tokenizer};
 use std::collections::HashMap;
 use std::iter::Peekable;
 
 type Result<T> = std::result::Result<T, Error>;
-
-/*
-#[derive(Debug)]
-pub enum ParseError {
-    UnexpectedEnd,
-    UnexpectedToken(SourceSpan, &'static str),
-}
-
-impl PrintableError for ParseError {
-    fn print(&self, contetx: &Context) {
-        match *self {
-            ParseError::UnexpectedEnd => {
-                println!("ERROR: Unexpected end of source during parsing.")
-            }
-            ParseError::UnexpectedToken(span, s) => {
-                let line = span.start.line;
-                let col = span.start.col;
-                println!("ERROR: Unexpected token encountered: \"{s}\" at {line}:{col}.")
-            }
-        }
-    }
-}
-*/
 
 pub struct Parser<'a> {
     tokens: Peekable<Tokenizer<'a>>,
@@ -152,20 +129,39 @@ impl Parser<'_> {
     fn parse_type(&mut self) -> Result<Type> {
         use TokenKind::*;
 
-        let ty = expect_token!(
-            self.tokens.next(),
-            Identifier(_) | KeywordInt | KeywordVoid | KeywordBool
-        )?;
+        let mut atoms = Vec::<Token>::new();
+        loop {
+            let peeked = expect_token!(self.tokens.peek(), _)?;
 
-        let kind = match ty.kind {
-            KeywordInt => TypeKind::Int,
-            KeywordVoid => TypeKind::Void,
-            KeywordBool => TypeKind::Bool,
-            _ => unreachable!(),
+            if !matches!(peeked.kind, Identifier(_) | Hat) {
+                break;
+            }
+
+            atoms.push(*peeked);
+
+            self.tokens.next();
+        }
+
+        if atoms.is_empty() {
+            todo!()
+        }
+
+        let mut kind = match atoms.last().unwrap().kind {
+            Identifier(sym) => TypeKind::Identifier(sym),
+            _ => panic!("illegal"),
         };
 
+        for atom in atoms.iter().rev().skip(1) {
+            match atom.kind {
+                Hat => {
+                    kind = TypeKind::Pointer(Box::new(kind));
+                }
+                _ => panic!("illegal"),
+            }
+        }
+
         let id = self.gen_node_id();
-        let span = ty.span;
+        let span = atoms[0].span.extend(&atoms.last().unwrap().span);
 
         self.spans.insert(id, span);
 
@@ -469,6 +465,24 @@ impl Parser<'_> {
                         };
 
                         ExprKind::BuiltinOp { op, args }
+                    }
+
+                    Ampersand => {
+                        let x = self.parse_expression()?;
+
+                        ExprKind::BuiltinOp {
+                            op: BuiltinOpKind::AddressOf,
+                            args: vec![x],
+                        }
+                    }
+
+                    At => {
+                        let x = self.parse_expression()?;
+
+                        ExprKind::BuiltinOp {
+                            op: BuiltinOpKind::At,
+                            args: vec![x],
+                        }
                     }
 
                     // Function call

@@ -11,9 +11,9 @@ use inkwell::{
     module::Module,
     passes::PassManager,
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
-    types::{BasicTypeEnum, IntType},
+    types::{BasicType, BasicTypeEnum, IntType},
     values::{BasicValueEnum, FunctionValue, PointerValue},
-    IntPredicate, OptimizationLevel,
+    AddressSpace, IntPredicate, OptimizationLevel,
 };
 use std::collections::HashMap;
 
@@ -23,7 +23,9 @@ enum VariableValue<'ctx> {
     Parameter(BasicValueEnum<'ctx>),
 }
 
+#[derive(Clone, Copy)]
 struct Variable<'ctx> {
+    type_token: TypeToken,
     ty: BasicTypeEnum<'ctx>,
     val: VariableValue<'ctx>,
 }
@@ -118,8 +120,37 @@ impl<'ctx> CodeGenerator<'ctx> {
             node_types,
             type_interner,
 
-            typetoken_to_inktype: HashMap::new(),
+            typetoken_to_inktype: HashMap::from([
+                (
+                    type_interner.get_for_type(&Type::Int).unwrap(),
+                    ctx.i64_type().into(),
+                ),
+                (
+                    type_interner.get_for_type(&Type::Bool).unwrap(),
+                    ctx.i64_type().into(),
+                ),
+            ]),
         }
+    }
+
+    fn get_inktype_of_type_token(&mut self, token: TypeToken) -> BasicTypeEnum<'ctx> {
+        if let Some(t) = self.typetoken_to_inktype.get(&token) {
+            return *t;
+        }
+
+        let ty = self.type_interner.get(&token);
+
+        let t = match ty {
+            Type::Pointer(inner) => {
+                let t = self.get_inktype_of_type_token(*inner);
+                t.ptr_type(AddressSpace::default()).into()
+            }
+            _ => todo!("Create LLVM type for internal type"),
+        };
+
+        self.typetoken_to_inktype.insert(token, t);
+
+        t
     }
 
     fn get_inktype_of_node(&mut self, id: NodeId) -> BasicTypeEnum<'ctx> {
@@ -127,20 +158,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             panic!("Could not get type token of node")
         };
 
-        if let Some(t) = self.typetoken_to_inktype.get(tok) {
-            return *t;
-        }
-
-        let ty = self.type_interner.get(&tok);
-
-        let t = match ty {
-            Type::Bool | Type::Int => self.i64_t.into(),
-            _ => todo!("Create LLVM type for internal type"),
-        };
-
-        self.typetoken_to_inktype.insert(*tok, t);
-
-        t
+        self.get_inktype_of_type_token(*tok)
     }
 
     fn add_basic_block(&self, name: &str) -> BasicBlock<'ctx> {
@@ -165,10 +183,10 @@ impl<'ctx> CodeGenerator<'ctx> {
         self.scopes.last().expect("There should always be a scope")
     }
 
-    fn get_variable(&self, name: &Symbol) -> Option<&Variable<'ctx>> {
+    fn get_variable(&self, name: &Symbol) -> Option<Variable<'ctx>> {
         for scope in self.scopes.iter().rev() {
             if let result @ Some(_) = scope.variables.get(name) {
-                return result;
+                return result.copied();
             }
         }
 
@@ -213,6 +231,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     self.add_to_current_scope(
                         param.name.sym,
                         Variable {
+                            type_token: *self.node_types.get(&param.id).unwrap(),
                             ty: val.get_type(),
                             val: VariableValue::Parameter(val),
                         },
@@ -365,12 +384,14 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let ptr = self.builder.build_alloca(basic_type, "");
 
                 if let Some(init) = init {
-                    todo!("Initialize value");
+                    let val = self.gen_expr(init)?;
+                    self.builder.build_store(ptr, val);
                 }
 
                 self.add_to_current_scope(
                     name.sym,
                     Variable {
+                        type_token: *self.node_types.get(&ty.id).unwrap(),
                         ty: basic_type,
                         val: VariableValue::Stack(ptr),
                     },
@@ -409,20 +430,21 @@ impl<'ctx> CodeGenerator<'ctx> {
         Ok(is_terminator)
     }
 
-    fn get_dst_ptr(&self, e: &Expr) -> Result<PointerValue, Error> {
+    fn get_dst_ptr(&self, e: &Expr) -> Result<PointerValue<'ctx>, Error> {
         match &e.kind {
             ExprKind::Identifier(sym) => {
-                let Variable { ty, val } = self.get_variable(sym).expect("Identifier should exist");
+                let Variable { ty, val, .. } =
+                    self.get_variable(sym).expect("Identifier should exist");
                 let VariableValue::Stack(ptr) = val else {
                     panic!("Tried to get dst of non-stack variable")
                 };
-                Ok(*ptr)
+                Ok(ptr)
             }
             _ => todo!("Get pointer for expression"),
         }
     }
 
-    fn gen_expr(&self, e: &Expr) -> Result<BasicValueEnum, Error> {
+    fn gen_expr(&mut self, e: &Expr) -> Result<BasicValueEnum<'ctx>, Error> {
         match &e.kind {
             ExprKind::IntLiteral(x) => Ok(self.i64_t.const_int(*x as u64, false).into()),
             ExprKind::BoolLiteral(x) => {
@@ -541,10 +563,53 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .build_int_signed_div(x.into_int_value(), y.into_int_value(), "")
                         .into())
                 }
-                _ => todo!("BuiltinOpKind \"{:?}\" not yet implemented", op),
+                BuiltinOpKind::AddressOf => {
+                    let ExprKind::Identifier(sym) = args[0].kind else {
+                        todo!()
+                    };
+                    let var = self.get_variable(&sym).unwrap();
+                    let Variable {
+                        val: VariableValue::Stack(ptr),
+                        ..
+                    } = var
+                    else {
+                        todo!()
+                    };
+
+                    Ok(ptr.into())
+                }
+                BuiltinOpKind::At => {
+                    let ExprKind::Identifier(sym) = args[0].kind else {
+                        todo!()
+                    };
+                    let Variable {
+                        type_token,
+                        ty,
+                        val,
+                    } = self.get_variable(&sym).unwrap();
+
+                    debug_assert!(ty.is_pointer_type());
+
+                    let ptr = match val {
+                        VariableValue::Stack(p) => p,
+                        VariableValue::Parameter(p) => p.into_pointer_value(),
+                    };
+
+                    let addr = self.builder.build_load(ty, ptr, "").into_pointer_value();
+
+                    let Type::Pointer(pointee_type_token) = self.type_interner.get(&type_token)
+                    else {
+                        todo!()
+                    };
+                    let pointee_type = self.get_inktype_of_type_token(*pointee_type_token);
+
+                    Ok(self.builder.build_load(pointee_type, addr, ""))
+                }
+                _ => todo!("BuiltinOpKind \"{:?}\"", op),
             },
             ExprKind::Identifier(sym) => {
-                let Variable { ty, val } = *self.get_variable(sym).expect("Identifer should exist");
+                let Variable { ty, val, .. } =
+                    self.get_variable(sym).expect("Identifer should exist");
                 match val {
                     VariableValue::Stack(ptr) => Ok(self.builder.build_load(ty, ptr, "")),
                     _ => todo!("Retrieve value from variable"),

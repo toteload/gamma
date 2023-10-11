@@ -1,0 +1,32 @@
+---
+source: tests/test_valid_samples.rs
+expression: output
+---
+; ModuleID = 'main'
+source_filename = "main"
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn
+declare ptr @llvm.stacksave() #0
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn
+declare void @llvm.stackrestore(ptr) #0
+
+define i64 @main() {
+entry:
+  %0 = call ptr @llvm.stacksave()
+  %1 = alloca i64, align 8
+  store i64 999, ptr %1, align 4
+  %2 = alloca ptr, align 8
+  store ptr %1, ptr %2, align 8
+  %3 = alloca i64, align 8
+  %4 = load ptr, ptr %2, align 8
+  %5 = load i64, ptr %4, align 4
+  %6 = add i64 %5, 1
+  store i64 %6, ptr %3, align 4
+  %7 = load i64, ptr %3, align 4
+  call void @llvm.stackrestore(ptr %0)
+  ret i64 %7
+}
+
+attributes #0 = { nocallback nofree nosync nounwind willreturn }
+

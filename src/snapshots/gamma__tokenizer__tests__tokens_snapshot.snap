@@ -170,7 +170,7 @@ expression: tokens
         col: 33,
       ),
     ),
-    kind: KeywordVoid,
+    kind: Identifier(Symbol(0)),
   ),
   Token(
     span: SourceSpan(
@@ -196,7 +196,7 @@ expression: tokens
         col: 45,
       ),
     ),
-    kind: Identifier(Symbol(0)),
+    kind: Identifier(Symbol(1)),
   ),
   Token(
     span: SourceSpan(
@@ -287,7 +287,7 @@ expression: tokens
         col: 15,
       ),
     ),
-    kind: KeywordInt,
+    kind: Identifier(Symbol(2)),
   ),
   Token(
     span: SourceSpan(
@@ -443,7 +443,7 @@ expression: tokens
         col: 62,
       ),
     ),
-    kind: KeywordBool,
+    kind: Identifier(Symbol(3)),
   ),
   Token(
     span: SourceSpan(
@@ -456,7 +456,7 @@ expression: tokens
         col: 66,
       ),
     ),
-    kind: KeywordInt,
+    kind: Identifier(Symbol(2)),
   ),
   Token(
     span: SourceSpan(
@@ -469,7 +469,7 @@ expression: tokens
         col: 71,
       ),
     ),
-    kind: KeywordVoid,
+    kind: Identifier(Symbol(0)),
   ),
   Token(
     span: SourceSpan(

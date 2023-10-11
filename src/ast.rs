@@ -51,21 +51,20 @@ pub enum ItemKind {
 }
 
 // Type has an associated TypeToken
-#[derive(Clone, Debug, Serialize, Copy)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Type {
     pub id: NodeId,
     pub kind: TypeKind,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub enum TypeKind {
-    Int,
-    Void,
-    Bool,
+    Identifier(Symbol),
+    Pointer(Box<TypeKind>),
 }
 
 // Param has an associated TypeToken
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Param {
     pub id: NodeId,
     pub name: Name,
@@ -123,6 +122,8 @@ pub enum BuiltinOpKind {
     GreaterThan,
     LessEquals,
     GreaterEquals,
+    AddressOf,
+    At,
 }
 
 // Expr always has an associated TypeToken

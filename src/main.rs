@@ -21,9 +21,9 @@ use semantics::validate_semantics;
 use semantics::SemanticContext;
 use std::collections::HashMap;
 use std::fs;
-use string_interner::StringInterner;
+use string_interner::{StringInterner, Symbol};
 use type_check::type_check;
-use types::TypeInterner;
+use types::{Type, TypeInterner, TypeToken};
 
 /*
 fn print_targets() {
@@ -43,38 +43,49 @@ fn print_targets() {
 */
 
 fn main() -> Result<()> {
-    let source = fs::read_to_string("tests/valid_samples/nested_loop.gamma").unwrap();
+    let source = fs::read_to_string("tests/valid_samples/pointer.gamma").unwrap();
 
-    for i in 0..1000 {
-        print!(".");
-        let mut id_generator = NodeIdGenerator::new();
-        let mut symbols = StringInterner::new();
-        let mut types = TypeInterner::new();
-        let mut ast_spans = HashMap::new();
-        let mut ast_types = HashMap::new();
+    let mut id_generator = NodeIdGenerator::new();
+    let mut symbols = StringInterner::new();
+    let mut type_tokens = TypeInterner::new();
 
-        let mut parser = Parser::new(&source, &mut symbols, &mut id_generator, &mut ast_spans);
+    let mut spans = HashMap::new();
+    let mut types = HashMap::new();
 
-        let items_result = parser.parse_items().map_err(|e| vec![e]);
+    let mut parser = Parser::new(&source, &mut symbols, &mut id_generator, &mut spans);
 
-        let Ok(items) = items_result else {
-            unreachable!()
+    let items_result = parser.parse_items().map_err(|e| vec![e]);
+
+    println!("Parsing done...");
+
+    let Ok(items) = items_result else {
+        unreachable!()
+    };
+
+    let mut type_table = HashMap::<Symbol, TypeToken>::from([
+        (symbols.add("int"), type_tokens.add(Type::Int)),
+        (symbols.add("void"), type_tokens.add(Type::Void)),
+        (symbols.add("bool"), type_tokens.add(Type::Bool)),
+    ]);
+
+    let semantics_result = {
+        let context = SemanticContext {
+            symbols: &symbols,
+            spans: &spans,
         };
 
-        let semantics_result = {
-            let context = SemanticContext {
-                symbols: &symbols,
-                spans: &ast_spans,
-            };
-            validate_semantics(&context, &items)
-        };
+        validate_semantics(&context, &items)
+    };
 
-        assert!(semantics_result.is_ok());
+    println!("Semantic validation done...");
 
-        let type_check_result = type_check(&items, &mut types, &mut ast_types);
+    assert!(semantics_result.is_ok());
 
-        assert!(type_check_result.is_ok());
-    }
+    let type_check_result = type_check(&items, &mut type_tokens, &mut types, &mut type_table);
+
+    println!("Type checking done...");
+
+    assert!(type_check_result.is_ok());
 
     /*
     println!("{}", ron::ser::to_string(&symbols).expect(""));

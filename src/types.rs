@@ -11,6 +11,7 @@ pub enum Type {
         params: Vec<TypeToken>,
         return_type: TypeToken,
     },
+    Pointer(TypeToken),
 }
 
 impl Type {
@@ -22,6 +23,7 @@ impl Type {
             Bool => 1,
             Int => 2,
             Function { .. } => 3,
+            Pointer(_) => 4,
         }
     }
 
@@ -32,6 +34,11 @@ impl Type {
             Void => "void".to_string(),
             Bool => "bool".to_string(),
             Int => "int".to_string(),
+            Pointer(x) => {
+                let mut s = "*".to_string();
+                s += &type_interner.get(x).to_string(type_interner);
+                s
+            }
             Function {
                 params,
                 return_type,
@@ -57,16 +64,19 @@ impl Hash for Type {
 
         state.write_u8(x);
 
-        if let Type::Function {
-            params,
-            return_type,
-        } = self
-        {
-            for param in params {
-                param.hash(state);
-            }
+        match self {
+            Type::Function {
+                params,
+                return_type,
+            } => {
+                for param in params {
+                    param.hash(state);
+                }
 
-            return_type.hash(state);
+                return_type.hash(state);
+            }
+            Type::Pointer(x) => x.hash(state),
+            _ => (),
         }
     }
 }
@@ -82,28 +92,29 @@ impl PartialEq for Type {
             return false;
         }
 
-        if let (
-            Function {
-                params: xparams,
-                return_type: xreturn_type,
-            },
-            Function {
-                params: yparams,
-                return_type: yreturn_type,
-            },
-        ) = (self, other)
-        {
-            let same_return_type = xreturn_type == yreturn_type;
+        match (self, other) {
+            (
+                Function {
+                    params: xparams,
+                    return_type: xreturn_type,
+                },
+                Function {
+                    params: yparams,
+                    return_type: yreturn_type,
+                },
+            ) => {
+                let same_return_type = xreturn_type == yreturn_type;
 
-            let same_params = xparams
-                .iter()
-                .zip(yparams)
-                .fold(true, |acc, (x, y)| acc && x == y);
+                let same_params = xparams
+                    .iter()
+                    .zip(yparams)
+                    .fold(true, |acc, (x, y)| acc && x == y);
 
-            return same_return_type && same_params && xparams.len() == yparams.len();
+                same_return_type && same_params && xparams.len() == yparams.len()
+            }
+            (Pointer(x), Pointer(y)) => x == y,
+            _ => true,
         }
-
-        true
     }
 }
 

@@ -6,7 +6,7 @@ VALID_SAMPLES_PATH = 'valid_samples'
 
 files = [f for f in os.listdir(VALID_SAMPLES_PATH) if path.isfile(path.join(VALID_SAMPLES_PATH, f))]
 
-FILE_HEADER = """use gamma::compiler::{{Context, Options, OutputTarget}};
+FILE_HEADER = """use gamma::compiler::{Context, Options, OutputTarget};
 use insta::assert_snapshot;
 use std::fs;
 
@@ -22,10 +22,6 @@ fn {name}() {{
     let Ok(output) = result else {{
         let Err(errors) = result else {{ unreachable!() }};
 
-        for e in &errors {{
-            e.print(&context);
-        }}
-
         panic!("Compilation of sample \\"{name}\\" resulted in {{}} error(s)", errors.len()); 
     }};
 
@@ -37,10 +33,6 @@ code = (FILE_HEADER +
         "\n".join([FUNCTION.format(sample_path=f, 
                                    name=Path(f).stem, 
                                    optimize='false', 
-                                   output='OutputTarget::LlvmIr') for f in files]) + 
-        "\n".join([FUNCTION.format(sample_path=f, 
-                                   name=Path(f).stem + '_optimized_assembly', 
-                                   optimize='true', 
-                                   output='OutputTarget::Assembly') for f in files]))
+                                   output='OutputTarget::LlvmIr') for f in files]))
 
 print(code.replace('\r', ''))
