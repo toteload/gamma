@@ -484,4 +484,30 @@ expression: tokens
     ),
     kind: KeywordEnd,
   ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 2,
+        col: 77,
+      ),
+      end: SourceLocation(
+        line: 2,
+        col: 77,
+      ),
+    ),
+    kind: BracketOpen,
+  ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 2,
+        col: 79,
+      ),
+      end: SourceLocation(
+        line: 2,
+        col: 79,
+      ),
+    ),
+    kind: BracketClose,
+  ),
 ]

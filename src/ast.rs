@@ -61,6 +61,7 @@ pub struct Type {
 pub enum TypeKind {
     Identifier(Symbol),
     Pointer(Box<TypeKind>),
+    Array(i64, Box<TypeKind>),
 }
 
 // Param has an associated TypeToken

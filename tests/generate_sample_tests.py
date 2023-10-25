@@ -22,6 +22,10 @@ fn {name}() {{
     let Ok(output) = result else {{
         let Err(errors) = result else {{ unreachable!() }};
 
+        for error in errors.iter() {{
+            error.print(&contents, &context.symbols, &context.type_tokens);
+        }}
+
         panic!("Compilation of sample \\"{name}\\" resulted in {{}} error(s)", errors.len()); 
     }};
 

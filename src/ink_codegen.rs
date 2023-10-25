@@ -145,7 +145,12 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let t = self.get_inktype_of_type_token(*inner);
                 t.ptr_type(AddressSpace::default()).into()
             }
-            _ => todo!("Create LLVM type for internal type"),
+            Type::Array(size, inner) => {
+                let t = self.get_inktype_of_type_token(*inner);
+                assert!(*size < u32::MAX as i64);
+                t.array_type(*size as u32).into()
+            }
+            _ => todo!("Create LLVM type for internal type: {:?}", ty),
         };
 
         self.typetoken_to_inktype.insert(token, t);
@@ -430,7 +435,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         Ok(is_terminator)
     }
 
-    fn get_dst_ptr(&self, e: &Expr) -> Result<PointerValue<'ctx>, Error> {
+    fn get_dst_ptr(&mut self, e: &Expr) -> Result<PointerValue<'ctx>, Error> {
         match &e.kind {
             ExprKind::Identifier(sym) => {
                 let Variable { ty, val, .. } =
@@ -440,7 +445,25 @@ impl<'ctx> CodeGenerator<'ctx> {
                 };
                 Ok(ptr)
             }
-            _ => todo!("Get pointer for expression"),
+            ExprKind::BuiltinOp {
+                op: BuiltinOpKind::At,
+                args,
+            } => {
+                assert!(args.len() <= 2);
+
+                if args.len() == 1 {
+                    let ty = self.get_inktype_of_node(args[0].id);
+                    let ptr = self.get_dst_ptr(&args[0])?;
+                    let ptr = self.builder.build_load(ty, ptr, "").into_pointer_value();
+                    Ok(ptr)
+                } else {
+                    let ty = self.get_inktype_of_node(args[0].id);
+                    let ptr = self.get_dst_ptr(&args[0])?;
+                    let idx = self.gen_expr(&args[1])?.into_int_value();
+                    Ok(unsafe { self.builder.build_gep(ty, ptr, &[idx], "") })
+                }
+            }
+            _ => todo!("Get pointer for expression: {:?}", e.kind),
         }
     }
 
@@ -449,6 +472,14 @@ impl<'ctx> CodeGenerator<'ctx> {
             ExprKind::IntLiteral(x) => Ok(self.i64_t.const_int(*x as u64, false).into()),
             ExprKind::BoolLiteral(x) => {
                 Ok(self.i64_t.const_int(if *x { 1 } else { 0 }, false).into())
+            }
+            ExprKind::Identifier(sym) => {
+                let Variable { ty, val, .. } =
+                    self.get_variable(sym).expect("Identifer should exist");
+                match val {
+                    VariableValue::Stack(ptr) => Ok(self.builder.build_load(ty, ptr, "")),
+                    _ => todo!("Retrieve value from variable"),
+                }
             }
             ExprKind::Cast { e: src, .. } => {
                 let src_ty_token = self.node_types.get(&src.id).unwrap();
@@ -582,6 +613,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     let ExprKind::Identifier(sym) = args[0].kind else {
                         todo!()
                     };
+
                     let Variable {
                         type_token,
                         ty,
@@ -607,14 +639,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 }
                 _ => todo!("BuiltinOpKind \"{:?}\"", op),
             },
-            ExprKind::Identifier(sym) => {
-                let Variable { ty, val, .. } =
-                    self.get_variable(sym).expect("Identifer should exist");
-                match val {
-                    VariableValue::Stack(ptr) => Ok(self.builder.build_load(ty, ptr, "")),
-                    _ => todo!("Retrieve value from variable"),
-                }
-            }
+
             _ => todo!("{:?}", e.kind),
         }
     }
@@ -634,11 +659,9 @@ impl<'ctx> CodeGenerator<'ctx> {
                         false,
                     );
 
-                    let f = self.module.add_function(
-                        self.symbols.get_str(name.sym),
-                        function_type,
-                        None,
-                    );
+                    let f =
+                        self.module
+                            .add_function(self.symbols.get(&name.sym), function_type, None);
 
                     self.functions.insert(name.sym, f.into());
                 }

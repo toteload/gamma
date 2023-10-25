@@ -28,11 +28,13 @@ impl Context {
     pub fn new() -> Self {
         let mut symbols = StringInterner::new();
         let mut type_tokens = TypeInterner::new();
+
         let type_table = HashMap::from([
             (symbols.add("int"), type_tokens.add(Type::Int)),
             (symbols.add("void"), type_tokens.add(Type::Void)),
             (symbols.add("bool"), type_tokens.add(Type::Bool)),
         ]);
+
         Context {
             id_generator: NodeIdGenerator::new(),
             symbols,

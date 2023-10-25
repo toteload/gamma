@@ -38,7 +38,14 @@ impl TypeChecker<'_> {
     }
 
     fn is_valid_set_destination(&self, e: &Expr) -> bool {
-        matches!(e.kind, ExprKind::Identifier(_))
+        matches!(
+            e.kind,
+            ExprKind::Identifier(_)
+                | ExprKind::BuiltinOp {
+                    op: BuiltinOpKind::At,
+                    ..
+                }
+        )
     }
 
     // Check that the found return type matches the declared return type of the function.
@@ -65,6 +72,10 @@ impl TypeChecker<'_> {
             TypeKind::Pointer(inner) => {
                 let inner = self.get_type_token_of_type_node_kind(inner)?;
                 Ok(self.type_tokens.add(Type::Pointer(inner)))
+            }
+            TypeKind::Array(size, inner) => {
+                let inner = self.get_type_token_of_type_node_kind(inner)?;
+                Ok(self.type_tokens.add(Type::Array(*size, inner)))
             }
         }
     }
@@ -368,7 +379,24 @@ impl TypeChecker<'_> {
                     let ty = self.type_tokens.get(&arg_type_token);
 
                     match ty {
-                        Type::Pointer(t) => *t,
+                        &Type::Pointer(t) => t,
+                        &Type::Array(_, t) => {
+                            let idx_type_token = self.visit_expr(&args[1])?;
+                            let ty = self.type_tokens.get(&idx_type_token);
+
+                            if !matches!(ty, Type::Int) {
+                                return Err(Error {
+                                    kind: ErrorKind::Type,
+                                    span: None,
+                                    info: vec![
+                                        ErrorInfo::Text("Array index must have int type, but was "),
+                                        ErrorInfo::Type(idx_type_token),
+                                    ],
+                                });
+                            }
+
+                            t
+                        }
                         _ => todo!(),
                     }
                 }

@@ -18,6 +18,10 @@ fn arithmetic() {
     let Ok(output) = result else {
         let Err(errors) = result else { unreachable!() };
 
+        for error in errors.iter() {
+            error.print(&contents, &context.symbols, &context.type_tokens);
+        }
+
         panic!(
             "Compilation of sample \"arithmetic\" resulted in {} error(s)",
             errors.len()
@@ -25,6 +29,35 @@ fn arithmetic() {
     };
 
     assert_snapshot!("arithmetic", output);
+}
+
+#[test]
+fn array() {
+    let contents = fs::read_to_string("tests/valid_samples/array.gamma").unwrap();
+
+    let mut context = Context::new();
+    let result = context.compile(
+        &contents,
+        &Options {
+            optimize: false,
+            output: OutputTarget::LlvmIr,
+        },
+    );
+
+    let Ok(output) = result else {
+        let Err(errors) = result else { unreachable!() };
+
+        for error in errors.iter() {
+            error.print(&contents, &context.symbols, &context.type_tokens);
+        }
+
+        panic!(
+            "Compilation of sample \"array\" resulted in {} error(s)",
+            errors.len()
+        );
+    };
+
+    assert_snapshot!("array", output);
 }
 
 #[test]
@@ -42,6 +75,10 @@ fn nested_loops() {
 
     let Ok(output) = result else {
         let Err(errors) = result else { unreachable!() };
+
+        for error in errors.iter() {
+            error.print(&contents, &context.symbols, &context.type_tokens);
+        }
 
         panic!(
             "Compilation of sample \"nested_loops\" resulted in {} error(s)",
@@ -68,6 +105,10 @@ fn only_main() {
     let Ok(output) = result else {
         let Err(errors) = result else { unreachable!() };
 
+        for error in errors.iter() {
+            error.print(&contents, &context.symbols, &context.type_tokens);
+        }
+
         panic!(
             "Compilation of sample \"only_main\" resulted in {} error(s)",
             errors.len()
@@ -93,6 +134,10 @@ fn pointer() {
     let Ok(output) = result else {
         let Err(errors) = result else { unreachable!() };
 
+        for error in errors.iter() {
+            error.print(&contents, &context.symbols, &context.type_tokens);
+        }
+
         panic!(
             "Compilation of sample \"pointer\" resulted in {} error(s)",
             errors.len()
@@ -117,6 +162,10 @@ fn sum_loop() {
 
     let Ok(output) = result else {
         let Err(errors) = result else { unreachable!() };
+
+        for error in errors.iter() {
+            error.print(&contents, &context.symbols, &context.type_tokens);
+        }
 
         panic!(
             "Compilation of sample \"sum_loop\" resulted in {} error(s)",

@@ -1,6 +1,6 @@
 fn main(): int
     let i: int = 999
     let p: ^int = (& i)
-    let s: int = (+ (@ p) 1)
-    return s
+    set (@ p) = (+ (@ p) 1)
+    return i
 end

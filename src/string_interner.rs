@@ -41,7 +41,7 @@ impl StringInterner {
         self.symbols.get(name).copied()
     }
 
-    pub fn get_str(&self, symbol: Symbol) -> &str {
+    pub fn get(&self, symbol: &Symbol) -> &str {
         &self.strings[symbol.0 as usize]
     }
 }
@@ -61,9 +61,9 @@ mod tests {
 
         assert_eq!(c, d);
 
-        assert_eq!(interner.get_str(a), "banana bread");
-        assert_eq!(interner.get_str(b), "chocolate");
-        assert_eq!(interner.get_str(c), "tuna");
+        assert_eq!(interner.get(&a), "banana bread");
+        assert_eq!(interner.get(&b), "chocolate");
+        assert_eq!(interner.get(&c), "tuna");
 
         let d = interner.add("chocolate");
 

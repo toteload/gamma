@@ -114,7 +114,7 @@ impl PartialEq for Type {
 - [x] Add optional initializer to `let` statement. This could be implemented with an AST modification.
 - [ ] Add script to list all TODO
 - [x] Add script to generate sample tests from root
-- [ ] Add error printing function
+- [x] Add error printing function
 - [ ] Verify arity of builtin functions
 ### Version 0.4.1
 - [ ] Start development of Tetris game in parallel to the compiler. Let the needs of the game steer the development direction of the compiler.
@@ -134,12 +134,13 @@ impl PartialEq for Type {
 	- [x] Add operator to take the address of a variable. `(& x)`
 		- [ ] Taking the address of a function is illegal
 	- [ ] Add pointer arithmetic.
+	- [x] Add dereferencing in the destination part of `set` statement
 	- [ ] Add type casting of one pointer type to another pointer type
 	- [ ] Add type casting of `u64` to a pointer and vice versa
 	- [ ] Add comparison operators
 - [ ] Add array type.
 	- `[128]T` or `[T:128]`. I prefer the first.
-	- [ ] Add indexing operator. `(@ p 12)`
+	- [x] Add indexing operator. `(@ p 12)`
 	- [ ] Indexing is only allowed on arrays and pointers, and can only be indexed by integers.
 ### Version 0.5
 - [ ] Add user defined functions.

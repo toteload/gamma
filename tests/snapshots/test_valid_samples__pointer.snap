@@ -18,12 +18,12 @@ entry:
   store i64 999, ptr %1, align 4
   %2 = alloca ptr, align 8
   store ptr %1, ptr %2, align 8
-  %3 = alloca i64, align 8
+  %3 = load ptr, ptr %2, align 8
   %4 = load ptr, ptr %2, align 8
   %5 = load i64, ptr %4, align 4
   %6 = add i64 %5, 1
   store i64 %6, ptr %3, align 4
-  %7 = load i64, ptr %3, align 4
+  %7 = load i64, ptr %1, align 4
   call void @llvm.stackrestore(ptr %0)
   ret i64 %7
 }

@@ -16,6 +16,7 @@ mod types;
 
 use anyhow::Result;
 use ast::NodeIdGenerator;
+use ink_codegen::{CodeGenerator, Options, OutputTarget};
 use parser::Parser;
 use semantics::validate_semantics;
 use semantics::SemanticContext;
@@ -43,7 +44,7 @@ fn print_targets() {
 */
 
 fn main() -> Result<()> {
-    let source = fs::read_to_string("tests/valid_samples/pointer.gamma").unwrap();
+    let source = fs::read_to_string("tests/valid_samples/array.gamma").unwrap();
 
     let mut id_generator = NodeIdGenerator::new();
     let mut symbols = StringInterner::new();
@@ -86,6 +87,21 @@ fn main() -> Result<()> {
     println!("Type checking done...");
 
     assert!(type_check_result.is_ok());
+
+    let ctx = inkwell::context::Context::create();
+    let mut codegen = CodeGenerator::new(&ctx, &symbols, &types, &type_tokens);
+    let options = Options {
+        optimize: false,
+        output: OutputTarget::LlvmIr,
+    };
+
+    let output = codegen.compile(&items, &options).map_err(|e| vec![e]);
+
+    assert!(output.is_ok());
+
+    let text = output.unwrap();
+
+    print!("{}", text);
 
     /*
     println!("{}", ron::ser::to_string(&symbols).expect(""));

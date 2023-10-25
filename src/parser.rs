@@ -126,42 +126,61 @@ impl Parser<'_> {
         Ok(item)
     }
 
-    fn parse_type(&mut self) -> Result<Type> {
+    fn parse_array_type(&mut self) -> Result<(SourceSpan, TypeKind)> {
         use TokenKind::*;
 
-        let mut atoms = Vec::<Token>::new();
-        loop {
-            let peeked = expect_token!(self.tokens.peek(), _)?;
+        let Token { span: start, .. } = expect_token!(self.tokens.next(), BracketOpen)?;
 
-            if !matches!(peeked.kind, Identifier(_) | Hat) {
-                break;
-            }
-
-            atoms.push(*peeked);
-
-            self.tokens.next();
-        }
-
-        if atoms.is_empty() {
-            todo!()
-        }
-
-        let mut kind = match atoms.last().unwrap().kind {
-            Identifier(sym) => TypeKind::Identifier(sym),
-            _ => panic!("illegal"),
+        let Token {
+            kind: IntLiteral(size),
+            ..
+        } = expect_token!(self.tokens.next(), IntLiteral(_))?
+        else {
+            unreachable!()
         };
 
-        for atom in atoms.iter().rev().skip(1) {
-            match atom.kind {
-                Hat => {
-                    kind = TypeKind::Pointer(Box::new(kind));
-                }
-                _ => panic!("illegal"),
+        expect_token!(self.tokens.next(), BracketClose)?;
+
+        let (end, base_type) = self.parse_base_type()?;
+
+        let span = start.extend(&end);
+
+        Ok((span, TypeKind::Array(size, Box::new(base_type))))
+    }
+
+    fn parse_pointer_type(&mut self) -> Result<(SourceSpan, TypeKind)> {
+        use TokenKind::*;
+
+        let Token { span: start, .. } = expect_token!(self.tokens.next(), Hat)?;
+
+        let (end, base_type) = self.parse_base_type()?;
+
+        let span = start.extend(&end);
+
+        Ok((span, TypeKind::Pointer(Box::new(base_type))))
+    }
+
+    fn parse_base_type(&mut self) -> Result<(SourceSpan, TypeKind)> {
+        use TokenKind::*;
+
+        let Token { kind, span } =
+            *expect_token!(self.tokens.peek(), Hat | BracketOpen | Identifier(_))?;
+
+        match kind {
+            Hat => self.parse_pointer_type(),
+            BracketOpen => self.parse_array_type(),
+            Identifier(sym) => {
+                self.tokens.next();
+                Ok((span, TypeKind::Identifier(sym)))
             }
+            _ => unreachable!(),
         }
+    }
+
+    fn parse_type(&mut self) -> Result<Type> {
+        let (span, kind) = self.parse_base_type()?;
 
         let id = self.gen_node_id();
-        let span = atoms[0].span.extend(&atoms.last().unwrap().span);
 
         self.spans.insert(id, span);
 
@@ -477,11 +496,20 @@ impl Parser<'_> {
                     }
 
                     At => {
-                        let x = self.parse_expression()?;
+                        let mut args = vec![self.parse_expression()?];
+
+                        loop {
+                            let peeked = expect_token!(self.tokens.peek(), _)?;
+                            if matches!(peeked.kind, ParenClose) {
+                                break;
+                            }
+
+                            args.push(self.parse_expression()?);
+                        }
 
                         ExprKind::BuiltinOp {
                             op: BuiltinOpKind::At,
-                            args: vec![x],
+                            args,
                         }
                     }
 

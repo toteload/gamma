@@ -12,6 +12,7 @@ pub enum Type {
         return_type: TypeToken,
     },
     Pointer(TypeToken),
+    Array(i64, TypeToken),
 }
 
 impl Type {
@@ -24,6 +25,7 @@ impl Type {
             Int => 2,
             Function { .. } => 3,
             Pointer(_) => 4,
+            Array(..) => 5,
         }
     }
 
@@ -36,6 +38,11 @@ impl Type {
             Int => "int".to_string(),
             Pointer(x) => {
                 let mut s = "*".to_string();
+                s += &type_interner.get(x).to_string(type_interner);
+                s
+            }
+            Array(size, x) => {
+                let mut s = format!("[{}]", size);
                 s += &type_interner.get(x).to_string(type_interner);
                 s
             }
@@ -76,6 +83,10 @@ impl Hash for Type {
                 return_type.hash(state);
             }
             Type::Pointer(x) => x.hash(state),
+            Type::Array(size, x) => {
+                state.write_i64(*size);
+                x.hash(state);
+            }
             _ => (),
         }
     }

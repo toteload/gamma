@@ -55,6 +55,9 @@ pub enum TokenKind {
     ParenOpen,
     ParenClose,
 
+    BracketOpen,
+    BracketClose,
+
     Semicolon,
     Colon,
 
@@ -232,6 +235,8 @@ impl<'a> Iterator for Tokenizer<'a> {
             ')' => Token { span: SourceSpan::single(start), kind: TokenKind::ParenClose, },
             '{' => Token { span: SourceSpan::single(start), kind: TokenKind::BraceOpen, },
             '}' => Token { span: SourceSpan::single(start), kind: TokenKind::BraceClose, },
+            '[' => Token { span: SourceSpan::single(start), kind: TokenKind::BracketOpen, },
+            ']' => Token { span: SourceSpan::single(start), kind: TokenKind::BracketClose, },
 
             ',' => Token { span: SourceSpan::single(start), kind: TokenKind::Comma, },
 
@@ -261,7 +266,7 @@ mod tests {
     #[test]
     fn tokenizer_creates_the_expected_tokens() {
         let source = "fn if else + - * ; : { } ( ) void let voidlet 4687 continue return-,=       
-            int eq / ne ge le lt gt true false loop break bool int void end";
+            int eq / ne ge le lt gt true false loop break bool int void end [ ]";
 
         let mut symbols = StringInterner::new();
         let tokenizer = Tokenizer::new(source, &mut symbols);
