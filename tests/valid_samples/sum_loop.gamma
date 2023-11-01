@@ -1,13 +1,12 @@
-fn main(): int
-    let s: int
-    set s = 0
+fn main(): i32
+    let s: i32 = (cast i32 0)
 
     loop
-        if (eq s 10)
+        if (eq s (cast i32 10))
             break
         end
 
-        set s = (+ s 1)
+        set s = (+ s (cast i32 1))
     end
 
     return s

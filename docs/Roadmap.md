@@ -121,10 +121,10 @@ impl PartialEq for Type {
 - [ ] Add functionality for calling externally defined C functions.
 	- [ ] Syntax for declaring externally defined functions.
 	- [ ] C types:
-		- [ ] Integers
+		- [x] Integers
 		- [ ] structs
 			- Struct indexing syntax `player.name`
-		- [ ] pointers
+		- [x] pointers
 		- [ ] ...
 ### Version 0.4
 - [ ] Add pointer type.
@@ -145,7 +145,7 @@ impl PartialEq for Type {
 ### Version 0.5
 - [ ] Add user defined functions.
 - [x] Add `loop`, `break` and `continue`
-	- [ ] Semantic check: `break` and `continue` can only be used inside a loop
+	- [x] Semantic check: `break` and `continue` can only be used inside a loop
 	- [ ] Add optional labels for `loop`. You can `break :label` or `continue :label`. A label has to start with a colon.
 	- `loop :main { break :main }`
 - [ ] Add modules

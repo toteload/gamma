@@ -4,6 +4,8 @@ expression: output
 ---
 ; ModuleID = 'main'
 source_filename = "main"
+target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-pc-windows-msvc"
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare ptr @llvm.stacksave() #0
@@ -11,17 +13,17 @@ declare ptr @llvm.stacksave() #0
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare void @llvm.stackrestore(ptr) #0
 
-define i64 @main() {
+define i32 @main() {
 entry:
   %0 = call ptr @llvm.stacksave()
-  %1 = alloca i64, align 8
-  store i64 0, ptr %1, align 4
+  %1 = alloca i32, align 4
+  store i32 0, ptr %1, align 4
   br label %loop
 
 loop:                                             ; preds = %endloop1, %entry
   %2 = call ptr @llvm.stacksave()
-  %3 = load i64, ptr %1, align 4
-  %4 = icmp eq i64 %3, 10
+  %3 = load i32, ptr %1, align 4
+  %4 = icmp eq i32 %3, 10
   br i1 %4, label %then, label %otherwise
 
 then:                                             ; preds = %loop
@@ -33,14 +35,14 @@ otherwise:                                        ; preds = %loop
   br label %endif
 
 endif:                                            ; preds = %otherwise
-  %6 = alloca i64, align 8
-  store i64 0, ptr %6, align 4
+  %6 = alloca i32, align 4
+  store i32 0, ptr %6, align 4
   br label %loop2
 
 loop2:                                            ; preds = %endif3, %endif
   %7 = call ptr @llvm.stacksave()
-  %8 = load i64, ptr %6, align 4
-  %9 = icmp eq i64 %8, 10
+  %8 = load i32, ptr %6, align 4
+  %9 = icmp eq i32 %8, 10
   br i1 %9, label %then5, label %otherwise4
 
 then5:                                            ; preds = %loop2
@@ -52,22 +54,23 @@ otherwise4:                                       ; preds = %loop2
   br label %endif3
 
 endif3:                                           ; preds = %otherwise4
-  %11 = load i64, ptr %6, align 4
-  %12 = add i64 %11, 1
-  store i64 %12, ptr %6, align 4
+  %11 = load i32, ptr %6, align 4
+  %12 = add i32 %11, 1
+  store i32 %12, ptr %6, align 4
   call void @llvm.stackrestore(ptr %7)
   br label %loop2
 
 endloop1:                                         ; preds = %then5
-  %13 = load i64, ptr %1, align 4
-  %14 = add i64 %13, 1
-  store i64 %14, ptr %1, align 4
+  %13 = load i32, ptr %1, align 4
+  %14 = add i32 %13, 1
+  store i32 %14, ptr %1, align 4
   call void @llvm.stackrestore(ptr %2)
   br label %loop
 
 endloop:                                          ; preds = %then
+  %15 = load i32, ptr %1, align 4
   call void @llvm.stackrestore(ptr %0)
-  ret i64 0
+  ret i32 %15
 }
 
 attributes #0 = { nocallback nofree nosync nounwind willreturn }

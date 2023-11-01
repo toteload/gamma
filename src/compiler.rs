@@ -7,7 +7,7 @@ use crate::{
     source_location::SourceSpan,
     string_interner::{StringInterner, Symbol},
     type_check::type_check,
-    types::{Type, TypeInterner, TypeToken},
+    types::{Signedness, Type, TypeInterner, TypeToken},
 };
 use std::collections::HashMap;
 
@@ -30,7 +30,62 @@ impl Context {
         let mut type_tokens = TypeInterner::new();
 
         let type_table = HashMap::from([
-            (symbols.add("int"), type_tokens.add(Type::Int)),
+            (
+                symbols.add("i8"),
+                type_tokens.add(Type::Int {
+                    signedness: Signedness::Signed,
+                    width: 8,
+                }),
+            ),
+            (
+                symbols.add("i16"),
+                type_tokens.add(Type::Int {
+                    signedness: Signedness::Signed,
+                    width: 16,
+                }),
+            ),
+            (
+                symbols.add("i32"),
+                type_tokens.add(Type::Int {
+                    signedness: Signedness::Signed,
+                    width: 32,
+                }),
+            ),
+            (
+                symbols.add("i64"),
+                type_tokens.add(Type::Int {
+                    signedness: Signedness::Signed,
+                    width: 64,
+                }),
+            ),
+            (
+                symbols.add("u8"),
+                type_tokens.add(Type::Int {
+                    signedness: Signedness::Unsigned,
+                    width: 8,
+                }),
+            ),
+            (
+                symbols.add("u16"),
+                type_tokens.add(Type::Int {
+                    signedness: Signedness::Unsigned,
+                    width: 16,
+                }),
+            ),
+            (
+                symbols.add("u32"),
+                type_tokens.add(Type::Int {
+                    signedness: Signedness::Unsigned,
+                    width: 32,
+                }),
+            ),
+            (
+                symbols.add("u64"),
+                type_tokens.add(Type::Int {
+                    signedness: Signedness::Unsigned,
+                    width: 64,
+                }),
+            ),
             (symbols.add("void"), type_tokens.add(Type::Void)),
             (symbols.add("bool"), type_tokens.add(Type::Bool)),
         ]);

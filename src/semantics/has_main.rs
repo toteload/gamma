@@ -38,7 +38,6 @@ impl Visitor for Prover {
 impl SemanticProver for Prover {
     fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Error>> {
         let no_main_defined_error: Error = Error {
-            kind: ErrorKind::Semantic,
             span: None,
             info: vec![ErrorInfo::Text("No main function defined")],
         };

@@ -4,7 +4,7 @@ use crate::compiler::Context;
 use crate::error::*;
 use crate::scope_stack::ScopeStack;
 use crate::string_interner::Symbol;
-use crate::types::{Type, TypeInterner, TypeToken};
+use crate::types::{Type, TypeInterner, TypeToken, Signedness};
 use std::collections::HashMap;
 
 struct TypeChecker<'a> {
@@ -52,7 +52,6 @@ impl TypeChecker<'_> {
     fn check_return_type(&mut self, found_return_type: Option<TypeToken>) {
         if found_return_type != self.declared_return_type {
             self.errors.push(Error {
-                kind: ErrorKind::Type,
                 span: None,
                 info: vec![ErrorInfo::Text("Return types do not match")],
             });
@@ -62,7 +61,6 @@ impl TypeChecker<'_> {
     fn get_type_token_of_type_node_kind(&mut self, kind: &TypeKind) -> Result<TypeToken, Error> {
         match kind {
             TypeKind::Identifier(sym) => self.type_table.get(sym).copied().ok_or(Error {
-                kind: ErrorKind::Type,
                 span: None,
                 info: vec![
                     ErrorInfo::Text("Undefined type identifier encountered: "),
@@ -85,7 +83,15 @@ impl TypeChecker<'_> {
     }
 
     fn is_valid_type_cast(&self, expr: TypeToken, cast_type: TypeToken) -> bool {
-        todo!()
+        use Type::*;
+        let dst_ty = self.type_tokens.get(&cast_type);
+        let expr_ty = self.type_tokens.get(&expr);
+        match (dst_ty, expr_ty) {
+            (Int{..}, Int{..}) => true,
+            (Int{..}, Bool) => true,
+            (Bool, Int{..}) => true,
+            _ => false,
+        }
     }
 
     fn visit_items(&mut self, items: &[Item]) {
@@ -226,7 +232,6 @@ impl TypeChecker<'_> {
 
                     if type_token != init_type_token {
                         self.errors.push(Error {
-                            kind: ErrorKind::Type,
                             span: None,
                             info: vec![
                                 ErrorInfo::Text("Type mismatch between declared type and type of initializer in set statement"),
@@ -243,7 +248,6 @@ impl TypeChecker<'_> {
                 // "L-value". Something like `set 0 = 1` would type check, but should not be valid.
                 if !self.is_valid_set_destination(dst) {
                     self.errors.push(Error {
-                        kind: ErrorKind::Type,
                         span: None,
                         info: vec![ErrorInfo::Text(
                             "Invalid expression for destination in set statement",
@@ -262,7 +266,6 @@ impl TypeChecker<'_> {
                 match (&dst_result, &val_result) {
                     (Ok(dst_type), Ok(val_type)) if dst_type != val_type => {
                         self.errors.push(Error {
-                            kind: ErrorKind::Type,
                             span: None,
                             info: vec![ErrorInfo::Text("Type mismatch in set statement.")],
                         });
@@ -283,7 +286,6 @@ impl TypeChecker<'_> {
                 match self.visit_expr(cond) {
                     Ok(ty) if ty != self.type_tokens.add(Type::Bool) => {
                         self.errors.push(Error {
-                            kind: ErrorKind::Type,
                             span: None,
                             info: vec![ErrorInfo::Text(
                                 "Type of condition in if statement must be bool.",
@@ -313,7 +315,10 @@ impl TypeChecker<'_> {
         use ExprKind::*;
 
         let ty = match &expression.kind {
-            IntLiteral(_) => self.type_tokens.add(Type::Int),
+            IntLiteral(_) => self.type_tokens.add(Type::Int {
+                signedness: Signedness::Signed,
+                width: 64,
+            }),
             BoolLiteral(_) => self.type_tokens.add(Type::Bool),
             Identifier(sym) => self.get_type_token_of_sym(sym),
             Cast { ty, e } => {
@@ -322,7 +327,6 @@ impl TypeChecker<'_> {
 
                 if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
                     return Err(Error {
-                        kind: ErrorKind::Type,
                         span: None,
                         info: vec![ErrorInfo::Text("Invalid cast.")],
                     });
@@ -340,7 +344,6 @@ impl TypeChecker<'_> {
 
                     if !args_are_of_same_type {
                         return Err(Error {
-                            kind: ErrorKind::Type,
                             span: None,
                             info: vec![ErrorInfo::Text("Arguments must have the same type.")],
                         });
@@ -352,23 +355,23 @@ impl TypeChecker<'_> {
                 | BuiltinOpKind::Add
                 | BuiltinOpKind::Div
                 | BuiltinOpKind::Sub => {
-                    // TODO: Also check that they are of type int. Right now it is only checked if
-                    // they are all the same, but they could all be bools.
+                    assert!(!args.is_empty());
+
                     let arg_types = args
                         .iter()
                         .map(|arg| self.visit_expr(arg))
                         .collect::<Result<Vec<_>, _>>()?;
+
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
 
                     if !args_are_of_same_type {
                         return Err(Error {
-                            kind: ErrorKind::Type,
                             span: None,
                             info: vec![ErrorInfo::Text("Arguments must have the same type.")],
                         });
                     }
 
-                    self.type_tokens.add(Type::Int)
+                    arg_types[0]
                 }
                 BuiltinOpKind::AddressOf => {
                     let arg_type_token = self.visit_expr(&args[0])?;
@@ -384,9 +387,8 @@ impl TypeChecker<'_> {
                             let idx_type_token = self.visit_expr(&args[1])?;
                             let ty = self.type_tokens.get(&idx_type_token);
 
-                            if !matches!(ty, Type::Int) {
+                            if !matches!(ty, Type::Int{..}) {
                                 return Err(Error {
-                                    kind: ErrorKind::Type,
                                     span: None,
                                     info: vec![
                                         ErrorInfo::Text("Array index must have int type, but was "),

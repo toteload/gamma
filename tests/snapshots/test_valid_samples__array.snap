@@ -4,6 +4,8 @@ expression: output
 ---
 ; ModuleID = 'main'
 source_filename = "main"
+target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-pc-windows-msvc"
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare ptr @llvm.stacksave() #0
@@ -11,18 +13,18 @@ declare ptr @llvm.stacksave() #0
 ; Function Attrs: nocallback nofree nosync nounwind willreturn
 declare void @llvm.stackrestore(ptr) #0
 
-define i64 @main() {
+define i32 @main() {
 entry:
   %0 = call ptr @llvm.stacksave()
-  %1 = alloca [16 x i64], align 8
-  %2 = alloca i64, align 8
-  store i64 0, ptr %2, align 4
+  %1 = alloca [16 x i32], align 4
+  %2 = alloca i32, align 4
+  store i32 0, ptr %2, align 4
   br label %loop
 
 loop:                                             ; preds = %endif, %entry
   %3 = call ptr @llvm.stacksave()
-  %4 = load i64, ptr %2, align 4
-  %5 = icmp eq i64 %4, 16
+  %4 = load i32, ptr %2, align 4
+  %5 = icmp eq i32 %4, 16
   br i1 %5, label %then, label %otherwise
 
 then:                                             ; preds = %loop
@@ -34,19 +36,19 @@ otherwise:                                        ; preds = %loop
   br label %endif
 
 endif:                                            ; preds = %otherwise
-  %7 = load i64, ptr %2, align 4
-  %8 = getelementptr [16 x i64], ptr %1, i64 %7
-  %9 = load i64, ptr %2, align 4
-  store i64 %9, ptr %8, align 4
-  %10 = load i64, ptr %2, align 4
-  %11 = add i64 %10, 1
-  store i64 %11, ptr %2, align 4
+  %7 = load i32, ptr %2, align 4
+  %8 = getelementptr [16 x i32], ptr %1, i32 %7
+  %9 = load i32, ptr %2, align 4
+  store i32 %9, ptr %8, align 4
+  %10 = load i32, ptr %2, align 4
+  %11 = add i32 %10, 1
+  store i32 %11, ptr %2, align 4
   call void @llvm.stackrestore(ptr %3)
   br label %loop
 
 endloop:                                          ; preds = %then
   call void @llvm.stackrestore(ptr %0)
-  ret i64 0
+  ret i32 0
 }
 
 attributes #0 = { nocallback nofree nosync nounwind willreturn }

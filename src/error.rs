@@ -3,13 +3,6 @@ use crate::string_interner::{StringInterner, Symbol};
 use crate::types::*;
 
 #[derive(Clone, Copy, Debug)]
-pub enum ErrorKind {
-    Parse,
-    Type,
-    Semantic,
-}
-
-#[derive(Clone, Copy, Debug)]
 pub enum ErrorInfo {
     Text(&'static str),
     Identifier(Symbol),
@@ -19,20 +12,13 @@ pub enum ErrorInfo {
 
 #[derive(Clone, Debug)]
 pub struct Error {
-    pub kind: ErrorKind,
     pub span: Option<SourceSpan>,
     pub info: Vec<ErrorInfo>,
 }
 
 impl Error {
     pub fn print(&self, source: &str, symbols: &StringInterner, type_tokens: &TypeInterner) {
-        print!("[ERROR] ");
-
-        match self.kind {
-            ErrorKind::Parse => print!("Parsing error: "),
-            ErrorKind::Type => print!("Type error: "),
-            ErrorKind::Semantic => print!("Semantic error: "),
-        }
+        print!("Error: ");
 
         for info in self.info.iter() {
             use ErrorInfo::*;

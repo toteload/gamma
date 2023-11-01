@@ -17,6 +17,7 @@ mod types;
 use anyhow::Result;
 use ast::NodeIdGenerator;
 use ink_codegen::{CodeGenerator, Options, OutputTarget};
+use inkwell::targets::{InitializationConfig, Target};
 use parser::Parser;
 use semantics::validate_semantics;
 use semantics::SemanticContext;
@@ -24,9 +25,8 @@ use std::collections::HashMap;
 use std::fs;
 use string_interner::{StringInterner, Symbol};
 use type_check::type_check;
-use types::{Type, TypeInterner, TypeToken};
+use types::{Type, TypeInterner, TypeToken, Signedness};
 
-/*
 fn print_targets() {
     Target::initialize_all(&InitializationConfig::default());
 
@@ -41,7 +41,6 @@ fn print_targets() {
         current = target.get_next();
     }
 }
-*/
 
 fn main() -> Result<()> {
     let source = fs::read_to_string("tests/valid_samples/array.gamma").unwrap();
@@ -64,7 +63,62 @@ fn main() -> Result<()> {
     };
 
     let mut type_table = HashMap::<Symbol, TypeToken>::from([
-        (symbols.add("int"), type_tokens.add(Type::Int)),
+        (
+            symbols.add("i8"),
+            type_tokens.add(Type::Int {
+                signedness: Signedness::Signed,
+                width: 8,
+            }),
+        ),
+        (
+            symbols.add("i16"),
+            type_tokens.add(Type::Int {
+                signedness: Signedness::Signed,
+                width: 16,
+            }),
+        ),
+        (
+            symbols.add("i32"),
+            type_tokens.add(Type::Int {
+                signedness: Signedness::Signed,
+                width: 32,
+            }),
+        ),
+        (
+            symbols.add("i64"),
+            type_tokens.add(Type::Int {
+                signedness: Signedness::Signed,
+                width: 64,
+            }),
+        ),
+        (
+            symbols.add("u8"),
+            type_tokens.add(Type::Int {
+                signedness: Signedness::Unsigned,
+                width: 8,
+            }),
+        ),
+        (
+            symbols.add("u16"),
+            type_tokens.add(Type::Int {
+                signedness: Signedness::Unsigned,
+                width: 16,
+            }),
+        ),
+        (
+            symbols.add("u32"),
+            type_tokens.add(Type::Int {
+                signedness: Signedness::Unsigned,
+                width: 32,
+            }),
+        ),
+        (
+            symbols.add("u64"),
+            type_tokens.add(Type::Int {
+                signedness: Signedness::Unsigned,
+                width: 64,
+            }),
+        ),
         (symbols.add("void"), type_tokens.add(Type::Void)),
         (symbols.add("bool"), type_tokens.add(Type::Bool)),
     ]);
@@ -85,6 +139,12 @@ fn main() -> Result<()> {
     let type_check_result = type_check(&items, &mut type_tokens, &mut types, &mut type_table);
 
     println!("Type checking done...");
+
+    if let Err(ref errors) = type_check_result {
+        for error in errors.iter() {
+            error.print(&source, &symbols, &type_tokens);
+        }
+    }
 
     assert!(type_check_result.is_ok());
 

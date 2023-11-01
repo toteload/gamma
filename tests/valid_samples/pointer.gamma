@@ -1,6 +1,6 @@
-fn main(): int
-    let i: int = 999
-    let p: ^int = (& i)
-    set (@ p) = (+ (@ p) 1)
+fn main(): i32
+    let i: i32 = (cast i32 999)
+    let p: ^i32 = (& i)
+    set (@ p) = (+ (@ p) (cast i32 1))
     return i
 end

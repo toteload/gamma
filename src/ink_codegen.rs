@@ -2,7 +2,7 @@ use crate::ast::*;
 use crate::compiler::Context as CompilerContext;
 use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
-use crate::types::{Type, TypeInterner, TypeToken};
+use crate::types::{Signedness, Type, TypeInterner, TypeToken};
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
@@ -70,7 +70,11 @@ pub struct CodeGenerator<'ctx> {
     llvm_stacksave: FunctionValue<'ctx>,
     llvm_stackrestore: FunctionValue<'ctx>,
 
+    i8_t: IntType<'ctx>,
+    i16_t: IntType<'ctx>,
+    i32_t: IntType<'ctx>,
     i64_t: IntType<'ctx>,
+
     typetoken_to_inktype: HashMap<TypeToken, BasicTypeEnum<'ctx>>,
 
     symbols: &'ctx StringInterner,
@@ -114,6 +118,9 @@ impl<'ctx> CodeGenerator<'ctx> {
             llvm_stacksave,
             llvm_stackrestore,
 
+            i8_t: ctx.i8_type(),
+            i16_t: ctx.i16_type(),
+            i32_t: ctx.i32_type(),
             i64_t: ctx.i64_type(),
 
             symbols,
@@ -122,14 +129,92 @@ impl<'ctx> CodeGenerator<'ctx> {
 
             typetoken_to_inktype: HashMap::from([
                 (
-                    type_interner.get_for_type(&Type::Int).unwrap(),
+                    type_interner
+                        .get_for_type(&Type::Int {
+                            signedness: Signedness::Signed,
+                            width: 8,
+                        })
+                        .unwrap(),
+                    ctx.i8_type().into(),
+                ),
+                (
+                    type_interner
+                        .get_for_type(&Type::Int {
+                            signedness: Signedness::Signed,
+                            width: 16,
+                        })
+                        .unwrap(),
+                    ctx.i16_type().into(),
+                ),
+                (
+                    type_interner
+                        .get_for_type(&Type::Int {
+                            signedness: Signedness::Signed,
+                            width: 32,
+                        })
+                        .unwrap(),
+                    ctx.i32_type().into(),
+                ),
+                (
+                    type_interner
+                        .get_for_type(&Type::Int {
+                            signedness: Signedness::Signed,
+                            width: 64,
+                        })
+                        .unwrap(),
+                    ctx.i64_type().into(),
+                ),
+                (
+                    type_interner
+                        .get_for_type(&Type::Int {
+                            signedness: Signedness::Unsigned,
+                            width: 8,
+                        })
+                        .unwrap(),
+                    ctx.i8_type().into(),
+                ),
+                (
+                    type_interner
+                        .get_for_type(&Type::Int {
+                            signedness: Signedness::Unsigned,
+                            width: 16,
+                        })
+                        .unwrap(),
+                    ctx.i16_type().into(),
+                ),
+                (
+                    type_interner
+                        .get_for_type(&Type::Int {
+                            signedness: Signedness::Unsigned,
+                            width: 32,
+                        })
+                        .unwrap(),
+                    ctx.i32_type().into(),
+                ),
+                (
+                    type_interner
+                        .get_for_type(&Type::Int {
+                            signedness: Signedness::Unsigned,
+                            width: 64,
+                        })
+                        .unwrap(),
                     ctx.i64_type().into(),
                 ),
                 (
                     type_interner.get_for_type(&Type::Bool).unwrap(),
-                    ctx.i64_type().into(),
+                    ctx.i8_type().into(),
                 ),
             ]),
+        }
+    }
+
+    fn int_type(&self, width: u32) -> IntType<'ctx> {
+        match width {
+            8 => self.i8_t,
+            16 => self.i16_t,
+            32 => self.i32_t,
+            64 => self.i64_t,
+            _ => panic!(),
         }
     }
 
@@ -491,7 +576,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let val = self.gen_expr(src)?;
 
                 match (src_ty, dst_ty) {
-                    (&Type::Int, &Type::Bool) => Ok(self
+                    (&Type::Int { .. }, &Type::Bool) => Ok(self
                         .builder
                         .build_int_compare(
                             IntPredicate::NE,
@@ -500,11 +585,13 @@ impl<'ctx> CodeGenerator<'ctx> {
                             "",
                         )
                         .into()),
-                    (&Type::Bool, &Type::Int) => Ok(self
+                    (&Type::Bool, &Type::Int { width, .. }) => Ok(self
                         .builder
-                        .build_int_z_extend(val.into_int_value(), self.i64_t, "")
+                        .build_int_z_extend(val.into_int_value(), self.int_type(width), "")
                         .into()),
-                    _ => todo!(),
+                    (&Type::Int { width: src_width, ..}, &Type::Int {width: dst_width, ..}) if src_width > dst_width =>
+                        Ok(self.builder.build_int_truncate(val.into_int_value(), self.int_type(dst_width), "").into()),
+                    _ => todo!("Cast from {:?} to {:?}", src_ty, dst_ty),
                 }
             }
             ExprKind::BuiltinOp { op, args } => match op {
@@ -654,8 +741,8 @@ impl<'ctx> CodeGenerator<'ctx> {
         for item in items {
             match &item.kind {
                 ItemKind::Function { name, params, .. } => {
-                    let function_type = self.i64_t.fn_type(
-                        &params.iter().map(|_| self.i64_t.into()).collect::<Vec<_>>(),
+                    let function_type = self.i32_t.fn_type(
+                        &params.iter().map(|_| self.i32_t.into()).collect::<Vec<_>>(),
                         false,
                     );
 
@@ -680,6 +767,30 @@ impl<'ctx> CodeGenerator<'ctx> {
             todo!("Handle error properly")
         }
 
+        // TODO This should maybe be in some other place, so it doesn't get called multiple times
+        Target::initialize_x86(&InitializationConfig::default());
+
+        let triple = TargetTriple::create("x86_64-pc-windows-msvc");
+        let target = Target::from_triple(&triple)
+            .expect("Should be able to get target from initialized triple");
+        let features = "";
+        let target_machine = target
+            .create_target_machine(
+                &triple,
+                "",
+                features,
+                OptimizationLevel::Default,
+                RelocMode::Default,
+                CodeModel::Default,
+            )
+            .expect("Should be able to create target machine");
+
+        let target_data = target_machine.get_target_data();
+        let data_layout = target_data.get_data_layout();
+
+        self.module.set_triple(&triple);
+        self.module.set_data_layout(&data_layout);
+
         if options.optimize {
             let pass_manager: PassManager<Module<'_>> = PassManager::create(());
             pass_manager.add_promote_memory_to_register_pass();
@@ -693,27 +804,6 @@ impl<'ctx> CodeGenerator<'ctx> {
         match options.output {
             OutputTarget::LlvmIr => Ok(self.module.to_string()),
             OutputTarget::Assembly => {
-                Target::initialize_x86(&InitializationConfig::default());
-
-                let triple = TargetTriple::create("x86_64-pc-windows-msvc");
-                let target = Target::from_triple(&triple)
-                    .expect("Should be able to get target from initialized triple");
-                let features = "";
-                let target_machine = target
-                    .create_target_machine(
-                        &triple,
-                        "",
-                        features,
-                        OptimizationLevel::Default,
-                        RelocMode::Default,
-                        CodeModel::Default,
-                    )
-                    .expect("Should be able to create target machine");
-                let target_data = target_machine.get_target_data();
-                let data_layout = target_data.get_data_layout();
-
-                self.module.set_data_layout(&data_layout);
-
                 let result =
                     target_machine.write_to_memory_buffer(&self.module, FileType::Assembly);
 

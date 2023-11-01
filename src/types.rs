@@ -2,11 +2,20 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum Signedness {
+    Signed,
+    Unsigned,
+}
+
 #[derive(Clone, Debug, Eq, Serialize)]
 pub enum Type {
     Void,
     Bool,
-    Int,
+    Int {
+        signedness: Signedness,
+        width: u32,
+    },
     Function {
         params: Vec<TypeToken>,
         return_type: TypeToken,
@@ -22,7 +31,7 @@ impl Type {
         match self {
             Void => 0,
             Bool => 1,
-            Int => 2,
+            Int { .. } => 2,
             Function { .. } => 3,
             Pointer(_) => 4,
             Array(..) => 5,
@@ -35,7 +44,15 @@ impl Type {
         match &self {
             Void => "void".to_string(),
             Bool => "bool".to_string(),
-            Int => "int".to_string(),
+            Int { signedness, width } => format!(
+                "{}{}",
+                if *signedness == Signedness::Signed {
+                    "i"
+                } else {
+                    "u"
+                },
+                width
+            ),
             Pointer(x) => {
                 let mut s = "*".to_string();
                 s += &type_interner.get(x).to_string(type_interner);
@@ -87,6 +104,10 @@ impl Hash for Type {
                 state.write_i64(*size);
                 x.hash(state);
             }
+            Type::Int { signedness, width } => {
+                state.write_u8(*signedness as u8);
+                width.hash(state);
+            }
             _ => (),
         }
     }
@@ -124,6 +145,16 @@ impl PartialEq for Type {
                 same_return_type && same_params && xparams.len() == yparams.len()
             }
             (Pointer(x), Pointer(y)) => x == y,
+            (
+                Int {
+                    signedness: x_signedness,
+                    width: x_width,
+                },
+                Int {
+                    signedness: y_signedness,
+                    width: y_width,
+                },
+            ) => x_signedness == y_signedness && x_width == y_width,
             _ => true,
         }
     }
@@ -181,7 +212,7 @@ mod tests {
 
         let a = interner.add(Void);
         let b = interner.add(Bool);
-        let c = interner.add(Int);
+        let c = interner.add(Int{signedness: Signedness::Unsigned, width: 32});
 
         assert_eq!(a.0, 0);
         assert_eq!(b.0, 1);
@@ -193,7 +224,7 @@ mod tests {
 
         assert_eq!(interner.get(&a), &Void);
         assert_eq!(interner.get(&b), &Bool);
-        assert_eq!(interner.get(&c), &Int);
+        assert_eq!(interner.get(&c), &Int{signedness: Signedness::Unsigned, width: 32});
 
         let d = interner.add(Function {
             params: vec![c, c, c],
