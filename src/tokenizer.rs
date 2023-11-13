@@ -13,6 +13,7 @@ pub struct Token {
 #[derive(strum_macros::IntoStaticStr, Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize)]
 pub enum TokenKind {
     KeywordFn,
+    KeywordExternalFn,
 
     KeywordIf,
     KeywordElse,
@@ -164,6 +165,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 };
 
                 match identifier {
+                    "external_fn" => Token { span, kind: TokenKind::KeywordExternalFn, },
                     "fn"       => Token { span, kind: TokenKind::KeywordFn, },
                     "if"       => Token { span, kind: TokenKind::KeywordIf, },
                     "else"     => Token { span, kind: TokenKind::KeywordElse, },

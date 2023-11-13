@@ -15,6 +15,11 @@ pub trait Visitor {
                 params,
                 body,
             } => self.visit_function(name, params, return_type, body),
+            ItemKind::ExternalFunction {
+                return_type,
+                name,
+                params,
+            } => self.visit_external_function(name, params, return_type),
         }
     }
 
@@ -26,6 +31,14 @@ pub trait Visitor {
         body: &Block,
     ) {
         self.visit_block(body);
+    }
+
+    fn visit_external_function(
+        &mut self,
+        name: &Name,
+        params: &[Param],
+        return_type: &crate::ast::Type,
+    ) {
     }
 
     fn visit_block(&mut self, block: &Block) {

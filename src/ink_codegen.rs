@@ -11,7 +11,7 @@ use inkwell::{
     module::Module,
     passes::PassManager,
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
-    types::{BasicType, BasicTypeEnum, IntType},
+    types::{BasicType, BasicTypeEnum, FunctionType, IntType, VoidType},
     values::{BasicValueEnum, FunctionValue, PointerValue},
     AddressSpace, IntPredicate, OptimizationLevel,
 };
@@ -74,7 +74,9 @@ pub struct CodeGenerator<'ctx> {
     i16_t: IntType<'ctx>,
     i32_t: IntType<'ctx>,
     i64_t: IntType<'ctx>,
+    void_t: VoidType<'ctx>,
 
+    void_token: TypeToken,
     typetoken_to_inktype: HashMap<TypeToken, BasicTypeEnum<'ctx>>,
 
     symbols: &'ctx StringInterner,
@@ -103,6 +105,8 @@ impl<'ctx> CodeGenerator<'ctx> {
             intrinsic.get_declaration(&module, &[]).unwrap()
         };
 
+        let void_token = type_interner.get_for_type(&Type::Void).expect("");
+
         Self {
             ctx,
             builder: ctx.create_builder(),
@@ -122,6 +126,9 @@ impl<'ctx> CodeGenerator<'ctx> {
             i16_t: ctx.i16_type(),
             i32_t: ctx.i32_type(),
             i64_t: ctx.i64_type(),
+            void_t: ctx.void_type(),
+
+            void_token,
 
             symbols,
             node_types,
@@ -215,6 +222,37 @@ impl<'ctx> CodeGenerator<'ctx> {
             32 => self.i32_t,
             64 => self.i64_t,
             _ => panic!(),
+        }
+    }
+
+    fn is_type_token_void_function(&self, token: TypeToken) -> bool {
+        let ty = self.type_interner.get(&token);
+        if let Type::Function{ return_type, .. } = ty {
+            return *return_type == self.void_token;
+        }
+
+        false
+    }
+
+    fn get_inktype_of_function(&mut self, token: TypeToken) -> FunctionType<'ctx> {
+        let Type::Function {
+            return_type,
+            params,
+        } = self.type_interner.get(&token)
+        else {
+            panic!()
+        };
+
+        let params = params
+            .iter()
+            .map(|p| self.get_inktype_of_type_token(*p).into())
+            .collect::<Vec<_>>();
+
+        if *return_type == self.void_token {
+            self.void_t.fn_type(params.as_slice(), false)
+        } else {
+            self.get_inktype_of_type_token(*return_type)
+                .fn_type(params.as_slice(), false)
         }
     }
 
@@ -342,6 +380,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 Ok(())
             }
+            ItemKind::ExternalFunction { .. } => Ok(()),
         }
     }
 
@@ -513,6 +552,23 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .expect("There should be a basic block present after a loop"),
                 );
             }
+            StatementKind::Expr(e) => 'expr_block: {
+                if let ExprKind::Call{ name, args } = &e.kind {
+                    let Some(tok) = self.node_types.get(&name.id) else { todo!() };
+                    if self.is_type_token_void_function(*tok) {
+                        let args = args
+                            .iter()
+                            .map(|arg| self.gen_expr(arg).map(|x| x.into()))
+                            .collect::<Result<Vec<_>, _>>()?;
+                        let f = self.functions.get(&name.sym).expect("");
+                        self.builder.build_call(*f, &args, "");
+
+                        break 'expr_block;
+                    }
+                }
+
+                self.gen_expr(e)?;
+            }
             _ => todo!("Statement \"{:?}\"", stmt.kind),
         }
 
@@ -589,8 +645,17 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .builder
                         .build_int_z_extend(val.into_int_value(), self.int_type(width), "")
                         .into()),
-                    (&Type::Int { width: src_width, ..}, &Type::Int {width: dst_width, ..}) if src_width > dst_width =>
-                        Ok(self.builder.build_int_truncate(val.into_int_value(), self.int_type(dst_width), "").into()),
+                    (
+                        &Type::Int {
+                            width: src_width, ..
+                        },
+                        &Type::Int {
+                            width: dst_width, ..
+                        },
+                    ) if src_width > dst_width => Ok(self
+                        .builder
+                        .build_int_truncate(val.into_int_value(), self.int_type(dst_width), "")
+                        .into()),
                     _ => todo!("Cast from {:?} to {:?}", src_ty, dst_ty),
                 }
             }
@@ -727,6 +792,16 @@ impl<'ctx> CodeGenerator<'ctx> {
                 _ => todo!("BuiltinOpKind \"{:?}\"", op),
             },
 
+            ExprKind::Call { name, args } => {
+                let args = args
+                    .iter()
+                    .map(|arg| self.gen_expr(arg).map(|x| x.into()))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let f = self.functions.get(&name.sym).expect("");
+                let val = self.builder.build_call(*f, &args, "");
+                Ok(val.try_as_basic_value().left().expect(""))
+            }
+
             _ => todo!("{:?}", e.kind),
         }
     }
@@ -740,16 +815,12 @@ impl<'ctx> CodeGenerator<'ctx> {
 
         for item in items {
             match &item.kind {
-                ItemKind::Function { name, params, .. } => {
-                    let function_type = self.i32_t.fn_type(
-                        &params.iter().map(|_| self.i32_t.into()).collect::<Vec<_>>(),
-                        false,
-                    );
-
+                ItemKind::Function { name, .. } | ItemKind::ExternalFunction { name, .. } => {
+                    let function_type =
+                        self.get_inktype_of_function(*self.node_types.get(&item.id).expect(""));
                     let f =
                         self.module
                             .add_function(self.symbols.get(&name.sym), function_type, None);
-
                     self.functions.insert(name.sym, f.into());
                 }
             }

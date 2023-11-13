@@ -195,7 +195,7 @@ impl TypeInterner {
         self.tokens.get(&ty).copied()
     }
 
-    pub fn get(&self, tok: &TypeToken) -> &Type {
+    pub fn get<'a>(&'a self, tok: &TypeToken) -> &'a Type {
         &self.types[tok.0 as usize]
     }
 }
@@ -212,7 +212,10 @@ mod tests {
 
         let a = interner.add(Void);
         let b = interner.add(Bool);
-        let c = interner.add(Int{signedness: Signedness::Unsigned, width: 32});
+        let c = interner.add(Int {
+            signedness: Signedness::Unsigned,
+            width: 32,
+        });
 
         assert_eq!(a.0, 0);
         assert_eq!(b.0, 1);
@@ -224,7 +227,13 @@ mod tests {
 
         assert_eq!(interner.get(&a), &Void);
         assert_eq!(interner.get(&b), &Bool);
-        assert_eq!(interner.get(&c), &Int{signedness: Signedness::Unsigned, width: 32});
+        assert_eq!(
+            interner.get(&c),
+            &Int {
+                signedness: Signedness::Unsigned,
+                width: 32
+            }
+        );
 
         let d = interner.add(Function {
             params: vec![c, c, c],

@@ -4,7 +4,7 @@ use crate::compiler::Context;
 use crate::error::*;
 use crate::scope_stack::ScopeStack;
 use crate::string_interner::Symbol;
-use crate::types::{Type, TypeInterner, TypeToken, Signedness};
+use crate::types::{Signedness, Type, TypeInterner, TypeToken};
 use std::collections::HashMap;
 
 struct TypeChecker<'a> {
@@ -82,14 +82,18 @@ impl TypeChecker<'_> {
         *self.scopes.get(sym).expect("")
     }
 
+    fn get_type_of_sym(&self, sym: &Symbol) -> &Type {
+        self.type_tokens.get(&self.get_type_token_of_sym(sym))
+    }
+
     fn is_valid_type_cast(&self, expr: TypeToken, cast_type: TypeToken) -> bool {
         use Type::*;
         let dst_ty = self.type_tokens.get(&cast_type);
         let expr_ty = self.type_tokens.get(&expr);
         match (dst_ty, expr_ty) {
-            (Int{..}, Int{..}) => true,
-            (Int{..}, Bool) => true,
-            (Bool, Int{..}) => true,
+            (Int { .. }, Int { .. }) => true,
+            (Int { .. }, Bool) => true,
+            (Bool, Int { .. }) => true,
             _ => false,
         }
     }
@@ -104,6 +108,11 @@ impl TypeChecker<'_> {
                     params: param_nodes,
                     return_type: return_type_node,
                     ..
+                }
+                | ItemKind::ExternalFunction {
+                    name,
+                    params: param_nodes,
+                    return_type: return_type_node,
                 } => {
                     let param_type_tokens = param_nodes
                         .iter()
@@ -163,6 +172,7 @@ impl TypeChecker<'_> {
 
                     self.visit_function(name, params, return_type, body);
                 }
+                ItemKind::ExternalFunction { .. } => (),
             }
         }
     }
@@ -180,7 +190,7 @@ impl TypeChecker<'_> {
             return_type,
         } = self.type_tokens.get(&function_type_token)
         else {
-            todo!("Type should be a function")
+            panic!("Type should be a function")
         };
 
         let param_symbols = params.iter().map(|p| p.name.sym);
@@ -340,6 +350,7 @@ impl TypeChecker<'_> {
                         .iter()
                         .map(|arg| self.visit_expr(arg))
                         .collect::<Result<Vec<_>, _>>()?;
+
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
 
                     if !args_are_of_same_type {
@@ -387,7 +398,7 @@ impl TypeChecker<'_> {
                             let idx_type_token = self.visit_expr(&args[1])?;
                             let ty = self.type_tokens.get(&idx_type_token);
 
-                            if !matches!(ty, Type::Int{..}) {
+                            if !matches!(ty, Type::Int { .. }) {
                                 return Err(Error {
                                     span: None,
                                     info: vec![
@@ -404,7 +415,41 @@ impl TypeChecker<'_> {
                 }
                 _ => todo!("Operator \"{:?}\"", op),
             },
-            _ => todo!(),
+            Call { name, args } => {
+                let function_type = self.get_type_of_sym(&name.sym);
+                let Type::Function {
+                    return_type,
+                    params,
+                } = function_type
+                else {
+                    return Err(todo!());
+                };
+
+                // TODO Maybe this can be improved?
+                // I was force to copy/clone things here, because otherwise the compiler complained
+                // about lifetimes. I don't really understand why :(
+                let return_type = *return_type;
+                let params = params.clone();
+
+                self.types.insert(name.id, self.get_type_token_of_sym(&name.sym));
+
+                let arg_types = args
+                    .iter()
+                    .map(|arg| self.visit_expr(arg))
+                    .collect::<Result<Vec<TypeToken>, _>>()?;
+
+                if params.len() != arg_types.len() {
+                    todo!()
+                }
+
+                for (expected, actual) in params.iter().zip(&arg_types) {
+                    if expected != actual {
+                        todo!()
+                    }
+                }
+
+                return_type
+            }
         };
 
         // Save the type for this AST node.

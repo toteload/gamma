@@ -36,6 +36,7 @@ impl Item {
     pub fn name_sym(&self) -> Symbol {
         match &self.kind {
             ItemKind::Function { name, .. } => name.sym,
+            ItemKind::ExternalFunction { name, .. } => name.sym,
         }
     }
 }
@@ -47,6 +48,11 @@ pub enum ItemKind {
         name: Name,
         params: Vec<Param>,
         body: Box<Block>,
+    },
+    ExternalFunction {
+        return_type: Type,
+        name: Name,
+        params: Vec<Param>,
     },
 }
 

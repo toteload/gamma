@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::fs;
 use string_interner::{StringInterner, Symbol};
 use type_check::type_check;
-use types::{Type, TypeInterner, TypeToken, Signedness};
+use types::{Signedness, Type, TypeInterner, TypeToken};
 
 fn print_targets() {
     Target::initialize_all(&InitializationConfig::default());
@@ -43,7 +43,7 @@ fn print_targets() {
 }
 
 fn main() -> Result<()> {
-    let source = fs::read_to_string("tests/valid_samples/array.gamma").unwrap();
+    let source = fs::read_to_string("external_fn.gamma").unwrap();
 
     let mut id_generator = NodeIdGenerator::new();
     let mut symbols = StringInterner::new();
@@ -55,6 +55,12 @@ fn main() -> Result<()> {
     let mut parser = Parser::new(&source, &mut symbols, &mut id_generator, &mut spans);
 
     let items_result = parser.parse_items().map_err(|e| vec![e]);
+
+    if let Err(ref errors) = items_result {
+        for error in errors.iter() {
+            error.print(&source, &symbols, &type_tokens);
+        }
+    }
 
     println!("Parsing done...");
 
