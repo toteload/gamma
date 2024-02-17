@@ -36,7 +36,7 @@ impl<'a> Prover<'a> {
 
             let span = *self.context.spans.get(id).unwrap();
             self.errors.push(Error {
-                span: Some(span),
+                source: ErrorSource::AstNode(*id),
                 info: vec![Text("Undefined identifier used "), Identifier(*sym)],
             });
         }

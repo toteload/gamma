@@ -24,7 +24,7 @@ macro_rules! expect_token {
             let token_matches_pattern = matches!(tok.kind, $( $pattern )|+ $( if $guard )?);
             if !token_matches_pattern {
                 Err(Error {
-                    span: Some(tok.span),
+                    source: ErrorSource::Span(tok.span),
                     info: vec![ErrorInfo::Text("Encountered unexpected token "), ErrorInfo::SourceText(tok.span)],
                 })
             } else {
@@ -32,7 +32,7 @@ macro_rules! expect_token {
             }
         } else {
             Err(Error {
-                span: None,
+                source: ErrorSource::Unspecified,
                 info: vec![ErrorInfo::Text("Unexpected end of source")],
             })
         }

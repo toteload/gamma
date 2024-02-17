@@ -1,6 +1,5 @@
 use crate::ast::*;
 use crate::ast_visitor::Visitor;
-use crate::compiler::Context;
 use crate::error::*;
 use crate::semantics::{SemanticContext, SemanticProver};
 use crate::string_interner::Symbol;
@@ -38,7 +37,7 @@ impl Visitor for Prover {
 impl SemanticProver for Prover {
     fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Error>> {
         let no_main_defined_error: Error = Error {
-            span: None,
+            source: ErrorSource::Unspecified,
             info: vec![ErrorInfo::Text("No main function defined")],
         };
 

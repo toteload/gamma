@@ -116,9 +116,11 @@ impl PartialEq for Type {
 - [x] Add script to generate sample tests from root
 - [x] Add error printing function
 - [ ] Verify arity of builtin functions
+
 ### Version 0.4.1
 - [ ] Start development of Tetris game in parallel to the compiler. Let the needs of the game steer the development direction of the compiler.
-- [ ] Add functionality for calling externally defined C functions.
+- [x] Refactor `main.rs` such that the compiler can be called from the command line with an input file.
+- [x] Add functionality for calling externally defined C functions.
 	- [ ] Syntax for declaring externally defined functions.
 	- [ ] C types:
 		- [x] Integers
@@ -126,6 +128,7 @@ impl PartialEq for Type {
 			- Struct indexing syntax `player.name`
 		- [x] pointers
 		- [ ] ...
+
 ### Version 0.4
 - [ ] Add pointer type.
 	- `^T`

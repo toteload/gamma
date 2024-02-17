@@ -2,7 +2,6 @@ mod has_main;
 mod validate_symbol_use;
 
 use crate::ast::*;
-use crate::compiler::Context;
 use crate::error::Error;
 use crate::source_location::SourceSpan;
 use crate::string_interner::StringInterner;

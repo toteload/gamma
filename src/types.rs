@@ -54,7 +54,7 @@ impl Type {
                 width
             ),
             Pointer(x) => {
-                let mut s = "*".to_string();
+                let mut s = "^".to_string();
                 s += &type_interner.get(x).to_string(type_interner);
                 s
             }

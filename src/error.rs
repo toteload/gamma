@@ -1,6 +1,8 @@
+use crate::ast::NodeId;
 use crate::source_location::SourceSpan;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::types::*;
+use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug)]
 pub enum ErrorInfo {
@@ -10,15 +12,39 @@ pub enum ErrorInfo {
     SourceText(SourceSpan),
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum ErrorSource {
+    Span(SourceSpan),
+    AstNode(NodeId),
+    Unspecified,
+}
+
 #[derive(Clone, Debug)]
 pub struct Error {
-    pub span: Option<SourceSpan>,
+    pub source: ErrorSource,
     pub info: Vec<ErrorInfo>,
 }
 
 impl Error {
-    pub fn print(&self, source: &str, symbols: &StringInterner, type_tokens: &TypeInterner) {
-        print!("Error: ");
+    pub fn print(
+        &self,
+        source: &str,
+        spans: &HashMap<NodeId, SourceSpan>,
+        symbols: &StringInterner,
+        type_tokens: &TypeInterner,
+    ) {
+        print!("[ERROR] ");
+
+        match self.source {
+            ErrorSource::AstNode(id) => {
+                let SourceSpan { start, end } = spans.get(&id).unwrap();
+                print!("{}:{} | ", start.line, start.col);
+            }
+            ErrorSource::Span(SourceSpan { start, end }) => {
+                print!("{}:{} | ", start.line, start.col)
+            }
+            ErrorSource::Unspecified => (),
+        }
 
         for info in self.info.iter() {
             use ErrorInfo::*;

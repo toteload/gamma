@@ -1,11 +1,10 @@
 use crate::ast::*;
-use crate::compiler::Context as CompilerContext;
 use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::types::{Signedness, Type, TypeInterner, TypeToken};
 use inkwell::{
     basic_block::BasicBlock,
-    builder::Builder,
+    builder::{Builder, BuilderError},
     context::Context,
     intrinsics::Intrinsic,
     module::Module,
@@ -16,6 +15,12 @@ use inkwell::{
     AddressSpace, IntPredicate, OptimizationLevel,
 };
 use std::collections::HashMap;
+
+impl From<BuilderError> for Error {
+    fn from(e: BuilderError) -> Self {
+        todo!()
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 enum VariableValue<'ctx> {
@@ -50,6 +55,7 @@ pub struct Options {
     pub output: OutputTarget,
 }
 
+#[derive(Debug, Copy, Clone)]
 pub enum OutputTarget {
     LlvmIr,
     Assembly,
@@ -227,7 +233,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
     fn is_type_token_void_function(&self, token: TypeToken) -> bool {
         let ty = self.type_interner.get(&token);
-        if let Type::Function{ return_type, .. } = ty {
+        if let Type::Function { return_type, .. } = ty {
             return *return_type == self.void_token;
         }
 
@@ -325,6 +331,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         let restore_point = self
             .builder
             .build_call(self.llvm_stacksave, &[], "")
+            .unwrap()
             .try_as_basic_value()
             .left()
             .expect("llvm.stacksave should return a basic value");
@@ -510,7 +517,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             }
             StatementKind::Let { name, ty, init } => {
                 let basic_type = self.get_inktype_of_node(ty.id);
-                let ptr = self.builder.build_alloca(basic_type, "");
+                let ptr = self.builder.build_alloca(basic_type, "").expect("");
 
                 if let Some(init) = init {
                     let val = self.gen_expr(init)?;
@@ -553,8 +560,10 @@ impl<'ctx> CodeGenerator<'ctx> {
                 );
             }
             StatementKind::Expr(e) => 'expr_block: {
-                if let ExprKind::Call{ name, args } = &e.kind {
-                    let Some(tok) = self.node_types.get(&name.id) else { todo!() };
+                if let ExprKind::Call { name, args } = &e.kind {
+                    let Some(tok) = self.node_types.get(&name.id) else {
+                        todo!()
+                    };
                     if self.is_type_token_void_function(*tok) {
                         let args = args
                             .iter()
@@ -595,13 +604,13 @@ impl<'ctx> CodeGenerator<'ctx> {
                 if args.len() == 1 {
                     let ty = self.get_inktype_of_node(args[0].id);
                     let ptr = self.get_dst_ptr(&args[0])?;
-                    let ptr = self.builder.build_load(ty, ptr, "").into_pointer_value();
+                    let ptr = self.builder.build_load(ty, ptr, "")?.into_pointer_value();
                     Ok(ptr)
                 } else {
                     let ty = self.get_inktype_of_node(args[0].id);
                     let ptr = self.get_dst_ptr(&args[0])?;
                     let idx = self.gen_expr(&args[1])?.into_int_value();
-                    Ok(unsafe { self.builder.build_gep(ty, ptr, &[idx], "") })
+                    Ok(unsafe { self.builder.build_gep(ty, ptr, &[idx], "")? })
                 }
             }
             _ => todo!("Get pointer for expression: {:?}", e.kind),
@@ -618,7 +627,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let Variable { ty, val, .. } =
                     self.get_variable(sym).expect("Identifer should exist");
                 match val {
-                    VariableValue::Stack(ptr) => Ok(self.builder.build_load(ty, ptr, "")),
+                    VariableValue::Stack(ptr) => Ok(self.builder.build_load(ty, ptr, "")?),
                     _ => todo!("Retrieve value from variable"),
                 }
             }
@@ -639,11 +648,11 @@ impl<'ctx> CodeGenerator<'ctx> {
                             val.into_int_value(),
                             self.i64_t.const_int(0, false),
                             "",
-                        )
+                        )?
                         .into()),
                     (&Type::Bool, &Type::Int { width, .. }) => Ok(self
                         .builder
-                        .build_int_z_extend(val.into_int_value(), self.int_type(width), "")
+                        .build_int_z_extend(val.into_int_value(), self.int_type(width), "")?
                         .into()),
                     (
                         &Type::Int {
@@ -654,7 +663,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                         },
                     ) if src_width > dst_width => Ok(self
                         .builder
-                        .build_int_truncate(val.into_int_value(), self.int_type(dst_width), "")
+                        .build_int_truncate(val.into_int_value(), self.int_type(dst_width), "")?
                         .into()),
                     _ => todo!("Cast from {:?} to {:?}", src_ty, dst_ty),
                 }
@@ -662,7 +671,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             ExprKind::BuiltinOp { op, args } => match op {
                 BuiltinOpKind::Not => {
                     let x = self.gen_expr(&args[0])?;
-                    Ok(self.builder.build_not(x.into_int_value(), "").into())
+                    Ok(self.builder.build_not(x.into_int_value(), "")?.into())
                 }
                 BuiltinOpKind::Equals => {
                     // For now only support two operands at a time
@@ -677,7 +686,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                             x.into_int_value(),
                             y.into_int_value(),
                             "",
-                        )
+                        )?
                         .into())
                 }
                 BuiltinOpKind::Add => {
@@ -694,11 +703,12 @@ impl<'ctx> CodeGenerator<'ctx> {
                         unreachable!()
                     };
 
-                    let sum_val = xs.iter().fold(first.into_int_value(), |acc, e| {
-                        self.builder
-                            .build_int_add(acc, e.into_int_value(), "")
-                            .into()
-                    });
+                    let mut sum_val = first.into_int_value();
+                    for x in xs.iter() {
+                        sum_val = self
+                            .builder
+                            .build_int_add(sum_val, x.into_int_value(), "")?;
+                    }
 
                     Ok(sum_val.into())
                 }
@@ -716,11 +726,12 @@ impl<'ctx> CodeGenerator<'ctx> {
                         unreachable!()
                     };
 
-                    let sum_val = xs.iter().fold(first.into_int_value(), |acc, e| {
-                        self.builder
-                            .build_int_sub(acc, e.into_int_value(), "")
-                            .into()
-                    });
+                    let mut sum_val = first.into_int_value();
+                    for x in xs.iter() {
+                        sum_val = self
+                            .builder
+                            .build_int_sub(sum_val, x.into_int_value(), "")?;
+                    }
 
                     Ok(sum_val.into())
                 }
@@ -732,7 +743,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     let y = self.gen_expr(&args[1])?;
                     Ok(self
                         .builder
-                        .build_int_mul(x.into_int_value(), y.into_int_value(), "")
+                        .build_int_mul(x.into_int_value(), y.into_int_value(), "")?
                         .into())
                 }
                 BuiltinOpKind::Div => {
@@ -743,7 +754,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     let y = self.gen_expr(&args[1])?;
                     Ok(self
                         .builder
-                        .build_int_signed_div(x.into_int_value(), y.into_int_value(), "")
+                        .build_int_signed_div(x.into_int_value(), y.into_int_value(), "")?
                         .into())
                 }
                 BuiltinOpKind::AddressOf => {
@@ -779,7 +790,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                         VariableValue::Parameter(p) => p.into_pointer_value(),
                     };
 
-                    let addr = self.builder.build_load(ty, ptr, "").into_pointer_value();
+                    let addr = self.builder.build_load(ty, ptr, "")?.into_pointer_value();
 
                     let Type::Pointer(pointee_type_token) = self.type_interner.get(&type_token)
                     else {
@@ -787,7 +798,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     };
                     let pointee_type = self.get_inktype_of_type_token(*pointee_type_token);
 
-                    Ok(self.builder.build_load(pointee_type, addr, ""))
+                    Ok(self.builder.build_load(pointee_type, addr, "")?)
                 }
                 _ => todo!("BuiltinOpKind \"{:?}\"", op),
             },
@@ -799,7 +810,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .collect::<Result<Vec<_>, _>>()?;
                 let f = self.functions.get(&name.sym).expect("");
                 let val = self.builder.build_call(*f, &args, "");
-                Ok(val.try_as_basic_value().left().expect(""))
+                Ok(val?.try_as_basic_value().left().expect(""))
             }
 
             _ => todo!("{:?}", e.kind),

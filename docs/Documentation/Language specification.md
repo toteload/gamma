@@ -25,4 +25,4 @@
  - Pointer and array operators
 	 - Taking address of `x` is `(& x)`
 	 - Dereferencing a pointer `p` is `(@ p)`
-	 - Indexing an array is `xs` at index 8 is `(@ xs 8)`
+	 - Indexing an array `xs` at index 8 is `(@ xs 8)`

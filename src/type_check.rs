@@ -1,6 +1,5 @@
 use crate::ast::BuiltinOpKind;
 use crate::ast::*;
-use crate::compiler::Context;
 use crate::error::*;
 use crate::scope_stack::ScopeStack;
 use crate::string_interner::Symbol;
@@ -18,7 +17,8 @@ struct TypeChecker<'a> {
     // This gets set to the declared return type of a function.
     // When we encounter a return statement in the function, the type of the returned value is
     // checked against this.
-    declared_return_type: Option<TypeToken>,
+    declared_return_type: TypeToken,
+    void_token: TypeToken,
 }
 
 impl TypeChecker<'_> {
@@ -27,13 +27,15 @@ impl TypeChecker<'_> {
         types: &'a mut HashMap<NodeId, TypeToken>,
         type_table: &'a mut HashMap<Symbol, TypeToken>,
     ) -> TypeChecker<'a> {
+        let void_token = type_tokens.add(Type::Void);
         TypeChecker {
             type_tokens,
             types,
             type_table,
             scopes: ScopeStack::new(),
             errors: Vec::new(),
-            declared_return_type: None,
+            declared_return_type: void_token,
+            void_token,
         }
     }
 
@@ -48,38 +50,33 @@ impl TypeChecker<'_> {
         )
     }
 
-    // Check that the found return type matches the declared return type of the function.
-    fn check_return_type(&mut self, found_return_type: Option<TypeToken>) {
-        if found_return_type != self.declared_return_type {
-            self.errors.push(Error {
-                span: None,
-                info: vec![ErrorInfo::Text("Return types do not match")],
-            });
-        }
-    }
-
-    fn get_type_token_of_type_node_kind(&mut self, kind: &TypeKind) -> Result<TypeToken, Error> {
+    fn get_type_token_of_type_kind(&mut self, kind: &TypeKind) -> Result<TypeToken, Symbol> {
         match kind {
-            TypeKind::Identifier(sym) => self.type_table.get(sym).copied().ok_or(Error {
-                span: None,
-                info: vec![
-                    ErrorInfo::Text("Undefined type identifier encountered: "),
-                    ErrorInfo::Identifier(*sym),
-                ],
-            }),
+            TypeKind::Identifier(sym) => self.type_table.get(sym).copied().ok_or(*sym),
             TypeKind::Pointer(inner) => {
-                let inner = self.get_type_token_of_type_node_kind(inner)?;
+                let inner = self.get_type_token_of_type_kind(inner)?;
                 Ok(self.type_tokens.add(Type::Pointer(inner)))
             }
             TypeKind::Array(size, inner) => {
-                let inner = self.get_type_token_of_type_node_kind(inner)?;
+                let inner = self.get_type_token_of_type_kind(inner)?;
                 Ok(self.type_tokens.add(Type::Array(*size, inner)))
             }
         }
     }
 
+    fn get_type_token_of_type_node(&mut self, ty: &crate::ast::Type) -> Result<TypeToken, Error> {
+        self.get_type_token_of_type_kind(&ty.kind)
+            .map_err(|sym| Error {
+                source: ErrorSource::AstNode(ty.id),
+                info: vec![
+                    ErrorInfo::Text("Identifier is not a valid type: "),
+                    ErrorInfo::Identifier(sym),
+                ],
+            })
+    }
+
     fn get_type_token_of_sym(&self, sym: &Symbol) -> TypeToken {
-        *self.scopes.get(sym).expect("")
+        *self.scopes.get(sym).unwrap()
     }
 
     fn get_type_of_sym(&self, sym: &Symbol) -> &Type {
@@ -94,6 +91,7 @@ impl TypeChecker<'_> {
             (Int { .. }, Int { .. }) => true,
             (Int { .. }, Bool) => true,
             (Bool, Int { .. }) => true,
+            (Pointer(_), Int { .. }) => true,
             _ => false,
         }
     }
@@ -116,15 +114,14 @@ impl TypeChecker<'_> {
                 } => {
                     let param_type_tokens = param_nodes
                         .iter()
-                        .map(|p| self.get_type_token_of_type_node_kind(&p.ty.kind))
+                        .map(|p| self.get_type_token_of_type_node(&p.ty))
                         .collect::<Result<Vec<_>, _>>();
 
                     let Ok(param_type_tokens) = param_type_tokens else {
                         todo!()
                     };
 
-                    let return_type_token =
-                        self.get_type_token_of_type_node_kind(&return_type_node.kind);
+                    let return_type_token = self.get_type_token_of_type_node(return_type_node);
 
                     let Ok(return_type_token) = return_type_token else {
                         todo!()
@@ -167,8 +164,9 @@ impl TypeChecker<'_> {
                 } => {
                     let return_type_token = *self.types.get(&return_type.id).unwrap();
 
-                    self.declared_return_type = Some(return_type_token)
-                        .filter(|tt| *tt != self.type_tokens.add(Type::Void));
+                    self.declared_return_type = return_type_token;
+                    //Some(return_type_token)
+                    //.filter(|tt| *tt != self.type_tokens.add(Type::Void));
 
                     self.visit_function(name, params, return_type, body);
                 }
@@ -218,7 +216,7 @@ impl TypeChecker<'_> {
 
         match &statement.kind {
             Let { name, ty, init } => {
-                let type_token = self.get_type_token_of_type_node_kind(&ty.kind);
+                let type_token = self.get_type_token_of_type_node(&ty);
 
                 let type_token = match type_token {
                     Ok(x) => x,
@@ -242,7 +240,7 @@ impl TypeChecker<'_> {
 
                     if type_token != init_type_token {
                         self.errors.push(Error {
-                            span: None,
+                            source: ErrorSource::AstNode(statement.id),
                             info: vec![
                                 ErrorInfo::Text("Type mismatch between declared type and type of initializer in set statement"),
                             ],
@@ -255,10 +253,11 @@ impl TypeChecker<'_> {
                 let val_result = self.visit_expr(val);
 
                 // The types of `val` and `dst` should match. However, `dst` should also be an
-                // "L-value". Something like `set 0 = 1` would type check, but should not be valid.
+                // "L-value". Something like `set 0 = 1` would type check (in the sense that the
+                // left and the right are both integers), but should not be valid.
                 if !self.is_valid_set_destination(dst) {
                     self.errors.push(Error {
-                        span: None,
+                        source: ErrorSource::AstNode(statement.id),
                         info: vec![ErrorInfo::Text(
                             "Invalid expression for destination in set statement",
                         )],
@@ -276,7 +275,7 @@ impl TypeChecker<'_> {
                 match (&dst_result, &val_result) {
                     (Ok(dst_type), Ok(val_type)) if dst_type != val_type => {
                         self.errors.push(Error {
-                            span: None,
+                            source: ErrorSource::AstNode(statement.id),
                             info: vec![ErrorInfo::Text("Type mismatch in set statement.")],
                         });
                     }
@@ -296,7 +295,7 @@ impl TypeChecker<'_> {
                 match self.visit_expr(cond) {
                     Ok(ty) if ty != self.type_tokens.add(Type::Bool) => {
                         self.errors.push(Error {
-                            span: None,
+                            source: ErrorSource::AstNode(cond.id),
                             info: vec![ErrorInfo::Text(
                                 "Type of condition in if statement must be bool.",
                             )],
@@ -311,11 +310,25 @@ impl TypeChecker<'_> {
                     self.visit_block(otherwise);
                 }
             }
-            Return(Some(e)) => match self.visit_expr(e) {
-                Err(err) => self.errors.push(err),
-                Ok(tt) => self.check_return_type(Some(tt)),
-            },
-            Return(None) => self.check_return_type(None),
+            Return(e) => {
+                let found_return_type = match e {
+                    Some(e) => match self.visit_expr(e) {
+                        Err(err) => {
+                            self.errors.push(err);
+                            return;
+                        }
+                        Ok(tt) => tt,
+                    },
+                    None => self.void_token,
+                };
+
+                if found_return_type != self.declared_return_type {
+                    self.errors.push(Error {
+                        source: ErrorSource::AstNode(statement.id),
+                        info: vec![ErrorInfo::Text("Return types do not match")],
+                    });
+                }
+            }
             Loop(body) => self.visit_block(body),
             Break | Continue => (),
         }
@@ -330,14 +343,26 @@ impl TypeChecker<'_> {
                 width: 64,
             }),
             BoolLiteral(_) => self.type_tokens.add(Type::Bool),
-            Identifier(sym) => self.get_type_token_of_sym(sym),
+            Identifier(sym) => {
+                if let Some(t) = self.scopes.get(sym) {
+                    *t
+                } else {
+                    return Err(Error {
+                        source: ErrorSource::AstNode(expression.id),
+                        info: vec![
+                            ErrorInfo::Text("Undefined symbol used: "),
+                            ErrorInfo::Identifier(*sym),
+                        ],
+                    });
+                }
+            }
             Cast { ty, e } => {
                 let expr_ty_token = self.visit_expr(e)?;
-                let cast_ty_token = self.get_type_token_of_type_node_kind(&ty.kind)?;
+                let cast_ty_token = self.get_type_token_of_type_node(&ty)?;
 
                 if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
                     return Err(Error {
-                        span: None,
+                        source: ErrorSource::AstNode(expression.id),
                         info: vec![ErrorInfo::Text("Invalid cast.")],
                     });
                 }
@@ -355,8 +380,8 @@ impl TypeChecker<'_> {
 
                     if !args_are_of_same_type {
                         return Err(Error {
-                            span: None,
-                            info: vec![ErrorInfo::Text("Arguments must have the same type.")],
+                            source: ErrorSource::AstNode(expression.id),
+                            info: vec![ErrorInfo::Text("Arguments must all have the same type.")],
                         });
                     }
 
@@ -377,7 +402,7 @@ impl TypeChecker<'_> {
 
                     if !args_are_of_same_type {
                         return Err(Error {
-                            span: None,
+                            source: ErrorSource::AstNode(expression.id),
                             info: vec![ErrorInfo::Text("Arguments must have the same type.")],
                         });
                     }
@@ -392,15 +417,15 @@ impl TypeChecker<'_> {
                     let arg_type_token = self.visit_expr(&args[0])?;
                     let ty = self.type_tokens.get(&arg_type_token);
 
-                    match ty {
-                        &Type::Pointer(t) => t,
-                        &Type::Array(_, t) => {
+                    match *ty {
+                        Type::Pointer(t) => t,
+                        Type::Array(_, t) => {
                             let idx_type_token = self.visit_expr(&args[1])?;
                             let ty = self.type_tokens.get(&idx_type_token);
 
                             if !matches!(ty, Type::Int { .. }) {
                                 return Err(Error {
-                                    span: None,
+                                    source: ErrorSource::AstNode(expression.id),
                                     info: vec![
                                         ErrorInfo::Text("Array index must have int type, but was "),
                                         ErrorInfo::Type(idx_type_token),
@@ -431,7 +456,8 @@ impl TypeChecker<'_> {
                 let return_type = *return_type;
                 let params = params.clone();
 
-                self.types.insert(name.id, self.get_type_token_of_sym(&name.sym));
+                self.types
+                    .insert(name.id, self.get_type_token_of_sym(&name.sym));
 
                 let arg_types = args
                     .iter()
@@ -444,7 +470,15 @@ impl TypeChecker<'_> {
 
                 for (expected, actual) in params.iter().zip(&arg_types) {
                     if expected != actual {
-                        todo!()
+                        return Err(Error {
+                            source: ErrorSource::Unspecified, // TODO(david) supply the actual location
+                            info: vec![
+                                ErrorInfo::Text("Expected type "),
+                                ErrorInfo::Type(*expected),
+                                ErrorInfo::Text(", but got "),
+                                ErrorInfo::Type(*actual),
+                            ],
+                        });
                     }
                 }
 

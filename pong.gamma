@@ -3,13 +3,11 @@ external_fn SDL_DestroyWindow(window: ^void): void
 external_fn SDL_Delay(ms: u32): void
 
 fn main(): i32
-  let SDL_WINDOWPOS_CENTERED: i32 = 1
+  let window: ^void = (SDL_CreateWindow (cast ^u8 0) (cast i32 1) (cast i32 1) (cast i32 800) (cast i32 800) (cast u32 0))
 
-  let window: ^void = (SDL_CreateWindow 0 1 1 800 800 Flags)
-
-  (SDL_Delay 1000)
+  (SDL_Delay (cast u32 1000))
 
   (SDL_DestroyWindow window)
   
-  return 0
+  return (cast i32 0)
 end

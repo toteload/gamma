@@ -10,7 +10,7 @@ pub struct Token {
     pub kind: TokenKind,
 }
 
-#[derive(strum_macros::IntoStaticStr, Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize)]
 pub enum TokenKind {
     KeywordFn,
     KeywordExternalFn,
