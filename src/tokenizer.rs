@@ -14,6 +14,7 @@ pub struct Token {
 pub enum TokenKind {
     KeywordFn,
     KeywordExternalFn,
+    KeywordLayout,
 
     KeywordIf,
     KeywordElse,
@@ -63,6 +64,7 @@ pub enum TokenKind {
     Colon,
 
     Comma,
+    Period,
 
     EqualSign,
 
@@ -167,6 +169,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 match identifier {
                     "external_fn" => Token { span, kind: TokenKind::KeywordExternalFn, },
                     "fn"       => Token { span, kind: TokenKind::KeywordFn, },
+                    "layout"   => Token { span, kind: TokenKind::KeywordLayout, },
                     "if"       => Token { span, kind: TokenKind::KeywordIf, },
                     "else"     => Token { span, kind: TokenKind::KeywordElse, },
                     "loop"     => Token { span, kind: TokenKind::KeywordLoop, },
@@ -241,6 +244,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             ']' => Token { span: SourceSpan::single(start), kind: TokenKind::BracketClose, },
 
             ',' => Token { span: SourceSpan::single(start), kind: TokenKind::Comma, },
+            '.' => Token { span: SourceSpan::single(start), kind: TokenKind::Period, },
 
             '=' => Token { span: SourceSpan::single(start), kind: TokenKind::EqualSign, },
 

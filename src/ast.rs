@@ -37,8 +37,16 @@ impl Item {
         match &self.kind {
             ItemKind::Function { name, .. } => name.sym,
             ItemKind::ExternalFunction { name, .. } => name.sym,
+            ItemKind::Layout { name, .. } => name.sym,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Field {
+    pub name: Name,
+    pub offset: u32,
+    pub ty: Type,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -53,6 +61,11 @@ pub enum ItemKind {
         return_type: Type,
         name: Name,
         params: Vec<Param>,
+    },
+    Layout {
+        name: Name,
+        align: u32,
+        fields: Vec<Field>,
     },
 }
 
@@ -145,6 +158,7 @@ pub enum ExprKind {
     IntLiteral(i64),
     BoolLiteral(bool),
     Identifier(Symbol),
+    CompoundIdentifier(Vec<Name>),
     BuiltinOp { op: BuiltinOpKind, args: Vec<Expr> },
     Call { name: Name, args: Vec<Expr> },
     Cast { ty: Type, e: Box<Expr> },

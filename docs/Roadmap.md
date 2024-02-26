@@ -80,6 +80,7 @@ Compiler is able to compile a basic program. Vertically speaking, most of the co
 - [ ] A function must have a `return` statement, even functions that return `void`.
 - [ ] Add `exit` statement to exit the program with an exit code.
 	- [ ] This means the program has a small runtime, similar to C. On Windows `ExitProcess` needs to be called and on Linux `exit`.
+	- [x] Basic Windows runtime wrapper is done.
 	- This can be used to create programs that check for conditions and exit with a specific code to signal that something is wrong. This can be used in a test suite, where the programs are compiled and ran, and the return code is verified.
 - [ ] `main` function must be of the correct type `fn(): void` or `fn(): int` ?? Not sure which one to choose.
 - [x] Add `let` statement.
@@ -140,6 +141,8 @@ impl PartialEq for Type {
 	- [x] Add dereferencing in the destination part of `set` statement
 	- [ ] Add type casting of one pointer type to another pointer type
 	- [ ] Add type casting of `u64` to a pointer and vice versa
+		- [x] Int -> Pointer
+		- [ ] Pointer -> Int
 	- [ ] Add comparison operators
 - [ ] Add array type.
 	- `[128]T` or `[T:128]`. I prefer the first.
@@ -147,7 +150,7 @@ impl PartialEq for Type {
 	- [ ] Indexing is only allowed on arrays and pointers, and can only be indexed by integers.
 ### Version 0.5
 - [ ] Add user defined functions.
-- [x] Add `loop`, `break` and `continue`
+- [ ] Add `loop`, `break` and `continue`
 	- [x] Semantic check: `break` and `continue` can only be used inside a loop
 	- [ ] Add optional labels for `loop`. You can `break :label` or `continue :label`. A label has to start with a colon.
 	- `loop :main { break :main }`
@@ -161,6 +164,19 @@ impl PartialEq for Type {
 - [ ] Add struct type
 	- [ ] Add struct value syntax so that a struct can be properly initialized.
 - [ ] Add field selection syntax for structs and unions
+
+`union` and `struct` are replaced by a `layout`. 
+A `layout` is similar to both compound constructs, but the fields in a layout have their byte offset explicitly set. 
+A `union` sets the byte offsets of all its fields to 0 implicitly. 
+A `struct` implicitly sets the byte offset of each field such that they lie in memory in order of declaration at the correct alignments. 
+A `layout` should also specify its alignment (or maybe it can take the maximum of the alignment of its members).
+
+```
+layout 8 Animal
+  species: 0 ^u8
+  weight: 8 u32
+end
+```
 
 ### Version 0.7
 - [ ] Add global variables

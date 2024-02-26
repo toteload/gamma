@@ -2,6 +2,7 @@ use crate::ast::*;
 use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::types::{Signedness, Type, TypeInterner, TypeToken};
+use inkwell::types::PointerType;
 use inkwell::{
     basic_block::BasicBlock,
     builder::{Builder, BuilderError},
@@ -81,6 +82,7 @@ pub struct CodeGenerator<'ctx> {
     i32_t: IntType<'ctx>,
     i64_t: IntType<'ctx>,
     void_t: VoidType<'ctx>,
+    ptr_t: PointerType<'ctx>,
 
     void_token: TypeToken,
     typetoken_to_inktype: HashMap<TypeToken, BasicTypeEnum<'ctx>>,
@@ -133,6 +135,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             i32_t: ctx.i32_type(),
             i64_t: ctx.i64_type(),
             void_t: ctx.void_type(),
+            ptr_t: ctx.i8_type().ptr_type(AddressSpace::default()),
 
             void_token,
 
@@ -240,7 +243,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         false
     }
 
-    fn get_inktype_of_function(&mut self, token: TypeToken) -> FunctionType<'ctx> {
+    fn get_ink_function_type(&mut self, token: TypeToken) -> FunctionType<'ctx> {
         let Type::Function {
             return_type,
             params,
@@ -251,18 +254,18 @@ impl<'ctx> CodeGenerator<'ctx> {
 
         let params = params
             .iter()
-            .map(|p| self.get_inktype_of_type_token(*p).into())
+            .map(|p| self.get_ink_basic_type(*p).into())
             .collect::<Vec<_>>();
 
         if *return_type == self.void_token {
             self.void_t.fn_type(params.as_slice(), false)
         } else {
-            self.get_inktype_of_type_token(*return_type)
+            self.get_ink_basic_type(*return_type)
                 .fn_type(params.as_slice(), false)
         }
     }
 
-    fn get_inktype_of_type_token(&mut self, token: TypeToken) -> BasicTypeEnum<'ctx> {
+    fn get_ink_basic_type(&mut self, token: TypeToken) -> BasicTypeEnum<'ctx> {
         if let Some(t) = self.typetoken_to_inktype.get(&token) {
             return *t;
         }
@@ -270,12 +273,9 @@ impl<'ctx> CodeGenerator<'ctx> {
         let ty = self.type_interner.get(&token);
 
         let t = match ty {
-            Type::Pointer(inner) => {
-                let t = self.get_inktype_of_type_token(*inner);
-                t.ptr_type(AddressSpace::default()).into()
-            }
+            Type::Pointer(_) => self.ptr_t.into(),
             Type::Array(size, inner) => {
-                let t = self.get_inktype_of_type_token(*inner);
+                let t = self.get_ink_basic_type(*inner);
                 assert!(*size < u32::MAX as i64);
                 t.array_type(*size as u32).into()
             }
@@ -292,7 +292,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             panic!("Could not get type token of node")
         };
 
-        self.get_inktype_of_type_token(*tok)
+        self.get_ink_basic_type(*tok)
     }
 
     fn add_basic_block(&self, name: &str) -> BasicBlock<'ctx> {
@@ -388,6 +388,11 @@ impl<'ctx> CodeGenerator<'ctx> {
                 Ok(())
             }
             ItemKind::ExternalFunction { .. } => Ok(()),
+            ItemKind::Layout {
+                name,
+                align,
+                fields,
+            } => todo!(),
         }
     }
 
@@ -641,7 +646,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let val = self.gen_expr(src)?;
 
                 match (src_ty, dst_ty) {
-                    (&Type::Int { .. }, &Type::Bool) => Ok(self
+                    (Type::Int { .. }, Type::Bool) => Ok(self
                         .builder
                         .build_int_compare(
                             IntPredicate::NE,
@@ -650,21 +655,29 @@ impl<'ctx> CodeGenerator<'ctx> {
                             "",
                         )?
                         .into()),
-                    (&Type::Bool, &Type::Int { width, .. }) => Ok(self
+
+                    (Type::Bool, Type::Int { width, .. }) => Ok(self
                         .builder
-                        .build_int_z_extend(val.into_int_value(), self.int_type(width), "")?
+                        .build_int_z_extend(val.into_int_value(), self.int_type(*width), "")?
                         .into()),
+
                     (
-                        &Type::Int {
+                        Type::Int {
                             width: src_width, ..
                         },
-                        &Type::Int {
+                        Type::Int {
                             width: dst_width, ..
                         },
                     ) if src_width > dst_width => Ok(self
                         .builder
-                        .build_int_truncate(val.into_int_value(), self.int_type(dst_width), "")?
+                        .build_int_truncate(val.into_int_value(), self.int_type(*dst_width), "")?
                         .into()),
+
+                    (Type::Int { .. }, Type::Pointer(_)) => Ok(self
+                        .builder
+                        .build_int_to_ptr(val.into_int_value(), self.ptr_t, "")?
+                        .into()),
+
                     _ => todo!("Cast from {:?} to {:?}", src_ty, dst_ty),
                 }
             }
@@ -796,7 +809,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     else {
                         todo!()
                     };
-                    let pointee_type = self.get_inktype_of_type_token(*pointee_type_token);
+                    let pointee_type = self.get_ink_basic_type(*pointee_type_token);
 
                     Ok(self.builder.build_load(pointee_type, addr, "")?)
                 }
@@ -828,12 +841,13 @@ impl<'ctx> CodeGenerator<'ctx> {
             match &item.kind {
                 ItemKind::Function { name, .. } | ItemKind::ExternalFunction { name, .. } => {
                     let function_type =
-                        self.get_inktype_of_function(*self.node_types.get(&item.id).expect(""));
+                        self.get_ink_function_type(*self.node_types.get(&item.id).expect(""));
                     let f =
                         self.module
                             .add_function(self.symbols.get(&name.sym), function_type, None);
                     self.functions.insert(name.sym, f.into());
                 }
+                ItemKind::Layout { .. } => (),
             }
         }
 

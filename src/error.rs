@@ -60,12 +60,18 @@ impl Error {
                     print!("{}", ty.to_string(type_tokens));
                 }
                 SourceText(span) => {
-                    print!(
-                        "at {}:{} - {}:{}",
-                        span.start.line, span.start.col, span.end.line, span.end.col
-                    );
+                    //print!(
+                    //    "at {}:{} - {}:{}",
+                    //    span.start.line, span.start.col, span.end.line, span.end.col
+                    //);
                     // TODO(david) This approach is very naive and could be better.
-                    //let line = source.lines().skip(span.start.line - 1);
+                    let line = source
+                        .lines()
+                        .skip(span.start.line as usize - 1)
+                        .next()
+                        .unwrap();
+                    let text = &line[span.start.col as usize - 1..span.end.col as usize];
+                    print!("\"{text}\"");
                 }
             }
         }

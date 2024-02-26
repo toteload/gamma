@@ -93,7 +93,10 @@ impl Parser<'_> {
     fn parse_item(&mut self) -> Result<Item> {
         use TokenKind::*;
 
-        let tok = expect_token!(self.tokens.next(), KeywordFn | KeywordExternalFn)?;
+        let tok = expect_token!(
+            self.tokens.next(),
+            KeywordFn | KeywordExternalFn | KeywordLayout
+        )?;
         let id = self.id_generator.gen_id();
 
         let kind = match tok.kind {
@@ -136,6 +139,48 @@ impl Parser<'_> {
                     return_type,
                     name,
                     params,
+                }
+            }
+            KeywordLayout => {
+                let Token {
+                    kind: IntLiteral(align),
+                    ..
+                } = expect_token!(self.tokens.next(), IntLiteral(_))?
+                else {
+                    unreachable!()
+                };
+
+                let align = align as u32;
+
+                let name = self.parse_name()?;
+
+                let mut fields = Vec::new();
+                loop {
+                    let peeked = expect_token!(self.tokens.peek(), KeywordEnd | Identifier(_))?;
+                    if matches!(peeked.kind, KeywordEnd) {
+                        self.tokens.next();
+                        break;
+                    }
+
+                    let name = self.parse_name()?;
+                    expect_token!(self.tokens.next(), Colon)?;
+                    let Token {
+                        kind: IntLiteral(offset),
+                        ..
+                    } = expect_token!(self.tokens.next(), IntLiteral(_))?
+                    else {
+                        unreachable!()
+                    };
+                    let offset = offset as u32;
+                    let ty = self.parse_type()?;
+
+                    fields.push(Field { name, offset, ty });
+                }
+
+                ItemKind::Layout {
+                    name,
+                    align,
+                    fields,
                 }
             }
             _ => unreachable!(),
@@ -214,7 +259,7 @@ impl Parser<'_> {
 
         let mut params = Vec::new();
         loop {
-            let peeked = expect_token!(self.tokens.peek(), _)?;
+            let peeked = expect_token!(self.tokens.peek(), Identifier(_) | ParenClose)?;
             if matches!(peeked.kind, ParenClose) {
                 break;
             }
@@ -234,8 +279,7 @@ impl Parser<'_> {
 
             params.push(Param { id, name, ty });
 
-            let peeked = expect_token!(self.tokens.peek(), Comma | ParenClose)?;
-            if matches!(peeked.kind, Comma) {
+            if let Some(Token { kind: Comma, .. }) = self.tokens.peek() {
                 self.tokens.next();
             }
         }

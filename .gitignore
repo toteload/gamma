@@ -1,2 +1,10 @@
 target/
 docs/.obsidian/workspace.json
+.vscode/
+*.lib
+*.exe
+*.exp
+*.o
+*.asm
+*.s
+*.ll

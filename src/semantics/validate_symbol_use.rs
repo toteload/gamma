@@ -112,9 +112,12 @@ impl Visitor for Prover<'_> {
     fn visit_expr(&mut self, e: &Expr) {
         use ExprKind::*;
 
+        let id = &e.id;
+
         match &e.kind {
             IntLiteral(_) | BoolLiteral(_) => (),
-            Identifier(sym) => self.validate_sym(sym, &e.id),
+            Identifier(sym) => self.validate_sym(sym, id),
+            CompoundIdentifier(idents) => self.validate_sym(&idents[0].sym, id),
             BuiltinOp { args, .. } => {
                 for arg in args {
                     self.visit_expr(arg);
@@ -122,7 +125,7 @@ impl Visitor for Prover<'_> {
             }
             Cast { e, .. } => self.visit_expr(e),
             Call { name, args } => {
-                self.validate_sym(&name.sym, &e.id);
+                self.validate_sym(&name.sym, id);
 
                 for arg in args {
                     self.visit_expr(arg);

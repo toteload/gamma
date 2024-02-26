@@ -149,6 +149,13 @@ impl TypeChecker<'_> {
 
                     top_scope.insert(name.sym, function_type_token);
                 }
+                ItemKind::Layout {
+                    name,
+                    align,
+                    fields,
+                } => {
+                    todo!()
+                }
             }
         }
 
@@ -170,7 +177,7 @@ impl TypeChecker<'_> {
 
                     self.visit_function(name, params, return_type, body);
                 }
-                ItemKind::ExternalFunction { .. } => (),
+                ItemKind::ExternalFunction { .. } | ItemKind::Layout { .. } => (),
             }
         }
     }
@@ -347,14 +354,33 @@ impl TypeChecker<'_> {
                 if let Some(t) = self.scopes.get(sym) {
                     *t
                 } else {
-                    return Err(Error {
-                        source: ErrorSource::AstNode(expression.id),
-                        info: vec![
-                            ErrorInfo::Text("Undefined symbol used: "),
-                            ErrorInfo::Identifier(*sym),
-                        ],
-                    });
+                    panic!()
+                    //return Err(Error {
+                    //    source: ErrorSource::AstNode(expression.id),
+                    //    info: vec![
+                    //        ErrorInfo::Text("Undefined symbol used: "),
+                    //        ErrorInfo::Identifier(*sym),
+                    //    ],
+                    //});
                 }
+            }
+            CompoundIdentifier(idents) => {
+                let Some(t) = self.scopes.get(&idents[0].sym) else {
+                    panic!()
+                };
+                let syms = idents[1..].iter().map(|ident| ident.sym);
+                let mut ttok = *t;
+                for sym in syms {
+                    let layout = self.type_tokens.get(&ttok);
+                    let Type::Layout(layout) = layout else {
+                        todo!()
+                    };
+                    let Some(field) = layout.fields.iter().find(|field| field.name == sym) else {
+                        todo!()
+                    };
+                    ttok = field.ty;
+                }
+                ttok
             }
             Cast { ty, e } => {
                 let expr_ty_token = self.visit_expr(e)?;

@@ -1,3 +1,4 @@
+use crate::string_interner::Symbol;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -8,8 +9,22 @@ pub enum Signedness {
     Unsigned,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LayoutField {
+    pub name: Symbol,
+    pub ty: TypeToken,
+    pub offset: u32,
+}
+
+#[derive(Clone, Debug, Eq, Serialize)]
+pub struct Layout {
+    pub align: u32,
+    pub fields: Vec<LayoutField>,
+}
+
 #[derive(Clone, Debug, Eq, Serialize)]
 pub enum Type {
+    Layout(Layout),
     Void,
     Bool,
     Int {
@@ -35,6 +50,7 @@ impl Type {
             Function { .. } => 3,
             Pointer(_) => 4,
             Array(..) => 5,
+            Layout(..) => 6,
         }
     }
 
@@ -78,6 +94,7 @@ impl Type {
                 s += &type_interner.get(return_type).to_string(type_interner);
                 s
             }
+            Layout(_) => todo!(),
         }
     }
 }
@@ -157,6 +174,15 @@ impl PartialEq for Type {
             ) => x_signedness == y_signedness && x_width == y_width,
             _ => true,
         }
+    }
+}
+
+impl PartialEq for Layout {
+    fn eq(&self, other: &Self) -> bool {
+        let mut a = self.fields.clone();
+        let mut b = other.fields.clone();
+
+        todo!()
     }
 }
 
