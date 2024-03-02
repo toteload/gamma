@@ -51,9 +51,16 @@ struct Scope<'ctx> {
     variables: HashMap<Symbol, Variable<'ctx>>,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum MachineTarget {
+    Windows,
+    Macos,
+}
+
 pub struct Options {
     pub optimize: bool,
     pub output: OutputTarget,
+    pub machine: MachineTarget,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -421,8 +428,8 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .expect("The function should have a stack restore point");
                 let val = self.gen_expr(e)?;
                 self.builder
-                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "");
-                self.builder.build_return(Some(&val));
+                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
+                self.builder.build_return(Some(&val))?;
             }
             StatementKind::If {
                 cond,
@@ -439,7 +446,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     cond_val.into_int_value(),
                     then_block,
                     otherwise_block,
-                );
+                )?;
 
                 let mut branch_terminator_count = 0u32;
 
@@ -453,9 +460,9 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .stack_restorepoint
                         .expect("Blocks should have a stack restore point");
                     self.builder
-                        .build_call(self.llvm_stackrestore, &[restore_point.into()], "");
+                        .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
 
-                    self.builder.build_unconditional_branch(end_block);
+                    self.builder.build_unconditional_branch(end_block)?;
                     branch_terminator_count += 1;
                 }
 
@@ -475,13 +482,13 @@ impl<'ctx> CodeGenerator<'ctx> {
                             self.llvm_stackrestore,
                             &[restore_point.into()],
                             "",
-                        );
+                        )?;
 
-                        self.builder.build_unconditional_branch(end_block);
+                        self.builder.build_unconditional_branch(end_block)?;
                         branch_terminator_count += 1;
                     }
                 } else {
-                    self.builder.build_unconditional_branch(end_block);
+                    self.builder.build_unconditional_branch(end_block)?;
                 }
 
                 if branch_terminator_count != 2 {
@@ -499,7 +506,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.loop_end_blocks.push(end_block);
 
-                self.builder.build_unconditional_branch(body_block);
+                self.builder.build_unconditional_branch(body_block)?;
 
                 self.position_builder_at_end_of(body_block);
 
@@ -511,9 +518,9 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .stack_restorepoint
                     .expect("Loop scopes should have a stack restore point");
                 self.builder
-                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "");
+                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
 
-                self.builder.build_unconditional_branch(body_block);
+                self.builder.build_unconditional_branch(body_block)?;
                 self.scopes.pop();
 
                 self.loop_end_blocks.pop();
@@ -526,7 +533,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 if let Some(init) = init {
                     let val = self.gen_expr(init)?;
-                    self.builder.build_store(ptr, val);
+                    self.builder.build_store(ptr, val)?;
                 }
 
                 self.add_to_current_scope(
@@ -541,7 +548,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             StatementKind::Set { dst, val } => {
                 let p = self.get_dst_ptr(dst)?;
                 let x = self.gen_expr(val)?;
-                self.builder.build_store(p, x);
+                self.builder.build_store(p, x)?;
             }
             StatementKind::Break => {
                 let loop_scope = self
@@ -556,13 +563,13 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .expect("The loop should have a stack restore point");
 
                 self.builder
-                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "");
+                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
                 self.builder.build_unconditional_branch(
                     *self
                         .loop_end_blocks
                         .last()
                         .expect("There should be a basic block present after a loop"),
-                );
+                )?;
             }
             StatementKind::Expr(e) => 'expr_block: {
                 if let ExprKind::Call { name, args } = &e.kind {
@@ -575,7 +582,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                             .map(|arg| self.gen_expr(arg).map(|x| x.into()))
                             .collect::<Result<Vec<_>, _>>()?;
                         let f = self.functions.get(&name.sym).expect("");
-                        self.builder.build_call(*f, &args, "");
+                        self.builder.build_call(*f, &args, "")?;
 
                         break 'expr_block;
                     }
@@ -677,6 +684,12 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .builder
                         .build_int_to_ptr(val.into_int_value(), self.ptr_t, "")?
                         .into()),
+
+                    (Type::Array(_, _), Type::Pointer(_)) => {
+                        todo!()
+                        //let base_type = val.into_array_value().get_type().get_element_type();
+                        //Ok(self.builder.build_bitcast(val, base_type.ptr_type(AddressSpace::default()), "")?.into())
+                    },
 
                     _ => todo!("Cast from {:?} to {:?}", src_ty, dst_ty),
                 }
@@ -866,7 +879,10 @@ impl<'ctx> CodeGenerator<'ctx> {
         // TODO This should maybe be in some other place, so it doesn't get called multiple times
         Target::initialize_x86(&InitializationConfig::default());
 
-        let triple = TargetTriple::create("x86_64-pc-windows-msvc");
+        let triple = match options.machine {
+            MachineTarget::Windows => TargetTriple::create("x86_64-pc-windows-msvc"),
+            MachineTarget::Macos => TargetTriple::create("x86_64-apple-darwin21.6.0"),
+        };
         let target = Target::from_triple(&triple)
             .expect("Should be able to get target from initialized triple");
         let features = "";

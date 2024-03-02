@@ -9,11 +9,11 @@ pub enum Signedness {
     Unsigned,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize)]
 pub struct LayoutField {
     pub name: Symbol,
-    pub ty: TypeToken,
     pub offset: u32,
+    pub ty: TypeToken,
 }
 
 #[derive(Clone, Debug, Eq, Serialize)]
@@ -182,11 +182,14 @@ impl PartialEq for Layout {
         let mut a = self.fields.clone();
         let mut b = other.fields.clone();
 
-        todo!()
+        a.sort();
+        b.sort();
+
+        a.into_iter().eq(b.into_iter())
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub struct TypeToken(u32);
 
 #[derive(Serialize)]

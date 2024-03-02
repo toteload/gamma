@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::collections::HashMap;
 
-#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq, Serialize)]
+#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq, PartialOrd, Ord, Serialize)]
 pub struct Symbol(u32);
 
 #[derive(Serialize)]

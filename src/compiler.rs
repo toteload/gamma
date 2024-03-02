@@ -11,7 +11,7 @@ use crate::{
 };
 use std::collections::HashMap;
 
-pub use crate::ink_codegen::{Options, OutputTarget};
+pub use crate::ink_codegen::{Options};
 
 pub struct Context {
     pub id_generator: NodeIdGenerator,

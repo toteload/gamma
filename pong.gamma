@@ -1,13 +1,15 @@
+external_fn SDL_SetMainReady(): void
+external_fn SDL_Init(flags: u32): i32
 external_fn SDL_CreateWindow(title: ^u8, x: i32, y: i32, w: i32, h: i32, flags: u32): ^void
 external_fn SDL_DestroyWindow(window: ^void): void
 external_fn SDL_Delay(ms: u32): void
 
-layout 4 SDL_Event
-  type: 0 u32
-  timestamp: 4 u32
-end
-
 fn main(): i32
+  (SDL_SetMainReady)
+
+  let init_everything: u32 = (cast u32 62001)
+  (SDL_Init init_everything)
+
   let window: ^void = (SDL_CreateWindow (cast ^u8 0) 
                                         (cast i32 1) 
                                         (cast i32 1) 

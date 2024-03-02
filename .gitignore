@@ -1,6 +1,8 @@
 target/
 docs/.obsidian/workspace.json
 .vscode/
+libSDL2-2.0.0.dylib
+libSDL2.a
 *.lib
 *.exe
 *.exp

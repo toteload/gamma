@@ -19,15 +19,24 @@ mod utils;
 use anyhow::Result;
 use clap::Parser as ClapParser;
 use compiler::Context;
-use ink_codegen::{Options, OutputTarget};
+use ink_codegen::{Options, OutputTarget, MachineTarget};
 use inkwell::targets::{InitializationConfig, Target};
 use std::fs;
+use std::path::Path;
 
 fn parse_output_format(s: &str) -> Result<OutputTarget, &'static str> {
     match s {
         "llvmir" => Ok(OutputTarget::LlvmIr),
         "asm" => Ok(OutputTarget::Assembly),
         _ => Err("Invalid output format"),
+    }
+}
+
+fn parse_machine_target(s: &str) -> Result<MachineTarget, &'static str> {
+    match s {
+        "windows" => Ok(MachineTarget::Windows),
+        "macos" => Ok(MachineTarget::Macos),
+        _ => Err("Invalid machine target"),
     }
 }
 
@@ -49,6 +58,9 @@ struct Args {
 
     #[arg(short, long, default_value_t = OutputTarget::LlvmIr, value_parser = parse_output_format)]
     output_format: OutputTarget,
+
+    #[arg(short, long, value_parser = parse_machine_target)]
+    target_machine: MachineTarget,
 }
 
 fn print_targets() {
@@ -67,21 +79,18 @@ fn print_targets() {
 }
 
 fn main() -> Result<()> {
-    //for arg in std::env::args_os() {
-    //    println!("{arg:?}");
-    //}
-
     let args = Args::try_parse()?;
 
     let mut compiler_context = Context::new();
 
-    let source = fs::read_to_string(args.input_file).unwrap();
+    let source = fs::read_to_string(&args.input_file).unwrap();
 
     let result = compiler_context.compile(
         &source,
         &Options {
             optimize: args.enable_optimizations,
             output: args.output_format,
+            machine: args.target_machine,
         },
     );
 
@@ -107,7 +116,19 @@ fn main() -> Result<()> {
     // - Link the two files into an executable with `link start_windows.o program.o -entry:start
     // /NODEFAULTLIB kernel32.lib`.
 
-    println!("{}", output);
+    let input_path = Path::new(&args.input_file);
+    let stem = input_path.file_stem();
+
+    let extension = match args.output_format {
+        OutputTarget::LlvmIr => "ll",
+        OutputTarget::Assembly => "s",
+    };
+
+    let output_path = input_path.with_extension(extension);
+
+    fs::write(&output_path, &output)?;
+
+    println!("Output written to {}", output_path.display());
 
     Ok(())
 }

@@ -92,6 +92,7 @@ impl TypeChecker<'_> {
             (Int { .. }, Bool) => true,
             (Bool, Int { .. }) => true,
             (Pointer(_), Int { .. }) => true,
+            (Pointer(ta), Array(_, tb)) if ta == tb => true,
             _ => false,
         }
     }
@@ -154,6 +155,10 @@ impl TypeChecker<'_> {
                     align,
                     fields,
                 } => {
+                    //let layout_fields = fields.iter().map(|Field { name, offset, ty }| {
+                    //    let ty = self.get_type_token_of_type_node(ty);
+                    //    LayoutField { name, offset, ty }
+                    //}).collect::<Result<Vec<_>,_>>();
                     todo!()
                 }
             }
@@ -389,7 +394,7 @@ impl TypeChecker<'_> {
                 if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
                     return Err(Error {
                         source: ErrorSource::AstNode(expression.id),
-                        info: vec![ErrorInfo::Text("Invalid cast.")],
+                        info: vec![ErrorInfo::Text("Invalid cast. From "), ErrorInfo::Type(expr_ty_token), ErrorInfo::Text(" to "), ErrorInfo::Type(cast_ty_token)],
                     });
                 }
 
@@ -473,7 +478,7 @@ impl TypeChecker<'_> {
                     params,
                 } = function_type
                 else {
-                    return Err(todo!());
+                    todo!()
                 };
 
                 // TODO Maybe this can be improved?
