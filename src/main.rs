@@ -18,34 +18,17 @@ mod utils;
 
 use anyhow::Result;
 use clap::Parser as ClapParser;
-use compiler::Context;
-use ink_codegen::{Options, OutputTarget, MachineTarget};
+use compiler::{Context, Options};
+use ink_codegen::MachineTarget;
 use inkwell::targets::{InitializationConfig, Target};
 use std::fs;
 use std::path::Path;
-
-fn parse_output_format(s: &str) -> Result<OutputTarget, &'static str> {
-    match s {
-        "llvmir" => Ok(OutputTarget::LlvmIr),
-        "asm" => Ok(OutputTarget::Assembly),
-        _ => Err("Invalid output format"),
-    }
-}
 
 fn parse_machine_target(s: &str) -> Result<MachineTarget, &'static str> {
     match s {
         "windows" => Ok(MachineTarget::Windows),
         "macos" => Ok(MachineTarget::Macos),
         _ => Err("Invalid machine target"),
-    }
-}
-
-impl std::fmt::Display for OutputTarget {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::LlvmIr => write!(f, "llvmir"),
-            Self::Assembly => write!(f, "asm"),
-        }
     }
 }
 
@@ -56,11 +39,14 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     enable_optimizations: bool,
 
-    #[arg(short, long, default_value_t = OutputTarget::LlvmIr, value_parser = parse_output_format)]
-    output_format: OutputTarget,
+    #[arg(long, default_value_t = false)]
+    emit_asm: bool,
+
+    #[arg(long, default_value_t = false)]
+    emit_llvm_ir: bool,
 
     #[arg(short, long, value_parser = parse_machine_target)]
-    target_machine: MachineTarget,
+    target: MachineTarget,
 }
 
 fn print_targets() {
@@ -79,18 +65,26 @@ fn print_targets() {
 }
 
 fn main() -> Result<()> {
-    let args = Args::try_parse()?;
+    let Args {
+        input_file,
+        enable_optimizations,
+        emit_asm,
+        emit_llvm_ir,
+        target,
+    } = Args::try_parse()?;
 
     let mut compiler_context = Context::new();
 
-    let source = fs::read_to_string(&args.input_file).unwrap();
+    let source = fs::read_to_string(&input_file).unwrap();
 
     let result = compiler_context.compile(
         &source,
         &Options {
-            optimize: args.enable_optimizations,
-            output: args.output_format,
-            machine: args.target_machine,
+            enable_optimizations,
+            emit_asm,
+            emit_llvm_ir,
+            emit_object: true,
+            target,
         },
     );
 
@@ -116,19 +110,25 @@ fn main() -> Result<()> {
     // - Link the two files into an executable with `link start_windows.o program.o -entry:start
     // /NODEFAULTLIB kernel32.lib`.
 
-    let input_path = Path::new(&args.input_file);
+    let input_path = Path::new(&input_file);
     let stem = input_path.file_stem();
 
-    let extension = match args.output_format {
-        OutputTarget::LlvmIr => "ll",
-        OutputTarget::Assembly => "s",
-    };
+    if let Some(llvm_ir) = output.llvm_ir {
+        let output_path = input_path.with_extension("ll");
+        fs::write(&output_path, &llvm_ir)?;
+    }
 
-    let output_path = input_path.with_extension(extension);
+    if let Some(asm) = output.asm {
+        let output_path = input_path.with_extension("s");
+        fs::write(&output_path, &asm)?;
+    }
 
-    fs::write(&output_path, &output)?;
+    if let Some(object) = output.object {
+        let output_path = input_path.with_extension("o");
+        fs::write(&output_path, object.as_slice())?;
+    }
 
-    println!("Output written to {}", output_path.display());
+    println!("Done!");
 
     Ok(())
 }

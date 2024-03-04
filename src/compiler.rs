@@ -1,7 +1,7 @@
 use crate::{
     ast::{NodeId, NodeIdGenerator},
     error::Error,
-    ink_codegen::CodeGenerator,
+    ink_codegen::{CodeGenerator, MachineTarget},
     parser::Parser,
     semantics::{validate_semantics, SemanticContext},
     source_location::SourceSpan,
@@ -9,9 +9,22 @@ use crate::{
     type_check::type_check,
     types::{Signedness, Type, TypeInterner, TypeToken},
 };
+use inkwell::memory_buffer::MemoryBuffer;
 use std::collections::HashMap;
 
-pub use crate::ink_codegen::{Options};
+pub struct Options {
+    pub target: MachineTarget,
+    pub enable_optimizations: bool,
+    pub emit_llvm_ir: bool,
+    pub emit_asm: bool,
+    pub emit_object: bool,
+}
+
+pub struct Output {
+    pub llvm_ir: Option<String>,
+    pub asm: Option<String>,
+    pub object: Option<MemoryBuffer>,
+}
 
 pub struct Context {
     pub id_generator: NodeIdGenerator,
@@ -22,6 +35,12 @@ pub struct Context {
 
     pub spans: HashMap<NodeId, SourceSpan>,
     pub types: HashMap<NodeId, TypeToken>,
+}
+
+impl From<Error> for Vec<Error> {
+    fn from(e: Error) -> Self {
+        todo!()
+    }
 }
 
 impl Context {
@@ -100,7 +119,7 @@ impl Context {
         }
     }
 
-    pub fn compile(&mut self, source: &str, options: &Options) -> Result<String, Vec<Error>> {
+    pub fn compile(&mut self, source: &str, options: &Options) -> Result<Output, Vec<Error>> {
         let mut parser = Parser::new(
             source,
             &mut self.symbols,
@@ -126,8 +145,32 @@ impl Context {
 
         let ctx = inkwell::context::Context::create();
         let mut codegen = CodeGenerator::new(&ctx, &self.symbols, &self.types, &self.type_tokens);
-        let output = codegen.compile(&items, options).map_err(|e| vec![e])?;
+        codegen
+            .compile(&items, &options.target)
+            .map_err(|e| vec![e])?;
 
-        Ok(output)
+        if options.enable_optimizations {
+            codegen.run_optimization_passes();
+        }
+
+        let llvm_ir = options.emit_llvm_ir.then(|| codegen.emit_llvm_ir_output());
+
+        let asm = if options.emit_asm {
+            Some(codegen.emit_asm_output()?)
+        } else {
+            None
+        };
+
+        let object = if options.emit_object {
+            Some(codegen.emit_object_output()?)
+        } else {
+            None
+        };
+
+        Ok(Output {
+            llvm_ir,
+            asm,
+            object,
+        })
     }
 }

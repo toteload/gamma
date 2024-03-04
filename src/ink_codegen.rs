@@ -2,12 +2,14 @@ use crate::ast::*;
 use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::types::{Signedness, Type, TypeInterner, TypeToken};
+use inkwell::targets::TargetMachine;
 use inkwell::types::PointerType;
 use inkwell::{
     basic_block::BasicBlock,
     builder::{Builder, BuilderError},
     context::Context,
     intrinsics::Intrinsic,
+    memory_buffer::MemoryBuffer,
     module::Module,
     passes::PassManager,
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
@@ -57,22 +59,11 @@ pub enum MachineTarget {
     Macos,
 }
 
-pub struct Options {
-    pub optimize: bool,
-    pub output: OutputTarget,
-    pub machine: MachineTarget,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum OutputTarget {
-    LlvmIr,
-    Assembly,
-}
-
 pub struct CodeGenerator<'ctx> {
     ctx: &'ctx Context,
     builder: Builder<'ctx>,
     module: Module<'ctx>,
+    target_machine: Option<TargetMachine>,
 
     current_function: Option<FunctionValue<'ctx>>,
     current_basic_block: Option<BasicBlock<'ctx>>,
@@ -126,6 +117,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             ctx,
             builder: ctx.create_builder(),
             module,
+            target_machine: None,
 
             current_function: None,
             current_basic_block: None,
@@ -689,7 +681,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                         todo!()
                         //let base_type = val.into_array_value().get_type().get_element_type();
                         //Ok(self.builder.build_bitcast(val, base_type.ptr_type(AddressSpace::default()), "")?.into())
-                    },
+                    }
 
                     _ => todo!("Cast from {:?} to {:?}", src_ty, dst_ty),
                 }
@@ -843,7 +835,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
-    pub fn compile(&mut self, items: &[Item], options: &Options) -> Result<String, Error> {
+    pub fn compile(&mut self, items: &[Item], machine: &MachineTarget) -> Result<(), Error> {
         self.scopes.push(Scope {
             kind: ScopeKind::Global,
             stack_restorepoint: None,
@@ -876,13 +868,15 @@ impl<'ctx> CodeGenerator<'ctx> {
             todo!("Handle error properly")
         }
 
-        // TODO This should maybe be in some other place, so it doesn't get called multiple times
+        // TODO Maybe this should be in some other place, so it doesn't get called multiple times
         Target::initialize_x86(&InitializationConfig::default());
 
-        let triple = match options.machine {
+        let triple = match machine {
             MachineTarget::Windows => TargetTriple::create("x86_64-pc-windows-msvc"),
             MachineTarget::Macos => TargetTriple::create("x86_64-apple-darwin21.6.0"),
         };
+        self.module.set_triple(&triple);
+
         let target = Target::from_triple(&triple)
             .expect("Should be able to get target from initialized triple");
         let features = "";
@@ -900,34 +894,63 @@ impl<'ctx> CodeGenerator<'ctx> {
         let target_data = target_machine.get_target_data();
         let data_layout = target_data.get_data_layout();
 
-        self.module.set_triple(&triple);
+        // TODO(david) I am not sure if this is really necessary?
+        // Code generation is all done through the target machine, so I expect it will set the
+        // data layout there as well.
         self.module.set_data_layout(&data_layout);
+        self.target_machine = Some(target_machine);
 
-        if options.optimize {
-            let pass_manager: PassManager<Module<'_>> = PassManager::create(());
-            pass_manager.add_promote_memory_to_register_pass();
-            pass_manager.add_cfg_simplification_pass();
-            pass_manager.add_instruction_combining_pass();
-            pass_manager.add_instruction_simplify_pass();
-            pass_manager.add_aggressive_dce_pass();
-            pass_manager.run_on(&self.module);
-        }
+        //let result = target_machine.write_to_file(&self.module, FileType::Object, Path::new(options.filename));
 
-        match options.output {
-            OutputTarget::LlvmIr => Ok(self.module.to_string()),
-            OutputTarget::Assembly => {
-                let result =
-                    target_machine.write_to_memory_buffer(&self.module, FileType::Assembly);
+        //match options.output {
+        //    OutputTarget::Assembly => {
+        //        let result =
+        //            target_machine.write_to_memory_buffer(&self.module, FileType::Assembly);
 
-                match result {
-                    Err(msg) => todo!("Handle error: {}", msg.to_string()),
-                    Ok(buffer) => {
-                        let s = std::str::from_utf8(buffer.as_slice())
-                            .expect("Buffer should contain valid UTF-8");
-                        Ok(s.into())
-                    }
-                }
-            }
-        }
+        //        match result {
+        //            Err(msg) => todo!("Handle error: {}", msg.to_string()),
+        //            Ok(buffer) => {
+        //
+        //            }
+        //        }
+        //    }
+        //}
+
+        Ok(())
+    }
+
+    pub fn run_optimization_passes(&mut self) {
+        let pass_manager: PassManager<Module<'_>> = PassManager::create(());
+        pass_manager.add_promote_memory_to_register_pass();
+        pass_manager.add_cfg_simplification_pass();
+        pass_manager.add_instruction_combining_pass();
+        pass_manager.add_instruction_simplify_pass();
+        pass_manager.add_aggressive_dce_pass();
+        pass_manager.run_on(&self.module);
+    }
+
+    pub fn emit_llvm_ir_output(&self) -> String {
+        self.module.to_string()
+    }
+
+    pub fn emit_asm_output(&self) -> Result<String, Error> {
+        self.target_machine
+            .as_ref()
+            .unwrap()
+            .write_to_memory_buffer(&self.module, FileType::Assembly)
+            .map(|buffer| {
+                std::str::from_utf8(buffer.as_slice())
+                    .expect("Buffer should contain valid UTF-8")
+                    .into()
+            })
+            .map_err(|_| todo!())
+    }
+
+    pub fn emit_object_output(&self) -> Result<MemoryBuffer, Error> {
+        self.target_machine
+            .as_ref()
+            .unwrap()
+            .write_to_memory_buffer(&self.module, FileType::Object)
+            .map_err(|_| todo!())
     }
 }

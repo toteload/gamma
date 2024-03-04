@@ -394,7 +394,12 @@ impl TypeChecker<'_> {
                 if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
                     return Err(Error {
                         source: ErrorSource::AstNode(expression.id),
-                        info: vec![ErrorInfo::Text("Invalid cast. From "), ErrorInfo::Type(expr_ty_token), ErrorInfo::Text(" to "), ErrorInfo::Type(cast_ty_token)],
+                        info: vec![
+                            ErrorInfo::Text("Invalid cast. From "),
+                            ErrorInfo::Type(expr_ty_token),
+                            ErrorInfo::Text(" to "),
+                            ErrorInfo::Type(cast_ty_token),
+                        ],
                     });
                 }
 
