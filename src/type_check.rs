@@ -3,13 +3,13 @@ use crate::ast::*;
 use crate::error::*;
 use crate::scope_stack::ScopeStack;
 use crate::string_interner::Symbol;
-use crate::types::{Signedness, Type, TypeInterner, TypeToken};
+use crate::types::{Layout, LayoutField, Signedness, Type, TypeInterner, TypeToken};
 use std::collections::HashMap;
 
 struct TypeChecker<'a> {
     type_tokens: &'a mut TypeInterner,
     types: &'a mut HashMap<NodeId, TypeToken>,
-    type_table: &'a HashMap<Symbol, TypeToken>,
+    type_table: &'a mut HashMap<Symbol, TypeToken>,
 
     scopes: ScopeStack<Symbol, TypeToken>,
     errors: Vec<Error>,
@@ -100,6 +100,44 @@ impl TypeChecker<'_> {
     fn visit_items(&mut self, items: &[Item]) {
         let mut top_scope = HashMap::new();
 
+        // 1. Register all the layouts as these may be referenced in `fn` and `external_fn`.
+        // 2. Register all the functions and external_fn
+        // 3. Type check all the `fn` bodies.
+
+        for item in items {
+            match &item.kind {
+                ItemKind::Layout {
+                    name,
+                    align,
+                    fields: ast_fields,
+                } => {
+                    let fields = ast_fields
+                        .iter()
+                        .map(|Field { name, offset, ty }| {
+                            self.get_type_token_of_type_node(ty).map(|ty| LayoutField {
+                                name: name.sym,
+                                offset: *offset,
+                                ty,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>();
+
+                    let Ok(fields) = fields else { todo!() };
+
+                    let layout_type = Type::Layout(Layout {
+                        align: *align,
+                        fields,
+                    });
+
+                    let layout_type_token = self.type_tokens.add(layout_type);
+
+                    self.type_table.insert(name.sym, layout_type_token);
+                    top_scope.insert(name.sym, layout_type_token);
+                }
+                _ => (),
+            }
+        }
+
         for item in items {
             match &item.kind {
                 ItemKind::Function {
@@ -150,17 +188,7 @@ impl TypeChecker<'_> {
 
                     top_scope.insert(name.sym, function_type_token);
                 }
-                ItemKind::Layout {
-                    name,
-                    align,
-                    fields,
-                } => {
-                    //let layout_fields = fields.iter().map(|Field { name, offset, ty }| {
-                    //    let ty = self.get_type_token_of_type_node(ty);
-                    //    LayoutField { name, offset, ty }
-                    //}).collect::<Result<Vec<_>,_>>();
-                    todo!()
-                }
+                _ => (),
             }
         }
 
@@ -406,7 +434,7 @@ impl TypeChecker<'_> {
                 cast_ty_token
             }
             BuiltinOp { op, args } => match op {
-                BuiltinOpKind::Equals => {
+                BuiltinOpKind::Equals | BuiltinOpKind::NotEquals => {
                     let arg_types = args
                         .iter()
                         .map(|arg| self.visit_expr(arg))
@@ -415,9 +443,17 @@ impl TypeChecker<'_> {
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
 
                     if !args_are_of_same_type {
+                        let mut info =
+                            vec![ErrorInfo::Text("Arguments must all have the same type.\n")];
+                        for (arg, arg_type) in args.iter().zip(arg_types) {
+                            info.push(ErrorInfo::AstNode(arg.id));
+                            info.push(ErrorInfo::Text(" has type "));
+                            info.push(ErrorInfo::Type(arg_type));
+                            info.push(ErrorInfo::Text("\n"));
+                        }
                         return Err(Error {
                             source: ErrorSource::AstNode(expression.id),
-                            info: vec![ErrorInfo::Text("Arguments must all have the same type.")],
+                            info,
                         });
                     }
 

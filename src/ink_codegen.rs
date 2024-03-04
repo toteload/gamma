@@ -386,12 +386,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 Ok(())
             }
-            ItemKind::ExternalFunction { .. } => Ok(()),
-            ItemKind::Layout {
-                name,
-                align,
-                fields,
-            } => todo!(),
+            ItemKind::ExternalFunction { .. } | ItemKind::Layout { .. } => Ok(()),
         }
     }
 
@@ -691,20 +686,21 @@ impl<'ctx> CodeGenerator<'ctx> {
                     let x = self.gen_expr(&args[0])?;
                     Ok(self.builder.build_not(x.into_int_value(), "")?.into())
                 }
-                BuiltinOpKind::Equals => {
+                BuiltinOpKind::Equals | BuiltinOpKind::NotEquals => {
                     // For now only support two operands at a time
                     assert_eq!(args.len(), 2);
+
+                    let predicate = match op {
+                        BuiltinOpKind::Equals => IntPredicate::EQ,
+                        BuiltinOpKind::NotEquals => IntPredicate::NE,
+                        _ => todo!(),
+                    };
 
                     let x = self.gen_expr(&args[0])?;
                     let y = self.gen_expr(&args[1])?;
                     Ok(self
                         .builder
-                        .build_int_compare(
-                            IntPredicate::EQ,
-                            x.into_int_value(),
-                            y.into_int_value(),
-                            "",
-                        )?
+                        .build_int_compare(predicate, x.into_int_value(), y.into_int_value(), "")?
                         .into())
                 }
                 BuiltinOpKind::Add => {

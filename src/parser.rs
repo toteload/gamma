@@ -542,6 +542,7 @@ impl Parser<'_> {
                     | Plus | Ampersand | At) => {
                         let op = match op {
                             Equal => BuiltinOpKind::Equals,
+                            NotEqual => BuiltinOpKind::NotEquals,
                             Star => BuiltinOpKind::Mul,
                             Div => BuiltinOpKind::Div,
                             KeywordNot => BuiltinOpKind::Not,

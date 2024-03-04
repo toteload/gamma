@@ -10,6 +10,7 @@ pub enum ErrorInfo {
     Identifier(Symbol),
     Type(TypeToken),
     SourceText(SourceSpan),
+    AstNode(NodeId),
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -66,6 +67,16 @@ impl Error {
                     //);
                     // TODO(david) This approach is very naive and could be better.
                     let line = source.lines().nth(span.start.line as usize - 1).unwrap();
+                    let text = &line[span.start.col as usize - 1..span.end.col as usize];
+                    print!("\"{text}\"");
+                }
+                AstNode(id) => {
+                    let span = spans.get(&id).unwrap();
+                    let line = source
+                        .lines()
+                        .skip(span.start.line as usize - 1)
+                        .next()
+                        .unwrap();
                     let text = &line[span.start.col as usize - 1..span.end.col as usize];
                     print!("\"{text}\"");
                 }

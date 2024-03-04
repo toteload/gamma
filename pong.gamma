@@ -3,12 +3,21 @@ external_fn SDL_Init(flags: u32): i32
 external_fn SDL_CreateWindow(title: ^u8, x: i32, y: i32, w: i32, h: i32, flags: u32): ^void
 external_fn SDL_DestroyWindow(window: ^void): void
 external_fn SDL_Delay(ms: u32): void
+external_fn SDL_PollEvent(event: ^SDL_Event): i32
+
+layout 4 SDL_Event
+  type: 0 u32
+  timestamp: 4 u32
+end
 
 fn main(): i32
   (SDL_SetMainReady)
 
   let init_everything: u32 = (cast u32 62001)
-  (SDL_Init init_everything)
+  let status: i32 = (SDL_Init init_everything)
+  if (ne status (cast i32 0))
+    return status
+  end
 
   let window: ^void = (SDL_CreateWindow (cast ^u8 0) 
                                         (cast i32 1) 
@@ -16,6 +25,17 @@ fn main(): i32
                                         (cast i32 800) 
                                         (cast i32 800) 
                                         (cast u32 0))
+
+  let event: SDL_Event
+
+  loop
+    loop
+      let has_more_events: i32 = (SDL_PollEvent (& event))
+      if (eq has_more_events (cast i32 0))
+        break
+      end
+    end
+  end
 
   (SDL_Delay (cast u32 1000))
 

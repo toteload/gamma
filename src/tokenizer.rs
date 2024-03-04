@@ -63,6 +63,7 @@ pub enum TokenKind {
     Semicolon,
     Colon,
 
+    HashTag,
     Comma,
     Period,
 
