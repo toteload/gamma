@@ -121,17 +121,17 @@ fn main() -> Result<()> {
 
     if let Some(llvm_ir) = output.llvm_ir {
         let output_path = input_path.with_extension("ll");
-        fs::write(&output_path, &llvm_ir)?;
+        fs::write(output_path, llvm_ir)?;
     }
 
     if let Some(asm) = output.asm {
         let output_path = input_path.with_extension("s");
-        fs::write(&output_path, &asm)?;
+        fs::write(output_path, asm)?;
     }
 
     if let Some(object) = output.object {
         let output_path = input_path.with_extension("o");
-        fs::write(&output_path, object.as_slice())?;
+        fs::write(output_path, object.as_slice())?;
     }
 
     println!("Done!");

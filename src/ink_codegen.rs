@@ -377,7 +377,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 self.position_builder_at_end_of(entry);
 
                 self.push_scope_with_stack_restore_point(ScopeKind::Function);
-                self.gen_block(&body)?;
+                self.gen_block(body)?;
                 self.scopes.pop();
 
                 self.current_function = None;
@@ -487,7 +487,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     self.position_builder_at_end_of(end_block);
                 } else {
                     let res = unsafe { end_block.delete() };
-                    if let Err(_) = res {
+                    if res.is_err() {
                         todo!()
                     }
                 }
@@ -637,10 +637,10 @@ impl<'ctx> CodeGenerator<'ctx> {
             }
             ExprKind::Cast { e: src, .. } => {
                 let src_ty_token = self.node_types.get(&src.id).unwrap();
-                let src_ty = self.type_interner.get(&src_ty_token);
+                let src_ty = self.type_interner.get(src_ty_token);
 
                 let dst_ty_token = self.node_types.get(&e.id).unwrap();
-                let dst_ty = self.type_interner.get(&dst_ty_token);
+                let dst_ty = self.type_interner.get(dst_ty_token);
 
                 let val = self.gen_expr(src)?;
 
@@ -708,11 +708,11 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .into())
                 }
                 BuiltinOpKind::Add => {
-                    assert!(args.len() >= 1);
+                    assert!(!args.is_empty());
 
                     let vals = args
                         .iter()
-                        .map(|x| self.gen_expr(&x))
+                        .map(|x| self.gen_expr(x))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     // The empty slice case is not covered by the destructuring. However, it cannot
@@ -735,7 +735,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                     let vals = args
                         .iter()
-                        .map(|x| self.gen_expr(&x))
+                        .map(|x| self.gen_expr(x))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     // The empty slice case is not covered by the destructuring. However, it cannot
@@ -850,7 +850,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     let f =
                         self.module
                             .add_function(self.symbols.get(&name.sym), function_type, None);
-                    self.functions.insert(name.sym, f.into());
+                    self.functions.insert(name.sym, f);
                 }
                 ItemKind::Layout { .. } => (),
             }

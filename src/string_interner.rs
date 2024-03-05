@@ -13,6 +13,12 @@ pub struct StringInterner {
 // This implementation also looks good and simple.
 // https://github.com/rust-lang/rust/blob/89b9f7b284aacc5f8613438b80e4dd7bdd10549e/compiler/rustc_span/src/symbol.rs#L1741
 
+impl Default for StringInterner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StringInterner {
     pub fn new() -> StringInterner {
         StringInterner {

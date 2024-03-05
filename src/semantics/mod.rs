@@ -17,8 +17,8 @@ pub trait SemanticProver {
 }
 
 pub fn validate_semantics(context: &SemanticContext, items: &[Item]) -> Result<(), Vec<Error>> {
-    let x: Box<dyn SemanticProver> = Box::new(has_main::Prover::new(&context));
-    let y: Box<dyn SemanticProver> = Box::new(validate_symbol_use::Prover::new(&context));
+    let x: Box<dyn SemanticProver> = Box::new(has_main::Prover::new(context));
+    let y: Box<dyn SemanticProver> = Box::new(validate_symbol_use::Prover::new(context));
 
     let mut provers = vec![x, y];
 

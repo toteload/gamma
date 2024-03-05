@@ -320,7 +320,7 @@ impl Parser<'_> {
                     .get(&last.id)
                     .expect("Statement should have a span saved");
 
-                first.extend(&last)
+                first.extend(last)
             }
             [statement] => *self
                 .spans

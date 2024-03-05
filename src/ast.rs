@@ -8,6 +8,12 @@ pub struct NodeIdGenerator {
     counter: u32,
 }
 
+impl Default for NodeIdGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeIdGenerator {
     pub fn new() -> NodeIdGenerator {
         NodeIdGenerator { counter: 0 }

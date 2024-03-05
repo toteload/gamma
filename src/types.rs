@@ -185,7 +185,7 @@ impl PartialEq for Layout {
         a.sort();
         b.sort();
 
-        a.into_iter().eq(b.into_iter())
+        a.into_iter().eq(b)
     }
 }
 
@@ -196,6 +196,12 @@ pub struct TypeToken(u32);
 pub struct TypeInterner {
     tokens: HashMap<Type, TypeToken>,
     types: Vec<Type>,
+}
+
+impl Default for TypeInterner {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TypeInterner {
@@ -221,7 +227,7 @@ impl TypeInterner {
     }
 
     pub fn get_for_type(&self, ty: &Type) -> Option<TypeToken> {
-        self.tokens.get(&ty).copied()
+        self.tokens.get(ty).copied()
     }
 
     pub fn get<'a>(&'a self, tok: &TypeToken) -> &'a Type {

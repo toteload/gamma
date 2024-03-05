@@ -43,6 +43,12 @@ impl From<Error> for Vec<Error> {
     }
 }
 
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Context {
     pub fn new() -> Self {
         let mut symbols = StringInterner::new();

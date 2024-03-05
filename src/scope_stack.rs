@@ -8,6 +8,15 @@ where
     stack: Vec<HashMap<K, V>>,
 }
 
+impl<K, V> Default for ScopeStack<K, V>
+where
+    K: Hash + Eq,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<K, V> ScopeStack<K, V>
 where
     K: Hash + Eq,

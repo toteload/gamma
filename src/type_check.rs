@@ -210,7 +210,7 @@ impl TypeChecker<'_> {
 
         self.scopes.push_scope(param_scope_map);
 
-        self.visit_block(&body);
+        self.visit_block(body);
 
         self.scopes.pop();
     }
@@ -228,7 +228,7 @@ impl TypeChecker<'_> {
 
         match &statement.kind {
             Let { name, ty, init } => {
-                let type_token = self.get_type_token_of_type_node(&ty);
+                let type_token = self.get_type_token_of_type_node(ty);
 
                 let type_token = match type_token {
                     Ok(x) => x,
@@ -389,7 +389,7 @@ impl TypeChecker<'_> {
             }
             Cast { ty, e } => {
                 let expr_ty_token = self.visit_expr(e)?;
-                let cast_ty_token = self.get_type_token_of_type_node(&ty)?;
+                let cast_ty_token = self.get_type_token_of_type_node(ty)?;
 
                 if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
                     return Err(Error {
