@@ -6,8 +6,8 @@ VALID_SAMPLES_PATH = 'valid_samples'
 
 files = [f for f in os.listdir(VALID_SAMPLES_PATH) if path.isfile(path.join(VALID_SAMPLES_PATH, f))]
 
-FILE_HEADER = """use gamma::compiler::{Context, Options};
-use gamma::ink_codegen::{OutputTarget, MachineTarget};
+FILE_HEADER = """use gamma::compiler::{Context, Options, Output};
+use gamma::ink_codegen::MachineTarget;
 use insta::assert_snapshot;
 use std::fs;
 
@@ -18,9 +18,9 @@ fn {name}() {{
     let contents = fs::read_to_string("tests/valid_samples/{sample_path}").unwrap();
 
     let mut context = Context::new();
-    let result = context.compile(&contents, &Options {{ optimize: {optimize}, output: {output}, machine: MachineTarget::Windows }});
+    let result = context.compile(&contents, &Options {{ target: MachineTarget::Windows, enable_optimizations: {optimize}, emit_llvm_ir: true, emit_asm: false, emit_object: false, }});
 
-    let Ok(output) = result else {{
+    let Ok(Output {{ llvm_ir: Some(output), .. }}) = result else {{
         let Err(errors) = result else {{ unreachable!() }};
 
         for error in errors.iter() {{
@@ -37,7 +37,6 @@ fn {name}() {{
 code = (FILE_HEADER + 
         "\n".join([FUNCTION.format(sample_path=f, 
                                    name=Path(f).stem, 
-                                   optimize='false', 
-                                   output='OutputTarget::LlvmIr') for f in files]))
+                                   optimize='false',) for f in files]))
 
 print(code.replace('\r', ''))

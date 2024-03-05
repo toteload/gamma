@@ -46,7 +46,7 @@ struct Args {
     emit_llvm_ir: bool,
 
     #[arg(short, long, value_parser = parse_machine_target)]
-    target: MachineTarget,
+    target: Option<MachineTarget>,
 }
 
 fn print_targets() {
@@ -72,6 +72,12 @@ fn main() -> Result<()> {
         emit_llvm_ir,
         target,
     } = Args::try_parse()?;
+
+    let target = if let Some(target) = target {
+        target
+    } else {
+        parse_machine_target(std::env::consts::OS).expect("")
+    };
 
     let mut compiler_context = Context::new();
 

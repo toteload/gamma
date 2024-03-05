@@ -1,5 +1,5 @@
-use gamma::compiler::{Context, Options};
-use gamma::ink_codegen::{MachineTarget, OutputTarget};
+use gamma::compiler::{Context, Options, Output};
+use gamma::ink_codegen::MachineTarget;
 use insta::assert_snapshot;
 use std::fs;
 
@@ -11,13 +11,19 @@ fn sum_loop() {
     let result = context.compile(
         &contents,
         &Options {
-            optimize: false,
-            output: OutputTarget::LlvmIr,
-            machine: MachineTarget::Windows,
+            target: MachineTarget::Windows,
+            enable_optimizations: false,
+            emit_llvm_ir: true,
+            emit_asm: false,
+            emit_object: false,
         },
     );
 
-    let Ok(output) = result else {
+    let Ok(Output {
+        llvm_ir: Some(output),
+        ..
+    }) = result
+    else {
         let Err(errors) = result else { unreachable!() };
 
         for error in errors.iter() {
@@ -46,13 +52,19 @@ fn only_main() {
     let result = context.compile(
         &contents,
         &Options {
-            optimize: false,
-            output: OutputTarget::LlvmIr,
-            machine: MachineTarget::Windows,
+            target: MachineTarget::Windows,
+            enable_optimizations: false,
+            emit_llvm_ir: true,
+            emit_asm: false,
+            emit_object: false,
         },
     );
 
-    let Ok(output) = result else {
+    let Ok(Output {
+        llvm_ir: Some(output),
+        ..
+    }) = result
+    else {
         let Err(errors) = result else { unreachable!() };
 
         for error in errors.iter() {
@@ -81,13 +93,19 @@ fn array() {
     let result = context.compile(
         &contents,
         &Options {
-            optimize: false,
-            output: OutputTarget::LlvmIr,
-            machine: MachineTarget::Windows,
+            target: MachineTarget::Windows,
+            enable_optimizations: false,
+            emit_llvm_ir: true,
+            emit_asm: false,
+            emit_object: false,
         },
     );
 
-    let Ok(output) = result else {
+    let Ok(Output {
+        llvm_ir: Some(output),
+        ..
+    }) = result
+    else {
         let Err(errors) = result else { unreachable!() };
 
         for error in errors.iter() {
@@ -116,13 +134,19 @@ fn pointer() {
     let result = context.compile(
         &contents,
         &Options {
-            optimize: false,
-            output: OutputTarget::LlvmIr,
-            machine: MachineTarget::Windows,
+            target: MachineTarget::Windows,
+            enable_optimizations: false,
+            emit_llvm_ir: true,
+            emit_asm: false,
+            emit_object: false,
         },
     );
 
-    let Ok(output) = result else {
+    let Ok(Output {
+        llvm_ir: Some(output),
+        ..
+    }) = result
+    else {
         let Err(errors) = result else { unreachable!() };
 
         for error in errors.iter() {
@@ -151,13 +175,19 @@ fn nested_loops() {
     let result = context.compile(
         &contents,
         &Options {
-            optimize: false,
-            output: OutputTarget::LlvmIr,
-            machine: MachineTarget::Windows,
+            target: MachineTarget::Windows,
+            enable_optimizations: false,
+            emit_llvm_ir: true,
+            emit_asm: false,
+            emit_object: false,
         },
     );
 
-    let Ok(output) = result else {
+    let Ok(Output {
+        llvm_ir: Some(output),
+        ..
+    }) = result
+    else {
         let Err(errors) = result else { unreachable!() };
 
         for error in errors.iter() {
@@ -186,13 +216,19 @@ fn arithmetic() {
     let result = context.compile(
         &contents,
         &Options {
-            optimize: false,
-            output: OutputTarget::LlvmIr,
-            machine: MachineTarget::Windows,
+            target: MachineTarget::Windows,
+            enable_optimizations: false,
+            emit_llvm_ir: true,
+            emit_asm: false,
+            emit_object: false,
         },
     );
 
-    let Ok(output) = result else {
+    let Ok(Output {
+        llvm_ir: Some(output),
+        ..
+    }) = result
+    else {
         let Err(errors) = result else { unreachable!() };
 
         for error in errors.iter() {
