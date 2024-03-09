@@ -108,7 +108,6 @@ impl TypeChecker<'_> {
             match &item.kind {
                 ItemKind::Layout {
                     name,
-                    align,
                     fields: ast_fields,
                 } => {
                     let fields = ast_fields
@@ -125,7 +124,6 @@ impl TypeChecker<'_> {
                     let Ok(fields) = fields else { todo!() };
 
                     let layout_type = Type::Layout(Layout {
-                        align: *align,
                         fields,
                     });
 

@@ -25,6 +25,12 @@ impl From<BuilderError> for Error {
     }
 }
 
+impl From<&str> for Error {
+    fn from(e: &str) -> Self {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum VariableValue<'ctx> {
     Stack(PointerValue<'ctx>),
@@ -57,6 +63,12 @@ struct Scope<'ctx> {
 pub enum MachineTarget {
     Windows,
     Macos,
+}
+
+struct AllocaTypeData<'ctx> {
+    explicit_align: Option<u32>,
+    basic_type: BasicTypeEnum<'ctx>,
+    basic_type_with_align_padding: BasicTypeEnum<'ctx>,
 }
 
 pub struct CodeGenerator<'ctx> {
@@ -287,11 +299,66 @@ impl<'ctx> CodeGenerator<'ctx> {
     }
 
     fn get_inktype_of_node(&mut self, id: NodeId) -> BasicTypeEnum<'ctx> {
-        let Some(tok) = self.node_types.get(&id) else {
+        let Some(type_token) = self.node_types.get(&id) else {
             panic!("Could not get type token of node")
         };
 
-        self.get_ink_basic_type(*tok)
+        self.get_ink_basic_type(*type_token)
+    }
+
+    fn get_alloca_type_data(&mut self, type_token: TypeToken) -> AllocaTypeData<'ctx> {
+        if let Some(t) = self.typetoken_to_inktype.get(&type_token) {
+            return AllocaTypeData {
+                explicit_align: None,
+                basic_type: *t,
+                basic_type_with_align_padding: *t,
+            };
+        }
+
+        let ty = self.type_interner.get(&type_token);
+
+        match ty {
+            Type::Pointer(_) => AllocaTypeData {
+                explicit_align: None,
+                basic_type: self.ptr_t.into(),
+                basic_type_with_align_padding: self.ptr_t.into(),
+            },
+            Type::Array(size, inner) => {
+                let AllocaTypeData {
+                    explicit_align,
+                    basic_type_with_align_padding: t,
+                    ..
+                }= self.get_alloca_type_data(*inner);
+
+                assert!(*size < u32::MAX as i64);
+
+                let t = t.array_type(*size as u32).into();
+
+                AllocaTypeData {
+                    explicit_align,
+                    basic_type: t,
+                    basic_type_with_align_padding: t,
+                }
+            }
+            Type::Layout(_) => {
+                let align = ty.align(self.type_interner);
+                let byte_size = ty.byte_size(self.type_interner);
+                let basic_type: BasicTypeEnum<'ctx> = self.i8_t.array_type(byte_size).into();
+                let aligned_byte_size = byte_size.next_multiple_of(align);
+                let basic_type_with_align_padding = if byte_size == aligned_byte_size {
+                    basic_type.into()
+                } else {
+                    self.i8_t.array_type(aligned_byte_size).into()
+                };
+
+                AllocaTypeData {
+                    explicit_align: Some(align),
+                    basic_type,
+                    basic_type_with_align_padding,
+                }
+            }
+            _ => todo!("Create LLVM type for internal type: {:?}", ty),
+        }
     }
 
     fn add_basic_block(&self, name: &str) -> BasicBlock<'ctx> {
@@ -515,8 +582,20 @@ impl<'ctx> CodeGenerator<'ctx> {
                 self.position_builder_at_end_of(end_block);
             }
             StatementKind::Let { name, ty, init } => {
-                let basic_type = self.get_inktype_of_node(ty.id);
+                let type_token = self.node_types.get(&ty.id).unwrap();
+
+                let AllocaTypeData {
+                    explicit_align,
+                    basic_type,
+                    ..
+                } = self.get_alloca_type_data(*type_token);
+
                 let ptr = self.builder.build_alloca(basic_type, "").expect("");
+
+                if let Some(align) = explicit_align {
+                    let instruction = ptr.as_instruction().unwrap();
+                    instruction.set_alignment(align)?;
+                }
 
                 if let Some(init) = init {
                     let val = self.gen_expr(init)?;

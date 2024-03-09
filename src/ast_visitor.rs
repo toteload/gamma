@@ -22,9 +22,8 @@ pub trait Visitor {
             } => self.visit_external_function(name, params, return_type),
             ItemKind::Layout {
                 name,
-                align,
                 fields,
-            } => self.visit_layout(name, *align, fields),
+            } => self.visit_layout(name, fields),
         }
     }
 
@@ -40,7 +39,7 @@ pub trait Visitor {
 
     fn visit_external_function(&mut self, name: &Name, params: &[Param], return_type: &Type) {}
 
-    fn visit_layout(&mut self, name: &Name, align: u32, fields: &[Field]) {}
+    fn visit_layout(&mut self, name: &Name, fields: &[Field]) {}
 
     fn visit_block(&mut self, block: &Block) {
         for statement in &block.statements {

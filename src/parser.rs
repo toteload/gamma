@@ -142,16 +142,6 @@ impl Parser<'_> {
                 }
             }
             KeywordLayout => {
-                let Token {
-                    kind: IntLiteral(align),
-                    ..
-                } = expect_token!(self.tokens.next(), IntLiteral(_))?
-                else {
-                    unreachable!()
-                };
-
-                let align = align as u32;
-
                 let name = self.parse_name()?;
 
                 let mut fields = Vec::new();
@@ -179,7 +169,6 @@ impl Parser<'_> {
 
                 ItemKind::Layout {
                     name,
-                    align,
                     fields,
                 }
             }
@@ -442,6 +431,12 @@ impl Parser<'_> {
             }
             KeywordLoop => {
                 self.tokens.next();
+
+                let peeked = expect_token!(self.tokens.peek(), _)?;
+
+                if matches!(peeked.kind, Identifier) {
+                    todo!()
+                }
 
                 let body = self.parse_block()?;
 

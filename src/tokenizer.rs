@@ -47,6 +47,7 @@ pub enum TokenKind {
     Greater,
 
     Identifier(Symbol),
+    Label(Symbol),
 
     IntLiteral(i64),
     BoolLiteral(bool),
@@ -129,6 +130,18 @@ impl<'a> Tokenizer<'a> {
             self.advance();
         }
     }
+
+    fn read_identifier(&mut self) -> (usize, usize) {
+        todo!()
+    }
+}
+
+fn is_identifier_start_char(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_'
+}
+
+fn is_identifier_rest_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_'
 }
 
 impl<'a> Iterator for Tokenizer<'a> {
@@ -142,16 +155,12 @@ impl<'a> Iterator for Tokenizer<'a> {
         #[rustfmt::skip]
         let tok = match c {
             // Identifier or keyword.
-            _ if c.is_ascii_alphabetic() || c == '_' => {
-                fn is_identifier_char(c: char) -> bool {
-                    c.is_ascii_alphanumeric() || c == '_'
-                }
-
+            _ if is_identifier_start_char(c) => {
                 let (mut end_offset, mut end_loc) = (offset + c.len_utf8(), start);
                 loop {
                     let Some(a) = self.iter.peek() else { break; };
 
-                    if !is_identifier_char(*a) {
+                    if !is_identifier_rest_char(*a) {
                         break;
                     }
 
@@ -255,7 +264,12 @@ impl<'a> Iterator for Tokenizer<'a> {
             '-' => Token { span: SourceSpan::single(start), kind: TokenKind::Minus, },
             '^' => Token { span: SourceSpan::single(start), kind: TokenKind::Hat, },
             '&' => Token { span: SourceSpan::single(start), kind: TokenKind::Ampersand, },
-            '@' => Token { span: SourceSpan::single(start), kind: TokenKind::At, },
+
+            '@' =>
+                match self.iter.peek() {
+                    Some(d) if is_identifier_start_char(d) => self.read_identifier(),
+                    _ => Token { span: SourceSpan::single(start), kind: TokenKind::At, },
+                },
 
             _ => todo!("Character '{}' not recognized", c),
         };

@@ -70,7 +70,6 @@ pub enum ItemKind {
     },
     Layout {
         name: Name,
-        align: u32,
         fields: Vec<Field>,
     },
 }
@@ -123,7 +122,7 @@ pub enum StatementKind {
     Break,
     Continue,
     Return(Option<Box<Expr>>),
-    Loop(Block),
+    Loop(Block, Option<Name>),
 }
 
 #[derive(Clone, Debug, Serialize)]

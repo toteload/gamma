@@ -169,10 +169,13 @@ impl PartialEq for Type {
 A `layout` is similar to both compound constructs, but the fields in a layout have their byte offset explicitly set. 
 A `union` sets the byte offsets of all its fields to 0 implicitly. 
 A `struct` implicitly sets the byte offset of each field such that they lie in memory in order of declaration at the correct alignments. 
-A `layout` should also specify its alignment (or maybe it can take the maximum of the alignment of its members).
+The alignment of a `layout` is the largest alignment of its members.
+The offset of the members should be a multiple of that member's alignment.
+
+Note: you could make setting the alignment of a `layout` optional to make it 
 
 ```
-layout 8 Animal
+layout Animal
   species: 0 ^u8
   weight: 8 u32
 end
