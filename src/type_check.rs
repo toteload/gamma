@@ -367,7 +367,7 @@ impl TypeChecker<'_> {
                     });
                 }
             }
-            Loop(body) => self.visit_block(body),
+            Loop(body, label) => self.visit_block(body),
             Break | Continue => (),
         }
     }

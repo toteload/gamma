@@ -434,15 +434,15 @@ impl Parser<'_> {
 
                 let peeked = expect_token!(self.tokens.peek(), _)?;
 
-                if matches!(peeked.kind, Identifier) {
-                    todo!()
-                }
+                let label = if matches!(peeked.kind, Identifier(_)) {
+                    Some(self.parse_name()?)
+                } else { None };
 
                 let body = self.parse_block()?;
 
                 span = tok.span.extend(self.spans.get(&body.id).unwrap());
 
-                Loop(body)
+                Loop(body, label)
             }
             _ => {
                 let e = self.parse_expression()?;
@@ -495,6 +495,18 @@ impl Parser<'_> {
             }
             Identifier(sym) => {
                 span = tok.span;
+
+                loop {
+                    let peeked = expect_token!(self.tokens.peek(), _)?;
+                    if !matches!(peeked.kind, Period) { 
+                        break; 
+                    }
+
+                    self.tokens.next();
+
+                }
+
+                todo!("Add compound identifier");
                 ExprKind::Identifier(sym)
             }
             ParenOpen => {

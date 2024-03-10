@@ -131,8 +131,16 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    fn read_identifier(&mut self) -> (usize, usize) {
-        todo!()
+    // Return str offset and Location of the last character of the identifier
+    fn read_identifier(&mut self) -> (usize, SourceLocation) {
+        loop {
+            let a = self.iter.peek();
+            if a.is_none() || !is_identifier_rest_char(*a.unwrap()) {
+                break (self.offset, self.loc);
+            }
+
+            self.advance();
+        }
     }
 }
 
@@ -156,18 +164,7 @@ impl<'a> Iterator for Tokenizer<'a> {
         let tok = match c {
             // Identifier or keyword.
             _ if is_identifier_start_char(c) => {
-                let (mut end_offset, mut end_loc) = (offset + c.len_utf8(), start);
-                loop {
-                    let Some(a) = self.iter.peek() else { break; };
-
-                    if !is_identifier_rest_char(*a) {
-                        break;
-                    }
-
-                    let b;
-                    (_, end_loc, b) = self.advance().unwrap();
-                    end_offset += b.len_utf8();
-                }
+                let (end_offset, end_loc) = self.read_identifier();
 
                 let identifier = &self.source[offset..end_offset];
 
@@ -267,7 +264,16 @@ impl<'a> Iterator for Tokenizer<'a> {
 
             '@' =>
                 match self.iter.peek() {
-                    Some(d) if is_identifier_start_char(d) => self.read_identifier(),
+                    Some(d) if is_identifier_start_char(*d) => {
+                        let (end_offset, end) = self.read_identifier();
+                        let identifier = &self.source[offset..end_offset];
+                        let span = SourceSpan { start, end };
+                        let sym = self.str_interner.add(identifier);
+                        Token {
+                            span,
+                            kind: TokenKind::Identifier(sym),
+                        }
+                    },
                     _ => Token { span: SourceSpan::single(start), kind: TokenKind::At, },
                 },
 

@@ -102,7 +102,7 @@ impl Visitor for Prover<'_> {
                 }
             }
             Return(Some(e)) => self.visit_expr(e),
-            Loop(body) => {
+            Loop(body, label) => {
                 self.visit_block(body);
             }
             Break | Continue | Return(None) => (),

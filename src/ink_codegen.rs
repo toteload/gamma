@@ -554,7 +554,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     }
                 }
             }
-            StatementKind::Loop(body) => {
+            StatementKind::Loop(body, label) => {
                 let end_block = self.add_basic_block("endloop");
                 let body_block = self.add_basic_block("loop");
 
