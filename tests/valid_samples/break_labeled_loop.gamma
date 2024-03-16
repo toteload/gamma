@@ -1,0 +1,16 @@
+fn main(): i32
+  let x: i64 = 0
+
+  loop @cherry
+    loop
+      set x = (+ x 1)
+      if (ne (rem x 10) 0)
+        continue
+      end
+
+      break @cherry
+    end
+  end
+
+  return (cast i32 x)
+end

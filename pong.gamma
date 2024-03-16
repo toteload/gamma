@@ -4,6 +4,7 @@ external_fn SDL_CreateWindow(title: ^u8, x: i32, y: i32, w: i32, h: i32, flags: 
 external_fn SDL_DestroyWindow(window: ^void): void
 external_fn SDL_Delay(ms: u32): void
 external_fn SDL_PollEvent(event: ^SDL_Event): i32
+external_fn SDL_Quit(): void
 
 layout SDL_Event
   type: 0 u32
@@ -12,10 +13,14 @@ layout SDL_Event
 end
 
 fn main(): i32
+  let EVENT_QUIT: u32 = (cast u32 256)
+  let EVENT_WINDOW: u32 = (cast u32 512)
+  let WINDOW_CLOSE: u32 = (cast u32 14)
+  let INIT_EVERYTHING: u32 = (cast u32 62001)
+
   (SDL_SetMainReady)
 
-  let init_everything: u32 = (cast u32 62001)
-  let status: i32 = (SDL_Init init_everything)
+  let status: i32 = (SDL_Init INIT_EVERYTHING)
   if (ne status (cast i32 0))
     return status
   end
@@ -36,12 +41,19 @@ fn main(): i32
         break
       end
 
-      if (eq event.type 0x100)
+      if (eq event.type EVENT_QUIT)
         break @game_loop
+      end
+
+      if (and (eq event.type EVENT_WINDOW) 
+              (eq event.window_event_id WINDOW_CLOSE))
+        break @game_loop
+      end
     end
   end
 
   (SDL_DestroyWindow window)
+  (SDL_Quit)
   
   return (cast i32 0)
 end

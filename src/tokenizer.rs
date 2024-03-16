@@ -35,6 +35,8 @@ pub enum TokenKind {
     KeywordNot,
     KeywordXor,
 
+    KeywordRem,
+
     KeywordBor,
     KeywordBand,
 
@@ -188,6 +190,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     "cast"     => Token { span, kind: TokenKind::KeywordCast, },
                     "end"      => Token { span, kind: TokenKind::KeywordEnd, },
 
+                    "rem"      => Token { span, kind: TokenKind::KeywordRem, },
                     "and"      => Token { span, kind: TokenKind::KeywordAnd, },
                     "or"       => Token { span, kind: TokenKind::KeywordOr, },
                     "not"      => Token { span, kind: TokenKind::KeywordNot, },
@@ -271,7 +274,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                         let sym = self.str_interner.add(identifier);
                         Token {
                             span,
-                            kind: TokenKind::Identifier(sym),
+                            kind: TokenKind::Label(sym),
                         }
                     },
                     _ => Token { span: SourceSpan::single(start), kind: TokenKind::At, },

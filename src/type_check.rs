@@ -123,9 +123,7 @@ impl TypeChecker<'_> {
 
                     let Ok(fields) = fields else { todo!() };
 
-                    let layout_type = Type::Layout(Layout {
-                        fields,
-                    });
+                    let layout_type = Type::Layout(Layout { fields });
 
                     let layout_type_token = self.type_tokens.add(layout_type);
 
@@ -368,7 +366,7 @@ impl TypeChecker<'_> {
                 }
             }
             Loop(body, label) => self.visit_block(body),
-            Break | Continue => (),
+            Break(_) | Continue(_) => (),
         }
     }
 
@@ -396,17 +394,16 @@ impl TypeChecker<'_> {
                 }
             }
             CompoundIdentifier(idents) => {
-                let Some(t) = self.scopes.get(&idents[0].sym) else {
+                let Some(t) = self.scopes.get(&idents[0]) else {
                     panic!()
                 };
-                let syms = idents[1..].iter().map(|ident| ident.sym);
                 let mut ttok = *t;
-                for sym in syms {
+                for sym in idents[1..].iter() {
                     let layout = self.type_tokens.get(&ttok);
                     let Type::Layout(layout) = layout else {
                         todo!()
                     };
-                    let Some(field) = layout.fields.iter().find(|field| field.name == sym) else {
+                    let Some(field) = layout.fields.iter().find(|field| field.name == *sym) else {
                         todo!()
                     };
                     ttok = field.ty;
@@ -508,6 +505,18 @@ impl TypeChecker<'_> {
                         _ => todo!(),
                     }
                 }
+                BuiltinOpKind::Not => {
+                    let [arg] = args.as_slice() else { todo!() };
+                    let arg_type_token = self.visit_expr(&arg)?;
+                    let ty = self.type_tokens.get(&arg_type_token);
+
+                    if !matches!(ty, Type::Bool) {
+                        todo!()
+                    }
+
+                    arg_type_token
+                }
+                BuiltinOpKind::And => { todo!(); self.type_tokens.add(Type::Bool) }
                 _ => todo!("Operator \"{:?}\"", op),
             },
             Call { name, args } => {

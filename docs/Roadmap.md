@@ -172,7 +172,7 @@ A `struct` implicitly sets the byte offset of each field such that they lie in m
 The alignment of a `layout` is the largest alignment of its members.
 The offset of the members should be a multiple of that member's alignment.
 
-Note: you could make setting the alignment of a `layout` optional to make it 
+Note: you could make setting the alignment of a `layout` optional to make it
 
 ```
 layout Animal

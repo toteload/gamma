@@ -14,7 +14,7 @@ use inkwell::{
     passes::PassManager,
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
     types::{BasicType, BasicTypeEnum, FunctionType, IntType, VoidType},
-    values::{BasicValueEnum, FunctionValue, PointerValue},
+    values::{BasicValueEnum, FunctionValue, PointerValue, BasicValue},
     AddressSpace, IntPredicate, OptimizationLevel,
 };
 use std::collections::HashMap;
@@ -55,6 +55,8 @@ enum ScopeKind {
 
 struct Scope<'ctx> {
     kind: ScopeKind,
+    label: Option<Symbol>,
+    block_after: Option<BasicBlock<'ctx>>,
     stack_restorepoint: Option<BasicValueEnum<'ctx>>,
     variables: HashMap<Symbol, Variable<'ctx>>,
 }
@@ -71,6 +73,12 @@ struct AllocaTypeData<'ctx> {
     basic_type_with_align_padding: BasicTypeEnum<'ctx>,
 }
 
+struct LayoutAccessData<'ctx> {
+    byte_offset: u32,
+    align: u32,
+    basic_type: BasicTypeEnum<'ctx>,
+}
+
 pub struct CodeGenerator<'ctx> {
     ctx: &'ctx Context,
     builder: Builder<'ctx>,
@@ -79,7 +87,6 @@ pub struct CodeGenerator<'ctx> {
 
     current_function: Option<FunctionValue<'ctx>>,
     current_basic_block: Option<BasicBlock<'ctx>>,
-    loop_end_blocks: Vec<BasicBlock<'ctx>>,
 
     functions: HashMap<Symbol, FunctionValue<'ctx>>,
     scopes: Vec<Scope<'ctx>>,
@@ -133,7 +140,6 @@ impl<'ctx> CodeGenerator<'ctx> {
 
             current_function: None,
             current_basic_block: None,
-            loop_end_blocks: Vec::new(),
 
             functions: HashMap::new(),
             scopes: Vec::new(),
@@ -235,6 +241,23 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
+    fn get_layout_access_data(&mut self, layout_type_token: TypeToken, accessor: &[Symbol]) -> LayoutAccessData<'ctx> {
+        let mut offset = 0;
+        let mut current = layout_type_token;
+        for name in accessor {
+            let Type::Layout(layout) = self.type_interner.get(&current) else { panic!() };
+            let field = layout.fields.iter().find(|field| field.name == *name).unwrap();
+            offset += field.offset;
+            current = field.ty;
+        }
+        
+        LayoutAccessData {
+            byte_offset: offset,
+            align: self.type_interner.get(&current).align(&self.type_interner),
+            basic_type: self.get_ink_basic_type(current),
+        }
+    }
+
     fn int_type(&self, width: u32) -> IntType<'ctx> {
         match width {
             8 => self.i8_t,
@@ -328,7 +351,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     explicit_align,
                     basic_type_with_align_padding: t,
                     ..
-                }= self.get_alloca_type_data(*inner);
+                } = self.get_alloca_type_data(*inner);
 
                 assert!(*size < u32::MAX as i64);
 
@@ -393,7 +416,12 @@ impl<'ctx> CodeGenerator<'ctx> {
         None
     }
 
-    fn push_scope_with_stack_restore_point(&mut self, kind: ScopeKind) {
+    fn push_scope_with_stack_restore_point(
+        &mut self,
+        kind: ScopeKind,
+        label: Option<Symbol>,
+        block_after: Option<BasicBlock<'ctx>>,
+    ) {
         let restore_point = self
             .builder
             .build_call(self.llvm_stacksave, &[], "")
@@ -404,6 +432,8 @@ impl<'ctx> CodeGenerator<'ctx> {
 
         self.scopes.push(Scope {
             kind,
+            label,
+            block_after,
             stack_restorepoint: Some(restore_point),
             variables: HashMap::new(),
         });
@@ -421,6 +451,8 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.scopes.push(Scope {
                     kind: ScopeKind::Parameter,
+                    label: None,
+                    block_after: None,
                     stack_restorepoint: None,
                     variables: HashMap::new(),
                 });
@@ -443,7 +475,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.position_builder_at_end_of(entry);
 
-                self.push_scope_with_stack_restore_point(ScopeKind::Function);
+                self.push_scope_with_stack_restore_point(ScopeKind::Function, None, None);
                 self.gen_block(body)?;
                 self.scopes.pop();
 
@@ -505,7 +537,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let mut branch_terminator_count = 0u32;
 
                 self.position_builder_at_end_of(then_block);
-                self.push_scope_with_stack_restore_point(ScopeKind::Block);
+                self.push_scope_with_stack_restore_point(ScopeKind::Block, None, None);
                 let has_terminator = self.gen_block(then)?;
 
                 if !has_terminator {
@@ -524,7 +556,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.position_builder_at_end_of(otherwise_block);
                 if let Some(otherwise) = otherwise {
-                    self.push_scope_with_stack_restore_point(ScopeKind::Block);
+                    self.push_scope_with_stack_restore_point(ScopeKind::Block, None, None);
                     let has_terminator = self.gen_block(otherwise)?;
 
                     if !has_terminator {
@@ -558,13 +590,15 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let end_block = self.add_basic_block("endloop");
                 let body_block = self.add_basic_block("loop");
 
-                self.loop_end_blocks.push(end_block);
-
                 self.builder.build_unconditional_branch(body_block)?;
 
                 self.position_builder_at_end_of(body_block);
 
-                self.push_scope_with_stack_restore_point(ScopeKind::Loop);
+                self.push_scope_with_stack_restore_point(
+                    ScopeKind::Loop,
+                    label.map(|name| name.sym),
+                    Some(end_block),
+                );
                 self.gen_block(body)?;
 
                 let restore_point = self
@@ -576,8 +610,6 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.builder.build_unconditional_branch(body_block)?;
                 self.scopes.pop();
-
-                self.loop_end_blocks.pop();
 
                 self.position_builder_at_end_of(end_block);
             }
@@ -616,13 +648,24 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let x = self.gen_expr(val)?;
                 self.builder.build_store(p, x)?;
             }
-            StatementKind::Break => {
-                let loop_scope = self
-                    .scopes
-                    .iter()
-                    .rev()
-                    .find(|scope| scope.kind == ScopeKind::Loop)
-                    .expect("There should exist a loop scope");
+            StatementKind::Break(label) => {
+                let loop_scope = if let Some(label) = label {
+                    self.scopes
+                        .iter()
+                        .rev()
+                        .find(|scope| {
+                            scope.kind == ScopeKind::Loop
+                                && scope.label.is_some()
+                                && scope.label.unwrap() == label.sym
+                        })
+                        .expect("There should exist a loop scope")
+                } else {
+                    self.scopes
+                        .iter()
+                        .rev()
+                        .find(|scope| scope.kind == ScopeKind::Loop)
+                        .expect("There should exist a loop scope")
+                };
 
                 let restore_point = loop_scope
                     .stack_restorepoint
@@ -630,10 +673,10 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.builder
                     .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
+
                 self.builder.build_unconditional_branch(
-                    *self
-                        .loop_end_blocks
-                        .last()
+                    loop_scope
+                        .block_after
                         .expect("There should be a basic block present after a loop"),
                 )?;
             }
@@ -659,7 +702,10 @@ impl<'ctx> CodeGenerator<'ctx> {
             _ => todo!("Statement \"{:?}\"", stmt.kind),
         }
 
-        let is_terminator = matches!(stmt.kind, StatementKind::Return(_) | StatementKind::Break);
+        let is_terminator = matches!(
+            stmt.kind,
+            StatementKind::Return(_) | StatementKind::Break(_) | StatementKind::Continue(_)
+        );
         Ok(is_terminator)
     }
 
@@ -709,6 +755,36 @@ impl<'ctx> CodeGenerator<'ctx> {
                     _ => todo!("Retrieve value from variable"),
                 }
             }
+            ExprKind::CompoundIdentifier(syms) => {
+                let Variable { ty, type_token, val } =
+                    self.get_variable(&syms[0]).expect("Identifer should exist");
+
+                match val {
+                    VariableValue::Stack(base_ptr) => {
+                        let LayoutAccessData {
+                            byte_offset,
+                            align,
+                            basic_type: pointee_ty,
+                        } = self.get_layout_access_data(type_token, &syms[1..]);
+
+                        let ptr = unsafe {
+                            self.builder.build_gep(
+                                ty,
+                                base_ptr,
+                                &[self.i32_t.const_int(byte_offset as u64, false)],
+                                "",
+                            )?
+                        };
+
+                        let pointee_val = self.builder.build_load(pointee_ty, ptr, "")?;
+
+                        pointee_val.as_instruction_value().expect("").set_alignment(align)?;
+
+                        Ok(pointee_val)
+                    }
+                    _ => todo!(),
+                }
+            }
             ExprKind::Cast { e: src, .. } => {
                 let src_ty_token = self.node_types.get(&src.id).unwrap();
                 let src_ty = self.type_interner.get(src_ty_token);
@@ -719,15 +795,18 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let val = self.gen_expr(src)?;
 
                 match (src_ty, dst_ty) {
-                    (Type::Int { .. }, Type::Bool) => Ok(self
-                        .builder
-                        .build_int_compare(
-                            IntPredicate::NE,
-                            val.into_int_value(),
-                            self.i64_t.const_int(0, false),
-                            "",
-                        )?
-                        .into()),
+                    (Type::Int { .. }, Type::Bool) => {
+                        let int_val = val.into_int_value();
+                        Ok(self
+                            .builder
+                            .build_int_compare(
+                                IntPredicate::NE,
+                                int_val,
+                                int_val.get_type().const_int(0, false),
+                                "",
+                            )?
+                            .into())
+                    }
 
                     (Type::Bool, Type::Int { width, .. }) => Ok(self
                         .builder
@@ -850,6 +929,18 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .build_int_signed_div(x.into_int_value(), y.into_int_value(), "")?
                         .into())
                 }
+                BuiltinOpKind::And => {
+                    // For now only support two operands at a time
+                    assert_eq!(args.len(), 2);
+
+                    let x = self.gen_expr(&args[0])?;
+                    let y = self.gen_expr(&args[1])?;
+
+                    Ok(self
+                        .builder
+                        .build_and(x.into_int_value(), y.into_int_value(), "")?
+                        .into())
+                }
                 BuiltinOpKind::AddressOf => {
                     let ExprKind::Identifier(sym) = args[0].kind else {
                         todo!()
@@ -905,14 +996,14 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let val = self.builder.build_call(*f, &args, "");
                 Ok(val?.try_as_basic_value().left().expect(""))
             }
-
-            _ => todo!("{:?}", e.kind),
         }
     }
 
     pub fn compile(&mut self, items: &[Item], machine: &MachineTarget) -> Result<(), Error> {
         self.scopes.push(Scope {
             kind: ScopeKind::Global,
+            label: None,
+            block_after: None,
             stack_restorepoint: None,
             variables: HashMap::new(),
         });

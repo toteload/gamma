@@ -39,10 +39,10 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     enable_optimizations: bool,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = true)]
     emit_asm: bool,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = true)]
     emit_llvm_ir: bool,
 
     #[arg(short, long, value_parser = parse_machine_target)]

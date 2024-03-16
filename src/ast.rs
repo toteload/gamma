@@ -31,6 +31,8 @@ pub struct Name {
     pub sym: Symbol,
 }
 
+pub type Label = Name;
+
 // Item has an associated TypeToken if it is a function
 #[derive(Debug, Serialize)]
 pub struct Item {
@@ -119,10 +121,10 @@ pub enum StatementKind {
         then: Block,
         otherwise: Option<Block>,
     },
-    Break,
-    Continue,
+    Break(Option<Label>),
+    Continue(Option<Label>),
     Return(Option<Box<Expr>>),
-    Loop(Block, Option<Name>),
+    Loop(Block, Option<Label>),
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -163,7 +165,7 @@ pub enum ExprKind {
     IntLiteral(i64),
     BoolLiteral(bool),
     Identifier(Symbol),
-    CompoundIdentifier(Vec<Name>),
+    CompoundIdentifier(Vec<Symbol>),
     BuiltinOp { op: BuiltinOpKind, args: Vec<Expr> },
     Call { name: Name, args: Vec<Expr> },
     Cast { ty: Type, e: Box<Expr> },

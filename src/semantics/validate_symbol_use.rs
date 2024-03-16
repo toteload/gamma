@@ -105,7 +105,7 @@ impl Visitor for Prover<'_> {
             Loop(body, label) => {
                 self.visit_block(body);
             }
-            Break | Continue | Return(None) => (),
+            Break(_) | Continue(_) | Return(None) => (),
         }
     }
 
@@ -117,7 +117,7 @@ impl Visitor for Prover<'_> {
         match &e.kind {
             IntLiteral(_) | BoolLiteral(_) => (),
             Identifier(sym) => self.validate_sym(sym, id),
-            CompoundIdentifier(idents) => self.validate_sym(&idents[0].sym, id),
+            CompoundIdentifier(idents) => self.validate_sym(&idents[0], id),
             BuiltinOp { args, .. } => {
                 for arg in args {
                     self.visit_expr(arg);

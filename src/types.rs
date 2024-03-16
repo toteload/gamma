@@ -59,7 +59,11 @@ impl Type {
         match self {
             Void | Function { .. } => panic!(),
             Bool => 1,
-            Layout(crate::types::Layout { fields }) => fields.iter().map(|LayoutField { ty, .. }| type_interner.get(ty).align(type_interner)).max().expect("A layout should have fields"),
+            Layout(crate::types::Layout { fields }) => fields
+                .iter()
+                .map(|LayoutField { ty, .. }| type_interner.get(ty).align(type_interner))
+                .max()
+                .expect("A layout should have fields"),
             Int { width, .. } => match width {
                 8 | 16 | 32 | 64 => width / 8,
                 _ => panic!(),
@@ -77,8 +81,11 @@ impl Type {
             Bool => 1,
             Layout(crate::types::Layout { fields, .. }) => fields
                 .iter()
-                .map(|LayoutField { offset, ty, .. }| offset + type_interner.get(ty).byte_size(type_interner))
-                .max().expect("A layout should have fields"),
+                .map(|LayoutField { offset, ty, .. }| {
+                    offset + type_interner.get(ty).byte_size(type_interner)
+                })
+                .max()
+                .expect("A layout should have fields"),
             Int { width, .. } => match width {
                 8 | 16 | 32 | 64 => width / 8,
                 _ => panic!(),
@@ -86,7 +93,9 @@ impl Type {
             Pointer(_) => 8,
             Array(n, base) => {
                 let base = type_interner.get(base);
-                let base_with_padding_size = base.byte_size(type_interner).next_multiple_of(base.align(type_interner));
+                let base_with_padding_size = base
+                    .byte_size(type_interner)
+                    .next_multiple_of(base.align(type_interner));
                 *n as u32 * base_with_padding_size
             }
         }

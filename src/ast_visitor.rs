@@ -20,10 +20,7 @@ pub trait Visitor {
                 name,
                 params,
             } => self.visit_external_function(name, params, return_type),
-            ItemKind::Layout {
-                name,
-                fields,
-            } => self.visit_layout(name, fields),
+            ItemKind::Layout { name, fields } => self.visit_layout(name, fields),
         }
     }
 

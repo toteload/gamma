@@ -22,7 +22,9 @@ impl SourceSpan {
     pub fn single(loc: SourceLocation) -> SourceSpan {
         SourceSpan {
             start: loc,
-            end: loc,
+            end: SourceLocation {
+                line: loc.line, col:loc.col+1,
+            },
         }
     }
 

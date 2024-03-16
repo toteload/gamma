@@ -72,6 +72,24 @@ impl Parser<'_> {
         Ok(items)
     }
 
+    fn parse_label(&mut self) -> Result<Label> {
+        use TokenKind::*;
+
+        let label_token = expect_token!(self.tokens.next(), Label(_))?;
+
+        let Label(sym) = label_token.kind else {
+            unreachable!()
+        };
+
+        let id = self.id_generator.gen_id();
+
+        let span = label_token.span;
+
+        self.spans.insert(id, span);
+
+        Ok(Name { id, sym })
+    }
+
     fn parse_name(&mut self) -> Result<Name> {
         use TokenKind::*;
 
@@ -167,10 +185,7 @@ impl Parser<'_> {
                     fields.push(Field { name, offset, ty });
                 }
 
-                ItemKind::Layout {
-                    name,
-                    fields,
-                }
+                ItemKind::Layout { name, fields }
             }
             _ => unreachable!(),
         };
@@ -415,12 +430,30 @@ impl Parser<'_> {
             KeywordBreak => {
                 self.tokens.next();
                 span = tok.span;
-                Break
+
+                let peeked = expect_token!(self.tokens.peek(), _)?;
+
+                let label = if matches!(peeked.kind, Label(_)) {
+                    Some(self.parse_label()?)
+                } else {
+                    None
+                };
+
+                Break(label)
             }
             KeywordContinue => {
                 self.tokens.next();
                 span = tok.span;
-                Continue
+
+                let peeked = expect_token!(self.tokens.peek(), _)?;
+
+                let label = if matches!(peeked.kind, Label(_)) {
+                    Some(self.parse_label()?)
+                } else {
+                    None
+                };
+
+                Continue(label)
             }
             KeywordReturn => {
                 self.tokens.next();
@@ -434,9 +467,11 @@ impl Parser<'_> {
 
                 let peeked = expect_token!(self.tokens.peek(), _)?;
 
-                let label = if matches!(peeked.kind, Identifier(_)) {
-                    Some(self.parse_name()?)
-                } else { None };
+                let label = if matches!(peeked.kind, Label(_)) {
+                    Some(self.parse_label()?)
+                } else {
+                    None
+                };
 
                 let body = self.parse_block()?;
 
@@ -495,19 +530,30 @@ impl Parser<'_> {
             }
             Identifier(sym) => {
                 span = tok.span;
+                let mut idents = vec![sym];
 
                 loop {
                     let peeked = expect_token!(self.tokens.peek(), _)?;
-                    if !matches!(peeked.kind, Period) { 
-                        break; 
+                    if !matches!(peeked.kind, Period) {
+                        break;
                     }
 
                     self.tokens.next();
 
+                    let Identifier(sym) = expect_token!(self.tokens.next(), Identifier(_))?.kind
+                    else {
+                        unreachable!()
+                    };
+
+                    idents.push(sym);
                 }
 
-                todo!("Add compound identifier");
-                ExprKind::Identifier(sym)
+                if let &[sym] = idents.as_slice() {
+                    ExprKind::Identifier(sym)
+                } else {
+                    // TODO(david) set the span correctly
+                    ExprKind::CompoundIdentifier(idents)
+                }
             }
             ParenOpen => {
                 let start_span = tok.span;
@@ -552,6 +598,7 @@ impl Parser<'_> {
                             NotEqual => BuiltinOpKind::NotEquals,
                             Star => BuiltinOpKind::Mul,
                             Div => BuiltinOpKind::Div,
+                            KeywordAnd => BuiltinOpKind::And,
                             KeywordNot => BuiltinOpKind::Not,
                             Minus => BuiltinOpKind::Sub,
                             Plus => BuiltinOpKind::Add,
