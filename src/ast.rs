@@ -151,6 +151,7 @@ pub enum BuiltinOpKind {
     GreaterEquals,
     AddressOf,
     At,
+    Remainder,
 }
 
 // Expr always has an associated TypeToken

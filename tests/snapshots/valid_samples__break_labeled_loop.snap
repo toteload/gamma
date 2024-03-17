@@ -1,0 +1,61 @@
+---
+source: tests/valid_samples.rs
+expression: output
+---
+; ModuleID = 'main'
+source_filename = "main"
+target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-pc-windows-msvc"
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn
+declare ptr @llvm.stacksave() #0
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn
+declare void @llvm.stackrestore(ptr) #0
+
+define i32 @main() {
+entry:
+  %0 = call ptr @llvm.stacksave()
+  %1 = alloca i64, align 8
+  store i64 0, ptr %1, align 4
+  br label %loop
+
+loop:                                             ; preds = %endloop1, %entry
+  %2 = call ptr @llvm.stacksave()
+  br label %loop2
+
+loop2:                                            ; preds = %then, %loop
+  %3 = call ptr @llvm.stacksave()
+  %4 = load i64, ptr %1, align 4
+  %5 = add i64 %4, 1
+  store i64 %5, ptr %1, align 4
+  %6 = load i64, ptr %1, align 4
+  %7 = srem i64 %6, 10
+  %8 = icmp ne i64 %7, 0
+  br i1 %8, label %then, label %otherwise
+
+then:                                             ; preds = %loop2
+  %9 = call ptr @llvm.stacksave()
+  call void @llvm.stackrestore(ptr %3)
+  br label %loop2
+
+otherwise:                                        ; preds = %loop2
+  br label %endif
+
+endif:                                            ; preds = %otherwise
+  call void @llvm.stackrestore(ptr %2)
+  br label %endloop
+
+endloop1:                                         ; No predecessors!
+  call void @llvm.stackrestore(ptr %2)
+  br label %loop
+
+endloop:                                          ; preds = %endif
+  %10 = load i64, ptr %1, align 4
+  %11 = trunc i64 %10 to i32
+  call void @llvm.stackrestore(ptr %0)
+  ret i32 %11
+}
+
+attributes #0 = { nocallback nofree nosync nounwind willreturn }
+

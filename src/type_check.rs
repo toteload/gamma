@@ -43,6 +43,7 @@ impl TypeChecker<'_> {
         matches!(
             e.kind,
             ExprKind::Identifier(_)
+                | ExprKind::CompoundIdentifier(_)
                 | ExprKind::BuiltinOp {
                     op: BuiltinOpKind::At,
                     ..
@@ -128,7 +129,6 @@ impl TypeChecker<'_> {
                     let layout_type_token = self.type_tokens.add(layout_type);
 
                     self.type_table.insert(name.sym, layout_type_token);
-                    top_scope.insert(name.sym, layout_type_token);
                 }
                 _ => (),
             }
@@ -295,7 +295,7 @@ impl TypeChecker<'_> {
                     self.errors.push(Error {
                         source: ErrorSource::AstNode(statement.id),
                         info: vec![ErrorInfo::Text(
-                            "Invalid expression for destination in set statement",
+                            "Invalid destination in set statement. It should be an identifier or an @-expression.",
                         )],
                     });
                 }
@@ -312,7 +312,13 @@ impl TypeChecker<'_> {
                     (Ok(dst_type), Ok(val_type)) if dst_type != val_type => {
                         self.errors.push(Error {
                             source: ErrorSource::AstNode(statement.id),
-                            info: vec![ErrorInfo::Text("Type mismatch in set statement.")],
+                            info: vec![
+                                ErrorInfo::Text("Type mismatch in set statement. "),
+                                ErrorInfo::Text("Destination type is "),
+                                ErrorInfo::Type(*dst_type),
+                                ErrorInfo::Text(", but value type is "),
+                                ErrorInfo::Type(*val_type),
+                            ],
                         });
                     }
                     _ => {}
@@ -397,6 +403,7 @@ impl TypeChecker<'_> {
                 let Some(t) = self.scopes.get(&idents[0]) else {
                     panic!()
                 };
+
                 let mut ttok = *t;
                 for sym in idents[1..].iter() {
                     let layout = self.type_tokens.get(&ttok);
@@ -404,7 +411,16 @@ impl TypeChecker<'_> {
                         todo!()
                     };
                     let Some(field) = layout.fields.iter().find(|field| field.name == *sym) else {
-                        todo!()
+                        return Err(Error {
+                            source: ErrorSource::Unspecified,
+                            info: vec![
+                                ErrorInfo::Text("Could not find field in layout: "),
+                                ErrorInfo::Identifier(*sym),
+                                ErrorInfo::Type(ttok),
+                                ErrorInfo::Identifier(idents[0]),
+                                ErrorInfo::Type(*self.scopes.get(&idents[0]).unwrap()),
+                            ],
+                        });
                     };
                     ttok = field.ty;
                 }
@@ -516,7 +532,28 @@ impl TypeChecker<'_> {
 
                     arg_type_token
                 }
-                BuiltinOpKind::And => { todo!(); self.type_tokens.add(Type::Bool) }
+                BuiltinOpKind::Remainder => {
+                    if args.len() != 2 {
+                        todo!("remainder must have 2 arguments")
+                    }
+
+                    let arg_types = args
+                        .iter()
+                        .map(|arg| self.visit_expr(arg))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
+                    let t = self.type_tokens.get(&arg_types[0]);
+
+                    if !args_are_of_same_type || !matches!(t, Type::Int { .. }) {
+                        todo!("remainder can only be used with same integer types");
+                    }
+
+                    arg_types[0]
+                }
+                BuiltinOpKind::And => {
+                    todo!();
+                    self.type_tokens.add(Type::Bool)
+                }
                 _ => todo!("Operator \"{:?}\"", op),
             },
             Call { name, args } => {

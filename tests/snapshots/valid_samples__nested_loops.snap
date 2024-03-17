@@ -1,5 +1,5 @@
 ---
-source: tests/test_valid_samples.rs
+source: tests/valid_samples.rs
 expression: output
 ---
 ; ModuleID = 'main'

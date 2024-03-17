@@ -568,6 +568,7 @@ impl Parser<'_> {
                         | KeywordXor
                         | Star
                         | Div
+                        | KeywordRem
                         | Equal
                         | NotEqual
                         | Less
@@ -590,7 +591,7 @@ impl Parser<'_> {
                         ExprKind::Cast { ty, e: e.into() }
                     }
 
-                    op @ (KeywordOr | KeywordAnd | KeywordXor | Star | Div | Equal | NotEqual
+                    op @ (KeywordOr | KeywordAnd | KeywordRem | Star | Div | Equal | NotEqual
                     | Less | Greater | LessEqual | GreaterEqual | KeywordNot | Minus
                     | Plus | Ampersand | At) => {
                         let op = match op {
@@ -600,6 +601,7 @@ impl Parser<'_> {
                             Div => BuiltinOpKind::Div,
                             KeywordAnd => BuiltinOpKind::And,
                             KeywordNot => BuiltinOpKind::Not,
+                            KeywordRem => BuiltinOpKind::Remainder,
                             Minus => BuiltinOpKind::Sub,
                             Plus => BuiltinOpKind::Add,
                             Ampersand => BuiltinOpKind::AddressOf,
@@ -619,7 +621,7 @@ impl Parser<'_> {
                         args: self.parse_arguments()?,
                     },
 
-                    _ => todo!(),
+                    _ => todo!("{:?}", tok.kind),
                 };
 
                 let end_token = expect_token!(self.tokens.next(), ParenClose)?;

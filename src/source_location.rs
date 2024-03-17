@@ -23,7 +23,8 @@ impl SourceSpan {
         SourceSpan {
             start: loc,
             end: SourceLocation {
-                line: loc.line, col:loc.col+1,
+                line: loc.line,
+                col: loc.col + 1,
             },
         }
     }

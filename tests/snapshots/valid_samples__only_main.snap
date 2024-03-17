@@ -1,5 +1,5 @@
 ---
-source: tests/test_valid_samples.rs
+source: tests/valid_samples.rs
 expression: output
 ---
 ; ModuleID = 'main'
@@ -17,7 +17,7 @@ define i32 @main() {
 entry:
   %0 = call ptr @llvm.stacksave()
   call void @llvm.stackrestore(ptr %0)
-  ret i32 11
+  ret i32 0
 }
 
 attributes #0 = { nocallback nofree nosync nounwind willreturn }

@@ -9,11 +9,11 @@ layout Monster
 end
 
 fn main(): i32
-  let beholder: Head
+  let beholder: Monster
 
-  set beholder.head.eyes = 1
-  set beholder.head.teeth = 123
-  set beholder.limbs = 8
+  set beholder.head.eyes = (cast u32 1)
+  set beholder.head.teeth = (cast u32 123)
+  set beholder.limbs = (cast u32 8)
 
   return (cast i32 beholder.head.teeth)
 end

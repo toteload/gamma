@@ -12,33 +12,41 @@ pub struct Token {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize)]
 pub enum TokenKind {
+    // Item
     KeywordFn,
     KeywordExternalFn,
     KeywordLayout,
 
+    // Statement
     KeywordIf,
     KeywordElse,
     KeywordLoop,
     KeywordBreak,
     KeywordContinue,
     KeywordReturn,
-
     KeywordLet,
     KeywordSet,
+    KeywordEnd,
 
     KeywordCast,
 
-    KeywordEnd,
-
+    // Logical operator
     KeywordOr,
     KeywordAnd,
     KeywordNot,
-    KeywordXor,
 
-    KeywordRem,
-
+    // Bitwise operator
     KeywordBor,
     KeywordBand,
+    KeywordXor,
+
+    // Literal
+    IntLiteral(i64),
+    BoolLiteral(bool),
+
+    // Unorganized below
+    // -----------------
+    KeywordRem, // Remainder
 
     // TODO call these keywords?
     Equal,
@@ -50,9 +58,6 @@ pub enum TokenKind {
 
     Identifier(Symbol),
     Label(Symbol),
-
-    IntLiteral(i64),
-    BoolLiteral(bool),
 
     BraceOpen,
     BraceClose,

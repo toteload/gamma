@@ -14,7 +14,7 @@ use inkwell::{
     passes::PassManager,
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
     types::{BasicType, BasicTypeEnum, FunctionType, IntType, VoidType},
-    values::{BasicValueEnum, FunctionValue, PointerValue, BasicValue},
+    values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
     AddressSpace, IntPredicate, OptimizationLevel,
 };
 use std::collections::HashMap;
@@ -56,6 +56,7 @@ enum ScopeKind {
 struct Scope<'ctx> {
     kind: ScopeKind,
     label: Option<Symbol>,
+    block_loop_start: Option<BasicBlock<'ctx>>,
     block_after: Option<BasicBlock<'ctx>>,
     stack_restorepoint: Option<BasicValueEnum<'ctx>>,
     variables: HashMap<Symbol, Variable<'ctx>>,
@@ -241,16 +242,26 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
-    fn get_layout_access_data(&mut self, layout_type_token: TypeToken, accessor: &[Symbol]) -> LayoutAccessData<'ctx> {
+    fn get_layout_access_data(
+        &mut self,
+        layout_type_token: TypeToken,
+        accessor: &[Symbol],
+    ) -> LayoutAccessData<'ctx> {
         let mut offset = 0;
         let mut current = layout_type_token;
         for name in accessor {
-            let Type::Layout(layout) = self.type_interner.get(&current) else { panic!() };
-            let field = layout.fields.iter().find(|field| field.name == *name).unwrap();
+            let Type::Layout(layout) = self.type_interner.get(&current) else {
+                panic!()
+            };
+            let field = layout
+                .fields
+                .iter()
+                .find(|field| field.name == *name)
+                .unwrap();
             offset += field.offset;
             current = field.ty;
         }
-        
+
         LayoutAccessData {
             byte_offset: offset,
             align: self.type_interner.get(&current).align(&self.type_interner),
@@ -433,6 +444,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         self.scopes.push(Scope {
             kind,
             label,
+            block_loop_start: None,
             block_after,
             stack_restorepoint: Some(restore_point),
             variables: HashMap::new(),
@@ -452,6 +464,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 self.scopes.push(Scope {
                     kind: ScopeKind::Parameter,
                     label: None,
+                    block_loop_start: None,
                     block_after: None,
                     stack_restorepoint: None,
                     variables: HashMap::new(),
@@ -477,11 +490,11 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.push_scope_with_stack_restore_point(ScopeKind::Function, None, None);
                 self.gen_block(body)?;
-                self.scopes.pop();
+                self.scopes.pop(); // function scope
 
                 self.current_function = None;
 
-                self.scopes.pop();
+                self.scopes.pop(); // parameter scope
 
                 Ok(())
             }
@@ -599,16 +612,19 @@ impl<'ctx> CodeGenerator<'ctx> {
                     label.map(|name| name.sym),
                     Some(end_block),
                 );
-                self.gen_block(body)?;
+                self.scopes.last_mut().unwrap().block_loop_start = Some(body_block);
+                let is_terminated = self.gen_block(body)?;
 
-                let restore_point = self
-                    .current_scope()
-                    .stack_restorepoint
-                    .expect("Loop scopes should have a stack restore point");
-                self.builder
-                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
+                if !is_terminated {
+                    let restore_point = self
+                        .current_scope()
+                        .stack_restorepoint
+                        .expect("Loop scopes should have a stack restore point");
+                    self.builder
+                        .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
+                    self.builder.build_unconditional_branch(body_block)?;
+                }
 
-                self.builder.build_unconditional_branch(body_block)?;
                 self.scopes.pop();
 
                 self.position_builder_at_end_of(end_block);
@@ -699,6 +715,20 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.gen_expr(e)?;
             }
+            StatementKind::Continue(None) => {
+                let loop_scope = self
+                    .scopes
+                    .iter()
+                    .rev()
+                    .find(|scope| scope.kind == ScopeKind::Loop)
+                    .expect("");
+                let restore_point = loop_scope.stack_restorepoint.expect("");
+
+                self.builder
+                    .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
+                self.builder
+                    .build_unconditional_branch(loop_scope.block_loop_start.expect(""))?;
+            }
             _ => todo!("Statement \"{:?}\"", stmt.kind),
         }
 
@@ -718,6 +748,35 @@ impl<'ctx> CodeGenerator<'ctx> {
                     panic!("Tried to get dst of non-stack variable")
                 };
                 Ok(ptr)
+            }
+            ExprKind::CompoundIdentifier(syms) => {
+                let Variable {
+                    ty,
+                    type_token,
+                    val,
+                } = self.get_variable(&syms[0]).expect("Identifer should exist");
+
+                match val {
+                    VariableValue::Stack(base_ptr) => {
+                        let LayoutAccessData {
+                            byte_offset,
+                            align,
+                            basic_type: pointee_ty,
+                        } = self.get_layout_access_data(type_token, &syms[1..]);
+
+                        let ptr = unsafe {
+                            self.builder.build_gep(
+                                ty,
+                                base_ptr,
+                                &[self.i32_t.const_int(byte_offset as u64, false)],
+                                "",
+                            )?
+                        };
+
+                        Ok(ptr)
+                    }
+                    _ => todo!(),
+                }
             }
             ExprKind::BuiltinOp {
                 op: BuiltinOpKind::At,
@@ -756,8 +815,11 @@ impl<'ctx> CodeGenerator<'ctx> {
                 }
             }
             ExprKind::CompoundIdentifier(syms) => {
-                let Variable { ty, type_token, val } =
-                    self.get_variable(&syms[0]).expect("Identifer should exist");
+                let Variable {
+                    ty,
+                    type_token,
+                    val,
+                } = self.get_variable(&syms[0]).expect("Identifer should exist");
 
                 match val {
                     VariableValue::Stack(base_ptr) => {
@@ -778,7 +840,10 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                         let pointee_val = self.builder.build_load(pointee_ty, ptr, "")?;
 
-                        pointee_val.as_instruction_value().expect("").set_alignment(align)?;
+                        pointee_val
+                            .as_instruction_value()
+                            .expect("")
+                            .set_alignment(align)?;
 
                         Ok(pointee_val)
                     }
@@ -815,15 +880,25 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                     (
                         Type::Int {
-                            width: src_width, ..
+                            width: src_width,
+                            signedness: src_signedness,
                         },
                         Type::Int {
-                            width: dst_width, ..
+                            width: dst_width,
+                            signedness: dst_signedness,
                         },
-                    ) if src_width > dst_width => Ok(self
-                        .builder
-                        .build_int_truncate(val.into_int_value(), self.int_type(*dst_width), "")?
-                        .into()),
+                    ) => {
+                        let is_signed = *dst_signedness == Signedness::Signed;
+                        Ok(self
+                            .builder
+                            .build_int_cast_sign_flag(
+                                val.into_int_value(),
+                                self.int_type(*dst_width),
+                                is_signed,
+                                "",
+                            )?
+                            .into())
+                    }
 
                     (Type::Int { .. }, Type::Pointer(_)) => Ok(self
                         .builder
@@ -929,6 +1004,15 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .build_int_signed_div(x.into_int_value(), y.into_int_value(), "")?
                         .into())
                 }
+                BuiltinOpKind::Remainder => {
+                    let x = self.gen_expr(&args[0])?;
+                    let y = self.gen_expr(&args[1])?;
+                    // TODO(david) build the right remainder instruction based on the signedness
+                    Ok(self
+                        .builder
+                        .build_int_signed_rem(x.into_int_value(), y.into_int_value(), "")?
+                        .into())
+                }
                 BuiltinOpKind::And => {
                     // For now only support two operands at a time
                     assert_eq!(args.len(), 2);
@@ -984,6 +1068,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                     Ok(self.builder.build_load(pointee_type, addr, "")?)
                 }
+
                 _ => todo!("BuiltinOpKind \"{:?}\"", op),
             },
 
@@ -1003,6 +1088,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         self.scopes.push(Scope {
             kind: ScopeKind::Global,
             label: None,
+            block_loop_start: None,
             block_after: None,
             stack_restorepoint: None,
             variables: HashMap::new(),

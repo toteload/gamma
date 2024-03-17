@@ -58,7 +58,7 @@ impl Error {
                 }
                 Type(tok) => {
                     let ty = type_tokens.get(tok);
-                    print!("{}", ty.to_string(type_tokens));
+                    print!("{}", ty.to_string(type_tokens, symbols));
                 }
                 SourceText(span) => {
                     //print!(

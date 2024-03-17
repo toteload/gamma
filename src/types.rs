@@ -1,4 +1,4 @@
-use crate::string_interner::Symbol;
+use crate::string_interner::{StringInterner, Symbol};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -9,7 +9,7 @@ pub enum Signedness {
     Unsigned,
 }
 
-#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize)]
 pub struct LayoutField {
     pub name: Symbol,
     pub offset: u32,
@@ -101,10 +101,14 @@ impl Type {
         }
     }
 
-    pub fn to_string(&self, type_interner: &TypeInterner) -> String {
+    pub fn to_string(
+        &self,
+        type_interner: &TypeInterner,
+        string_interner: &StringInterner,
+    ) -> String {
         use Type::*;
 
-        match &self {
+        match self {
             Void => "void".to_string(),
             Bool => "bool".to_string(),
             Int { signedness, width } => format!(
@@ -118,12 +122,16 @@ impl Type {
             ),
             Pointer(x) => {
                 let mut s = "^".to_string();
-                s += &type_interner.get(x).to_string(type_interner);
+                s += &type_interner
+                    .get(x)
+                    .to_string(type_interner, string_interner);
                 s
             }
             Array(size, x) => {
                 let mut s = format!("[{}]", size);
-                s += &type_interner.get(x).to_string(type_interner);
+                s += &type_interner
+                    .get(x)
+                    .to_string(type_interner, string_interner);
                 s
             }
             Function {
@@ -133,15 +141,33 @@ impl Type {
                 let mut s = "fn(".to_string();
 
                 for param in params {
-                    s += &type_interner.get(param).to_string(type_interner);
+                    s += &type_interner
+                        .get(param)
+                        .to_string(type_interner, string_interner);
                     s.push_str(", ");
                 }
 
                 s.push_str("): ");
-                s += &type_interner.get(return_type).to_string(type_interner);
+                s += &type_interner
+                    .get(return_type)
+                    .to_string(type_interner, string_interner);
                 s
             }
-            Layout(_) => todo!(),
+            Layout(crate::types::Layout { fields }) => {
+                let mut s = "layout { ".to_string();
+                for LayoutField { name, offset, ty } in fields {
+                    s.push_str(&format!(
+                        "{}: {offset} {}, ",
+                        string_interner.get(name),
+                        type_interner
+                            .get(ty)
+                            .to_string(type_interner, string_interner)
+                    ));
+                }
+                s.push_str("}");
+
+                s
+            }
         }
     }
 }
@@ -153,6 +179,7 @@ impl Hash for Type {
         state.write_u8(x);
 
         match self {
+            Type::Void | Type::Bool => (),
             Type::Function {
                 params,
                 return_type,
@@ -172,7 +199,15 @@ impl Hash for Type {
                 state.write_u8(*signedness as u8);
                 width.hash(state);
             }
-            _ => (),
+            Type::Layout(Layout { fields }) => {
+                let mut fields = fields.clone();
+                fields.sort_unstable_by_key(|field| field.offset);
+                for field in fields {
+                    state.write_u32(field.offset);
+                    field.ty.hash(state);
+                    field.name.hash(state);
+                }
+            }
         }
     }
 }
@@ -188,7 +223,68 @@ impl PartialEq for Type {
             return false;
         }
 
+        match self {
+            Bool | Void => true,
+            Pointer(a) => {
+                let Pointer(b) = other else { unreachable!() };
+                a == b
+            }
+            Array(n, a) => {
+                let Array(m, b) = other else { unreachable!() };
+                n == m && a == b
+            }
+            Layout(crate::types::Layout { fields }) => {
+                let Layout(crate::types::Layout { fields: fs }) = other else {
+                    unreachable!()
+                };
+
+                let mut fs = fs.clone();
+                fs.sort_unstable_by_key(|field| field.offset);
+
+                let mut fields = fields.clone();
+                fields.sort_unstable_by_key(|field| field.offset);
+
+                let same_fields = fields
+                    .iter()
+                    .zip(&fs)
+                    .fold(true, |acc, (x, y)| acc && x == y);
+
+                fs.len() == fields.len() && same_fields
+            }
+            Function {
+                params,
+                return_type,
+            } => {
+                let Function {
+                    params: p,
+                    return_type: r,
+                } = other
+                else {
+                    unreachable!()
+                };
+                let same_return_type = return_type == r;
+
+                let same_param_types = params.iter().zip(p).fold(true, |acc, (x, y)| acc && x == y);
+
+                same_return_type && params.len() == p.len() && same_param_types
+            }
+            Int { signedness, width } => {
+                let Int {
+                    signedness: s,
+                    width: w,
+                } = other
+                else {
+                    unreachable!()
+                };
+                signedness == s && width == w
+            }
+        }
+
+        /*
         match (self, other) {
+            (Bool, _) | (Void, _) => true,
+            (Array(n, t), Array(m, u)) => n == m && t == u,
+            (Layout(_), Layout(_)) => todo!(),
             (
                 Function {
                     params: xparams,
@@ -219,8 +315,8 @@ impl PartialEq for Type {
                     width: y_width,
                 },
             ) => x_signedness == y_signedness && x_width == y_width,
-            _ => true,
         }
+        */
     }
 }
 
