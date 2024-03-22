@@ -138,6 +138,8 @@ pub enum BuiltinOpKind {
     Or,
     And,
     Xor,
+    BitwiseAnd,
+    BitwiseOr,
     Not,
     Add,
     Sub,

@@ -16,16 +16,8 @@ declare void @llvm.stackrestore(ptr) #0
 define i32 @main() {
 entry:
   %0 = call ptr @llvm.stacksave()
-  %1 = alloca i64, align 8
-  store i64 192, ptr %1, align 4
-  %2 = alloca i64, align 8
-  store i64 25, ptr %2, align 4
-  %3 = alloca i64, align 8
-  store i64 1, ptr %3, align 4
-  %4 = load i64, ptr %3, align 4
-  %5 = trunc i64 %4 to i32
   call void @llvm.stackrestore(ptr %0)
-  ret i32 %5
+  ret i32 0
 }
 
 attributes #0 = { nocallback nofree nosync nounwind willreturn }

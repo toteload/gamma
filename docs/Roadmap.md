@@ -152,18 +152,18 @@ impl PartialEq for Type {
 - [ ] Add user defined functions.
 - [ ] Add `loop`, `break` and `continue`
 	- [x] Semantic check: `break` and `continue` can only be used inside a loop
-	- [ ] Add optional labels for `loop`. You can `break :label` or `continue :label`. A label has to start with a colon.
+	- [x] Add optional labels for `loop`. You can `break :label` or `continue :label`. A label has to start with a colon.
 	- `loop :main { break :main }`
 - [ ] Add modules
 - [ ] Add `alloc` and `free` functions for dynamic memory allocations, to a module called `std`
 	- [ ] The `std` module will be a special hard coded module (?)
 
 ### Version 0.6
-- [ ] Add union type
+- [x] Add union type
 	- [ ] Add union value syntax so that a union can be properly initialized.
-- [ ] Add struct type
+- [x] Add struct type
 	- [ ] Add struct value syntax so that a struct can be properly initialized.
-- [ ] Add field selection syntax for structs and unions
+- [x] Add field selection syntax for structs and unions
 
 `union` and `struct` are replaced by a `layout`. 
 A `layout` is similar to both compound constructs, but the fields in a layout have their byte offset explicitly set. 

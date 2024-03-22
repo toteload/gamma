@@ -554,6 +554,20 @@ impl TypeChecker<'_> {
                     todo!();
                     self.type_tokens.add(Type::Bool)
                 }
+                BuiltinOpKind::BitwiseAnd | BuiltinOpKind::BitwiseOr | BuiltinOpKind::Xor => {
+                    let arg_types = args
+                        .iter()
+                        .map(|arg| self.visit_expr(arg))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
+                    let t = self.type_tokens.get(&arg_types[0]);
+
+                    if !args_are_of_same_type || !matches!(t, Type::Int { .. }) {
+                        todo!("operator can only be used with same integer types");
+                    }
+
+                    arg_types[0]
+                }
                 _ => todo!("Operator \"{:?}\"", op),
             },
             Call { name, args } => {

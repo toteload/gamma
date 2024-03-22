@@ -59,6 +59,8 @@ pub enum TokenKind {
     Identifier(Symbol),
     Label(Symbol),
 
+    LineComment(Symbol),
+
     BraceOpen,
     BraceClose,
 
@@ -71,7 +73,6 @@ pub enum TokenKind {
     Semicolon,
     Colon,
 
-    HashTag,
     Comma,
     Period,
 
@@ -93,16 +94,18 @@ pub struct Tokenizer<'a> {
     loc: SourceLocation,
     offset: usize,
     str_interner: &'a mut StringInterner,
+    skip_comments: bool,
 }
 
 impl<'a> Tokenizer<'a> {
-    pub fn new(source: &'a str, str_interner: &'a mut StringInterner) -> Self {
+    pub fn new(source: &'a str, str_interner: &'a mut StringInterner, skip_comments: bool) -> Self {
         Tokenizer {
             source,
             iter: source.chars().peekable(),
             loc: SourceLocation { line: 1, col: 1 },
             offset: 0,
             str_interner,
+            skip_comments,
         }
     }
 
@@ -125,11 +128,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        loop {
-            let Some(c) = self.iter.peek() else {
-                break;
-            };
-
+        while let Some(c) = self.iter.peek() {
             if !c.is_whitespace() {
                 break;
             }
@@ -138,16 +137,27 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
+    fn read_until_end_of_line(&mut self) -> (usize, SourceLocation) {
+        while let Some((offset, loc, c)) = self.advance() {
+            if c == '\n' {
+                return (offset, loc);
+            }
+        }
+
+        (self.offset, self.loc)
+    }
+
     // Return str offset and Location of the last character of the identifier
     fn read_identifier(&mut self) -> (usize, SourceLocation) {
-        loop {
-            let a = self.iter.peek();
-            if a.is_none() || !is_identifier_rest_char(*a.unwrap()) {
-                break (self.offset, self.loc);
+        while let Some(c) = self.iter.peek() {
+            if !is_identifier_rest_char(*c) {
+                break;
             }
 
             self.advance();
         }
+
+        (self.offset, self.loc)
     }
 }
 
@@ -248,6 +258,20 @@ impl<'a> Iterator for Tokenizer<'a> {
                 }
             }
 
+            '#' => {
+                let (end_offset, end) = self.read_until_end_of_line();
+                if self.skip_comments {
+                    return self.next();
+                }
+
+                let comment = &self.source[offset..end_offset];
+                let sym = self.str_interner.add(comment);
+                Token {
+                    span: dbg!(SourceSpan { start, end }),
+                    kind: TokenKind::LineComment(sym),
+                }
+            }
+
             ';' => Token { span: SourceSpan::single(start), kind: TokenKind::Semicolon, },
             ':' => Token { span: SourceSpan::single(start), kind: TokenKind::Colon, },
 
@@ -304,7 +328,7 @@ mod tests {
             int eq / ne ge le lt gt true false loop break bool int void end [ ]";
 
         let mut symbols = StringInterner::new();
-        let tokenizer = Tokenizer::new(source, &mut symbols);
+        let tokenizer = Tokenizer::new(source, &mut symbols, true);
 
         let tokens = tokenizer.collect::<Vec<_>>();
 

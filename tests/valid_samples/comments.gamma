@@ -1,0 +1,8 @@
+fn main(): i32
+  # This is a comment and is not part of the code output
+  # let a: i64 = 123456 <- this looks like code, but is actually a comment
+
+  return (cast i32 0)
+end
+
+# I am also a comment

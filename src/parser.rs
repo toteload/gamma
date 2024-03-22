@@ -47,7 +47,7 @@ impl Parser<'_> {
         spans: &'a mut HashMap<NodeId, SourceSpan>,
     ) -> Parser<'a> {
         Parser {
-            tokens: Tokenizer::new(source, string_interner).peekable(),
+            tokens: Tokenizer::new(source, string_interner, true).peekable(),
             id_generator,
             spans,
         }
@@ -556,31 +556,35 @@ impl Parser<'_> {
                 }
             }
             ParenOpen => {
+                macro_rules! builtin_operators {
+                    () => {
+                        KeywordOr
+                            | KeywordAnd
+                            | KeywordXor
+                            | KeywordBand
+                            | KeywordBor
+                            | Star
+                            | Div
+                            | KeywordRem
+                            | Equal
+                            | NotEqual
+                            | Less
+                            | Greater
+                            | LessEqual
+                            | GreaterEqual
+                            | KeywordNot
+                            | Minus
+                            | Plus
+                            | Ampersand
+                            | At
+                    };
+                }
+
                 let start_span = tok.span;
 
                 let tok = *expect_token!(self.tokens.peek(), _)?;
 
-                if matches!(
-                    tok.kind,
-                    KeywordCast
-                        | KeywordOr
-                        | KeywordAnd
-                        | KeywordXor
-                        | Star
-                        | Div
-                        | KeywordRem
-                        | Equal
-                        | NotEqual
-                        | Less
-                        | Greater
-                        | LessEqual
-                        | GreaterEqual
-                        | KeywordNot
-                        | Minus
-                        | Plus
-                        | Ampersand
-                        | At
-                ) {
+                if matches!(tok.kind, builtin_operators!() | KeywordCast) {
                     self.tokens.next();
                 }
 
@@ -591,16 +595,17 @@ impl Parser<'_> {
                         ExprKind::Cast { ty, e: e.into() }
                     }
 
-                    op @ (KeywordOr | KeywordAnd | KeywordRem | Star | Div | Equal | NotEqual
-                    | Less | Greater | LessEqual | GreaterEqual | KeywordNot | Minus
-                    | Plus | Ampersand | At) => {
+                    op @ builtin_operators!() => {
                         let op = match op {
                             Equal => BuiltinOpKind::Equals,
                             NotEqual => BuiltinOpKind::NotEquals,
                             Star => BuiltinOpKind::Mul,
                             Div => BuiltinOpKind::Div,
+                            KeywordBor => BuiltinOpKind::BitwiseOr,
+                            KeywordBand => BuiltinOpKind::BitwiseAnd,
                             KeywordAnd => BuiltinOpKind::And,
                             KeywordNot => BuiltinOpKind::Not,
+                            KeywordXor => BuiltinOpKind::Xor,
                             KeywordRem => BuiltinOpKind::Remainder,
                             Minus => BuiltinOpKind::Sub,
                             Plus => BuiltinOpKind::Add,

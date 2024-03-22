@@ -1013,7 +1013,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .build_int_signed_rem(x.into_int_value(), y.into_int_value(), "")?
                         .into())
                 }
-                BuiltinOpKind::And => {
+                BuiltinOpKind::And | BuiltinOpKind::BitwiseAnd => {
                     // For now only support two operands at a time
                     assert_eq!(args.len(), 2);
 
@@ -1023,6 +1023,30 @@ impl<'ctx> CodeGenerator<'ctx> {
                     Ok(self
                         .builder
                         .build_and(x.into_int_value(), y.into_int_value(), "")?
+                        .into())
+                }
+                BuiltinOpKind::Or | BuiltinOpKind::BitwiseOr => {
+                    // For now only support two operands at a time
+                    assert_eq!(args.len(), 2);
+
+                    let x = self.gen_expr(&args[0])?;
+                    let y = self.gen_expr(&args[1])?;
+
+                    Ok(self
+                        .builder
+                        .build_or(x.into_int_value(), y.into_int_value(), "")?
+                        .into())
+                }
+                BuiltinOpKind::Xor => {
+                    // For now only support two operands at a time
+                    assert_eq!(args.len(), 2);
+
+                    let x = self.gen_expr(&args[0])?;
+                    let y = self.gen_expr(&args[1])?;
+
+                    Ok(self
+                        .builder
+                        .build_xor(x.into_int_value(), y.into_int_value(), "")?
                         .into())
                 }
                 BuiltinOpKind::AddressOf => {

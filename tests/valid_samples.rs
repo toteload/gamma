@@ -42,24 +42,10 @@ fn compile(source: &str) -> String {
 }
 
 #[test]
-fn arithmetic() {
-    let source = fs::read_to_string("tests/valid_samples/arithmetic.gamma").unwrap();
+fn sum_loop() {
+    let source = fs::read_to_string("tests/valid_samples/sum_loop.gamma").unwrap();
     let output = compile(&source);
-    assert_snapshot!("arithmetic", output);
-}
-
-#[test]
-fn array() {
-    let source = fs::read_to_string("tests/valid_samples/array.gamma").unwrap();
-    let output = compile(&source);
-    assert_snapshot!("array", output);
-}
-
-#[test]
-fn break_labeled_loop() {
-    let source = fs::read_to_string("tests/valid_samples/break_labeled_loop.gamma").unwrap();
-    let output = compile(&source);
-    assert_snapshot!("break_labeled_loop", output);
+    assert_snapshot!("sum_loop", output);
 }
 
 #[test]
@@ -70,10 +56,10 @@ fn nested_layout() {
 }
 
 #[test]
-fn nested_loops() {
-    let source = fs::read_to_string("tests/valid_samples/nested_loops.gamma").unwrap();
+fn comments() {
+    let source = fs::read_to_string("tests/valid_samples/comments.gamma").unwrap();
     let output = compile(&source);
-    assert_snapshot!("nested_loops", output);
+    assert_snapshot!("comments", output);
 }
 
 #[test]
@@ -84,6 +70,13 @@ fn only_main() {
 }
 
 #[test]
+fn array() {
+    let source = fs::read_to_string("tests/valid_samples/array.gamma").unwrap();
+    let output = compile(&source);
+    assert_snapshot!("array", output);
+}
+
+#[test]
 fn pointer() {
     let source = fs::read_to_string("tests/valid_samples/pointer.gamma").unwrap();
     let output = compile(&source);
@@ -91,8 +84,29 @@ fn pointer() {
 }
 
 #[test]
-fn sum_loop() {
-    let source = fs::read_to_string("tests/valid_samples/sum_loop.gamma").unwrap();
+fn bitwise_operators() {
+    let source = fs::read_to_string("tests/valid_samples/bitwise_operators.gamma").unwrap();
     let output = compile(&source);
-    assert_snapshot!("sum_loop", output);
+    assert_snapshot!("bitwise_operators", output);
+}
+
+#[test]
+fn nested_loops() {
+    let source = fs::read_to_string("tests/valid_samples/nested_loops.gamma").unwrap();
+    let output = compile(&source);
+    assert_snapshot!("nested_loops", output);
+}
+
+#[test]
+fn arithmetic() {
+    let source = fs::read_to_string("tests/valid_samples/arithmetic.gamma").unwrap();
+    let output = compile(&source);
+    assert_snapshot!("arithmetic", output);
+}
+
+#[test]
+fn break_labeled_loop() {
+    let source = fs::read_to_string("tests/valid_samples/break_labeled_loop.gamma").unwrap();
+    let output = compile(&source);
+    assert_snapshot!("break_labeled_loop", output);
 }
