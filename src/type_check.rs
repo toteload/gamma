@@ -77,7 +77,7 @@ impl TypeChecker<'_> {
     }
 
     fn get_type_token_of_sym(&self, sym: &Symbol) -> TypeToken {
-        *self.scopes.get(sym).unwrap()
+        *self.scopes.get(sym).expect(format!("Symbol {sym:?} should be found in scope").as_str())
     }
 
     fn get_type_of_sym(&self, sym: &Symbol) -> &Type {
@@ -551,7 +551,17 @@ impl TypeChecker<'_> {
                     arg_types[0]
                 }
                 BuiltinOpKind::And => {
-                    todo!();
+                     let arg_types = args
+                        .iter()
+                        .map(|arg| self.visit_expr(arg))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
+                    let t = self.type_tokens.get(&arg_types[0]);
+
+                    if !args_are_of_same_type || !matches!(t, Type::Int { .. } | Type::Bool) {
+                        todo!("operator can only be used with same integer types");
+                    }
+
                     self.type_tokens.add(Type::Bool)
                 }
                 BuiltinOpKind::BitwiseAnd | BuiltinOpKind::BitwiseOr | BuiltinOpKind::Xor => {
@@ -601,7 +611,8 @@ impl TypeChecker<'_> {
                 for (expected, actual) in params.iter().zip(&arg_types) {
                     if expected != actual {
                         return Err(Error {
-                            source: ErrorSource::Unspecified, // TODO(david) supply the actual location
+                            source: ErrorSource::AstNode(expression.id), // TODO(david) supply the actual location
+                                                          // of the param
                             info: vec![
                                 ErrorInfo::Text("Expected type "),
                                 ErrorInfo::Type(*expected),

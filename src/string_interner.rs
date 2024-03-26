@@ -50,6 +50,12 @@ impl StringInterner {
     pub fn get(&self, symbol: &Symbol) -> &str {
         &self.strings[symbol.0 as usize]
     }
+
+    pub fn print_symbols(&self) {
+        for (i, s) in self.strings.iter().enumerate() {
+            println!("{i} = '{s}'");
+        }
+    }
 }
 
 #[cfg(test)]

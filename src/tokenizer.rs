@@ -159,6 +159,18 @@ impl<'a> Tokenizer<'a> {
 
         (self.offset, self.loc)
     }
+
+    fn read_while<P: Fn(char) -> bool>(&mut self, predicate: P) -> (usize, SourceLocation) {
+        while let Some(c) = self.iter.peek() {
+            if !predicate(*c) {
+                break;
+            }
+
+            self.advance();
+        }
+
+        (self.offset, self.loc)
+    }
 }
 
 fn is_identifier_start_char(c: char) -> bool {
@@ -231,26 +243,42 @@ impl<'a> Iterator for Tokenizer<'a> {
                 }
             }
 
-            _ if c.is_ascii_digit() => {
-                let (mut end_offset, mut end_loc) = (offset + c.len_utf8(), start);
-                loop {
-                    let Some(d) = self.iter.peek() else { break; };
-
-                    if !d.is_ascii_digit() {
-                        break;
-                    }
-
-                    let b;
-                    (_, end_loc, b) = self.advance().unwrap();
-                    end_offset += b.len_utf8();
-                }
+            '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '-' => 'number_block: {
+                if c == '-' {
+                    if self.iter.peek().map_or(false, |c| c.is_ascii_digit()) {
+                        // negative number
+                        let (end_offset, end) = self.read_while(|c| c.is_ascii_digit());
 
                 let number: i64 = self.source[offset..end_offset].parse().unwrap();
+                let span = SourceSpan { start, end };
 
-                let span = SourceSpan {
-                    start,
-                    end: end_loc,
+                break 'number_block Token {
+                    span,
+                    kind: TokenKind::IntLiteral(number),
                 };
+
+                    } else {
+                        break 'number_block Token { span: SourceSpan::single(start), kind: TokenKind::Minus, };
+                    }
+                }
+
+                let (end_offset, end) = self.read_while(|c| c.is_ascii_digit());
+
+                //let (mut end_offset, mut end_loc) = (offset + c.len_utf8(), start);
+                //loop {
+                //    let Some(d) = self.iter.peek() else { break; };
+
+                //    if !d.is_ascii_digit() {
+                //        break;
+                //    }
+
+                //    let b;
+                //    (_, end_loc, b) = self.advance().unwrap();
+                //    end_offset += b.len_utf8();
+                //}
+
+                let number: i64 = self.source[offset..end_offset].parse().unwrap();
+                let span = SourceSpan { start, end };
 
                 Token {
                     span,
@@ -290,7 +318,6 @@ impl<'a> Iterator for Tokenizer<'a> {
             '*' => Token { span: SourceSpan::single(start), kind: TokenKind::Star, },
             '+' => Token { span: SourceSpan::single(start), kind: TokenKind::Plus, },
             '/' => Token { span: SourceSpan::single(start), kind: TokenKind::Div, },
-            '-' => Token { span: SourceSpan::single(start), kind: TokenKind::Minus, },
             '^' => Token { span: SourceSpan::single(start), kind: TokenKind::Hat, },
             '&' => Token { span: SourceSpan::single(start), kind: TokenKind::Ampersand, },
 

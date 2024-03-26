@@ -1,10 +1,18 @@
 external_fn SDL_SetMainReady(): void
 external_fn SDL_Init(flags: u32): i32
+external_fn SDL_Quit(): void
+
 external_fn SDL_CreateWindow(title: ^u8, x: i32, y: i32, w: i32, h: i32, flags: u32): ^void
 external_fn SDL_DestroyWindow(window: ^void): void
+
 external_fn SDL_Delay(ms: u32): void
+
 external_fn SDL_PollEvent(event: ^SDL_Event): i32
-external_fn SDL_Quit(): void
+
+external_fn SDL_CreateRenderer(window: ^void, index: i32, flags: u32): ^void
+external_fn SDL_DestroyRenderer(renderer: ^void): void
+external_fn SDL_SetRenderDrawColor(renderer: ^void, r: u8, g: u8, b: u8, a: u8): i32
+external_fn SDL_RenderClear(renderer: ^void): i32
 
 layout SDL_Event
   type: 0 u32
@@ -17,6 +25,7 @@ fn main(): i32
   let EVENT_WINDOW: u32 = (cast u32 512)
   let WINDOW_CLOSE: u32 = (cast u32 14)
   let INIT_EVERYTHING: u32 = (cast u32 62001)
+  let NULL: ^void = (cast ^void 0)
 
   (SDL_SetMainReady)
 
@@ -31,6 +40,14 @@ fn main(): i32
                                         (cast i32 800) 
                                         (cast i32 800) 
                                         (cast u32 0))
+  if (eq window NULL)
+    return (cast i32 1)
+  end
+
+  let renderer: ^void = (SDL_CreateRenderer window (cast i32 -1) (cast u32 0))
+  if (eq renderer NULL)
+    return (cast i32 2)
+  end
 
   let event: SDL_Event
 
@@ -52,6 +69,13 @@ fn main(): i32
     end
   end
 
+  (SDL_SetRenderDrawColor renderer (cast u8 255) 
+                                   (cast u8 0)
+				   (cast u8 0) 
+				   (cast u8 0))
+  (SDL_RenderClear renderer)
+
+  (SDL_DestroyRenderer renderer)
   (SDL_DestroyWindow window)
   (SDL_Quit)
   

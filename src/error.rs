@@ -67,7 +67,7 @@ impl Error {
                     //);
                     // TODO(david) This approach is very naive and could be better.
                     let line = source.lines().nth(span.start.line as usize - 1).unwrap();
-                    let text = &line[span.start.col as usize - 1..span.end.col as usize-1];
+                    let text = &line[span.start.col as usize - 1..span.end.col as usize - 1];
                     print!("\"{text}\"");
                 }
                 AstNode(id) => {

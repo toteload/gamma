@@ -82,8 +82,11 @@ impl Visitor for Prover<'_> {
         use StatementKind::*;
 
         match &stmt.kind {
-            Let { name, .. } => {
+            Let { name, init, .. } => {
                 self.scopes.last_mut().unwrap().insert(name.sym);
+                if let Some(init) = init {
+                    self.visit_expr(init);
+                }
             }
             Set { dst, val } => {
                 self.visit_expr(dst);
