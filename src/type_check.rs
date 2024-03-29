@@ -77,7 +77,10 @@ impl TypeChecker<'_> {
     }
 
     fn get_type_token_of_sym(&self, sym: &Symbol) -> TypeToken {
-        *self.scopes.get(sym).expect(format!("Symbol {sym:?} should be found in scope").as_str())
+        *self
+            .scopes
+            .get(sym)
+            .expect(format!("Symbol {sym:?} should be found in scope").as_str())
     }
 
     fn get_type_of_sym(&self, sym: &Symbol) -> &Type {
@@ -468,6 +471,16 @@ impl TypeChecker<'_> {
                         });
                     }
 
+                    let t = self.type_tokens.get(&arg_types[0]);
+                    if !matches!(t, Type::Bool | Type::Int { .. } | Type::Pointer(_)) {
+                        return Err(Error {
+                            source: ErrorSource::AstNode(expression.id),
+                            info: vec![ErrorInfo::Text(
+                                "Only bool, int and pointer can be compared",
+                            )],
+                        });
+                    }
+
                     self.type_tokens.add(Type::Bool)
                 }
                 BuiltinOpKind::Mul
@@ -551,7 +564,7 @@ impl TypeChecker<'_> {
                     arg_types[0]
                 }
                 BuiltinOpKind::And => {
-                     let arg_types = args
+                    let arg_types = args
                         .iter()
                         .map(|arg| self.visit_expr(arg))
                         .collect::<Result<Vec<_>, _>>()?;
@@ -612,7 +625,7 @@ impl TypeChecker<'_> {
                     if expected != actual {
                         return Err(Error {
                             source: ErrorSource::AstNode(expression.id), // TODO(david) supply the actual location
-                                                          // of the param
+                            // of the param
                             info: vec![
                                 ErrorInfo::Text("Expected type "),
                                 ErrorInfo::Type(*expected),

@@ -549,30 +549,14 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 let mut branch_terminator_count = 0u32;
 
-                self.position_builder_at_end_of(then_block);
-                self.push_scope_with_stack_restore_point(ScopeKind::Block, None, None);
-                let has_terminator = self.gen_block(then)?;
-
-                if !has_terminator {
-                    let restore_point = self
-                        .current_scope()
-                        .stack_restorepoint
-                        .expect("Blocks should have a stack restore point");
-                    self.builder
-                        .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
-
-                    self.builder.build_unconditional_branch(end_block)?;
-                    branch_terminator_count += 1;
-                }
-
-                self.scopes.pop();
-
-                self.position_builder_at_end_of(otherwise_block);
-                if let Some(otherwise) = otherwise {
+                {
+                    self.position_builder_at_end_of(then_block);
                     self.push_scope_with_stack_restore_point(ScopeKind::Block, None, None);
-                    let has_terminator = self.gen_block(otherwise)?;
+                    let has_terminator = self.gen_block(then)?;
 
                     if !has_terminator {
+                        // If the block has a terminator then the generation of
+                        // the terminator also takes care of the stack restoration.
                         let restore_point = self
                             .current_scope()
                             .stack_restorepoint
@@ -584,10 +568,36 @@ impl<'ctx> CodeGenerator<'ctx> {
                         )?;
 
                         self.builder.build_unconditional_branch(end_block)?;
+                    } else {
                         branch_terminator_count += 1;
                     }
-                } else {
-                    self.builder.build_unconditional_branch(end_block)?;
+
+                    self.scopes.pop();
+                }
+
+                {
+                    self.position_builder_at_end_of(otherwise_block);
+                    if let Some(otherwise) = otherwise {
+                        self.push_scope_with_stack_restore_point(ScopeKind::Block, None, None);
+                        let has_terminator = self.gen_block(otherwise)?;
+                        if !has_terminator {
+                            let restore_point = self
+                                .current_scope()
+                                .stack_restorepoint
+                                .expect("Blocks should have a stack restore point");
+                            self.builder.build_call(
+                                self.llvm_stackrestore,
+                                &[restore_point.into()],
+                                "",
+                            )?;
+
+                            self.builder.build_unconditional_branch(end_block)?;
+                        } else {
+                            branch_terminator_count += 1;
+                        }
+                    } else {
+                        self.builder.build_unconditional_branch(end_block)?;
+                    }
                 }
 
                 if branch_terminator_count != 2 {
@@ -931,10 +941,31 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                     let x = self.gen_expr(&args[0])?;
                     let y = self.gen_expr(&args[1])?;
-                    Ok(self
-                        .builder
-                        .build_int_compare(predicate, x.into_int_value(), y.into_int_value(), "")?
-                        .into())
+
+                    if x.is_pointer_value() {
+                        let x = self.builder.build_ptr_to_int(
+                            x.into_pointer_value(),
+                            self.i64_t,
+                            "",
+                        )?;
+                        let y = self.builder.build_ptr_to_int(
+                            y.into_pointer_value(),
+                            self.i64_t,
+                            "",
+                        )?;
+
+                        Ok(self.builder.build_int_compare(predicate, x, y, "")?.into())
+                    } else {
+                        Ok(self
+                            .builder
+                            .build_int_compare(
+                                predicate,
+                                x.into_int_value(),
+                                y.into_int_value(),
+                                "",
+                            )?
+                            .into())
+                    }
                 }
                 BuiltinOpKind::Add => {
                     assert!(!args.is_empty());

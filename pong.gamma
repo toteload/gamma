@@ -13,11 +13,14 @@ external_fn SDL_CreateRenderer(window: ^void, index: i32, flags: u32): ^void
 external_fn SDL_DestroyRenderer(renderer: ^void): void
 external_fn SDL_SetRenderDrawColor(renderer: ^void, r: u8, g: u8, b: u8, a: u8): i32
 external_fn SDL_RenderClear(renderer: ^void): i32
+external_fn SDL_RenderPresent(renderer: ^void): void
 
 layout SDL_Event
   type: 0 u32
   timestamp: 4 u32
-  window_event_id: 12 u32
+  window_event_id: 12 u32 # The offset could be wrong here. double check
+
+  padding: 0 [56]u8
 end
 
 fn main(): i32
@@ -30,9 +33,6 @@ fn main(): i32
   (SDL_SetMainReady)
 
   let status: i32 = (SDL_Init INIT_EVERYTHING)
-  if (ne status (cast i32 0))
-    return status
-  end
 
   let window: ^void = (SDL_CreateWindow (cast ^u8 0) 
                                         (cast i32 1) 
@@ -40,18 +40,10 @@ fn main(): i32
                                         (cast i32 800) 
                                         (cast i32 800) 
                                         (cast u32 0))
-  if (eq window NULL)
-    return (cast i32 1)
-  end
 
   let renderer: ^void = (SDL_CreateRenderer window (cast i32 -1) (cast u32 0))
-  if (eq renderer NULL)
-    return (cast i32 2)
-  end
-
-  let event: SDL_Event
-
   loop @game_loop
+    let event: SDL_Event
     loop
       let has_more_events: i32 = (SDL_PollEvent (& event))
       if (not (cast bool has_more_events))
@@ -61,19 +53,15 @@ fn main(): i32
       if (eq event.type EVENT_QUIT)
         break @game_loop
       end
-
-      if (and (eq event.type EVENT_WINDOW) 
-              (eq event.window_event_id WINDOW_CLOSE))
-        break @game_loop
-      end
     end
-  end
 
-  (SDL_SetRenderDrawColor renderer (cast u8 255) 
-                                   (cast u8 0)
-				   (cast u8 0) 
-				   (cast u8 0))
-  (SDL_RenderClear renderer)
+    (SDL_SetRenderDrawColor renderer (cast u8 255) 
+                                     (cast u8 0)
+                                     (cast u8 0) 
+                                     (cast u8 0))
+    (SDL_RenderClear renderer)
+    (SDL_RenderPresent renderer)
+  end
 
   (SDL_DestroyRenderer renderer)
   (SDL_DestroyWindow window)

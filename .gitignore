@@ -10,3 +10,5 @@ libSDL2.a
 *.asm
 *.s
 *.ll
+pong
+**/.DS_Store
