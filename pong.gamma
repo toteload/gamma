@@ -1,19 +1,18 @@
 external_fn SDL_SetMainReady(): void
 external_fn SDL_Init(flags: u32): i32
 external_fn SDL_Quit(): void
-
 external_fn SDL_CreateWindow(title: ^u8, x: i32, y: i32, w: i32, h: i32, flags: u32): ^void
 external_fn SDL_DestroyWindow(window: ^void): void
-
 external_fn SDL_Delay(ms: u32): void
-
 external_fn SDL_PollEvent(event: ^SDL_Event): i32
-
 external_fn SDL_CreateRenderer(window: ^void, index: i32, flags: u32): ^void
 external_fn SDL_DestroyRenderer(renderer: ^void): void
 external_fn SDL_SetRenderDrawColor(renderer: ^void, r: u8, g: u8, b: u8, a: u8): i32
 external_fn SDL_RenderClear(renderer: ^void): i32
 external_fn SDL_RenderPresent(renderer: ^void): void
+external_fn SDL_RenderDrawRect(renderer: ^void, rect: ^SDL_Rect): i32
+external_fn SDL_RenderFillRect(renderer: ^void, rect: ^SDL_Rect): i32
+external_fn SDL_GetTicks64(): u64
 
 layout SDL_Event
   type: 0 u32
@@ -24,25 +23,58 @@ layout SDL_Event
   padding: 0 [56]u8
 end
 
+layout SDL_Rect
+  x: 0 i32
+  y: 4 i32
+  w: 8 i32
+  h: 12 i32
+end
+
+layout Ball
+  x: 0 i32
+  y: 4 i32
+  vx: 8 i32
+  vy: 12 i32
+end
+
+layout Game
+  y0: 0 i32
+  y1: 4 i32
+  ball: 8 Ball
+end
+
 fn main(): i32
-  let EVENT_QUIT: u32 = (cast u32 256)
-  let EVENT_WINDOW: u32 = (cast u32 512)
-  let WINDOW_CLOSE: u32 = (cast u32 14)
-  let INIT_EVERYTHING: u32 = (cast u32 62001)
-  let NULL: ^void = (cast ^void 0)
+  # Constants
+  # ---------
+
+  let EVENT_QUIT: u32 = 256
+  let EVENT_WINDOW: u32 = 512
+  let WINDOW_CLOSE: u32 = 14
+  let INIT_EVERYTHING: u32 = 62001
+  let WINDOWPOS_CENTERED: i32 = 805240832
+  let RENDERER_PRESENTVSYNC: u32 = 4
+  let RENDERER_ACCELERATED: u32 = 2
 
   (SDL_SetMainReady)
 
-  let status: i32 = (SDL_Init INIT_EVERYTHING)
+  (SDL_Init INIT_EVERYTHING)
+  let window: ^void = (SDL_CreateWindow (cast ^u8 (cast u64 0)) WINDOWPOS_CENTERED WINDOWPOS_CENTERED 800 800 0)
+  let renderer: ^void = (SDL_CreateRenderer window -1 (bor RENDERER_ACCELERATED RENDERER_PRESENTVSYNC))
 
-  let window: ^void = (SDL_CreateWindow (cast ^u8 0) 
-                                        (cast i32 1) 
-                                        (cast i32 1) 
-                                        (cast i32 800) 
-                                        (cast i32 800) 
-                                        (cast u32 0))
+  let game: Game
+  set game.y0 = 400
+  set game.y1 = 400
+  set game.ball.x = 400
+  set game.ball.y = 400
+  set game.ball.vx = 4
+  set game.ball.vy = 4
 
-  let renderer: ^void = (SDL_CreateRenderer window (cast i32 -1) (cast u32 0))
+  let field: SDL_Rect
+  set field.x = 0
+  set field.y = 0
+  set field.w = 800
+  set field.h = 800
+
   loop @game_loop
     let event: SDL_Event
     loop
@@ -56,11 +88,39 @@ fn main(): i32
       end
     end
 
-    (SDL_SetRenderDrawColor renderer (cast u8 255) 
-                                     (cast u8 0)
-                                     (cast u8 0) 
-                                     (cast u8 0))
+    (SDL_SetRenderDrawColor renderer 0 0 0 0)
     (SDL_RenderClear renderer)
+
+    (SDL_SetRenderDrawColor renderer 255 255 255 255)
+
+    let r: SDL_Rect
+    set r.x = 10
+    set r.y = game.y0
+    set r.w = 20
+    set r.h = 80
+
+    (SDL_RenderFillRect renderer (& r))
+
+    set game.ball.x = (+ game.ball.x game.ball.vx)
+    set game.ball.y = (+ game.ball.y game.ball.vy)
+
+    if (or (gt game.ball.x (cast i32 800)) 
+           (lt game.ball.x (cast i32 0)))
+      set game.ball.vx = (* (cast i32 -1) game.ball.vx)
+    end
+
+    if (or (gt game.ball.y (cast i32 800)) 
+           (lt game.ball.y (cast i32 0)))
+      set game.ball.vy = (* (cast i32 -1) game.ball.vy)
+    end
+
+    let r: SDL_Rect
+    set r.x = game.ball.x
+    set r.y = game.ball.y
+    set r.w = 20
+    set r.h = 20
+    (SDL_RenderFillRect renderer (& r))
+
     (SDL_RenderPresent renderer)
   end
 
@@ -68,5 +128,5 @@ fn main(): i32
   (SDL_DestroyWindow window)
   (SDL_Quit)
   
-  return (cast i32 0)
+  return 0
 end
