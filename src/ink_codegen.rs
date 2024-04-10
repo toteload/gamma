@@ -778,7 +778,10 @@ impl<'ctx> CodeGenerator<'ctx> {
                             self.builder.build_gep(
                                 ty,
                                 base_ptr,
-                                &[self.i32_t.const_int(byte_offset as u64, false)],
+                                &[
+                                    self.i32_t.const_zero(),
+                                    self.i32_t.const_int(byte_offset as u64, false),
+                                ],
                                 "",
                             )?
                         };
@@ -803,7 +806,10 @@ impl<'ctx> CodeGenerator<'ctx> {
                     let ty = self.get_inktype_of_node(args[0].id);
                     let ptr = self.get_dst_ptr(&args[0])?;
                     let idx = self.gen_expr(&args[1])?.into_int_value();
-                    Ok(unsafe { self.builder.build_gep(ty, ptr, &[idx], "")? })
+                    Ok(unsafe {
+                        self.builder
+                            .build_gep(ty, ptr, &[self.i32_t.const_zero(), idx], "")?
+                    })
                 }
             }
             _ => todo!("Get pointer for expression: {:?}", e.kind),
@@ -812,7 +818,20 @@ impl<'ctx> CodeGenerator<'ctx> {
 
     fn gen_expr(&mut self, e: &Expr) -> Result<BasicValueEnum<'ctx>, Error> {
         match &e.kind {
-            ExprKind::IntLiteral(x) => Ok(self.i64_t.const_int(*x as u64, false).into()),
+            ExprKind::IntLiteral(x) => {
+                let ty = self.type_interner.get(
+                    self.node_types
+                        .get(&e.id)
+                        .expect("IntLiteral node should have a registered type"),
+                );
+                match ty {
+                    Type::Int { width, .. } => {
+                        Ok(self.int_type(*width).const_int(*x as u64, false).into())
+                    }
+                    Type::IntConstant => Ok(self.i64_t.const_int(*x as u64, false).into()),
+                    _ => panic!(),
+                }
+            }
             ExprKind::BoolLiteral(x) => {
                 Ok(self.i64_t.const_int(if *x { 1 } else { 0 }, false).into())
             }
@@ -843,7 +862,10 @@ impl<'ctx> CodeGenerator<'ctx> {
                             self.builder.build_gep(
                                 ty,
                                 base_ptr,
-                                &[self.i32_t.const_int(byte_offset as u64, false)],
+                                &[
+                                    self.i32_t.const_zero(),
+                                    self.i32_t.const_int(byte_offset as u64, false),
+                                ],
                                 "",
                             )?
                         };
@@ -921,6 +943,16 @@ impl<'ctx> CodeGenerator<'ctx> {
                         //Ok(self.builder.build_bitcast(val, base_type.ptr_type(AddressSpace::default()), "")?.into())
                     }
 
+                    (Type::IntConstant, Type::Int { width, signedness }) => Ok(self
+                        .builder
+                        .build_int_cast_sign_flag(
+                            val.into_int_value(),
+                            self.int_type(*width),
+                            *signedness == Signedness::Signed,
+                            "",
+                        )?
+                        .into()),
+
                     _ => todo!("Cast from {:?} to {:?}", src_ty, dst_ty),
                 }
             }
@@ -933,14 +965,14 @@ impl<'ctx> CodeGenerator<'ctx> {
                     // For now only support two operands at a time
                     assert_eq!(args.len(), 2);
 
+                    let x = self.gen_expr(&args[0])?;
+                    let y = self.gen_expr(&args[1])?;
+
                     let predicate = match op {
                         BuiltinOpKind::Equals => IntPredicate::EQ,
                         BuiltinOpKind::NotEquals => IntPredicate::NE,
                         _ => todo!(),
                     };
-
-                    let x = self.gen_expr(&args[0])?;
-                    let y = self.gen_expr(&args[1])?;
 
                     if x.is_pointer_value() {
                         let x = self.builder.build_ptr_to_int(
@@ -1122,6 +1154,9 @@ impl<'ctx> CodeGenerator<'ctx> {
                     let pointee_type = self.get_ink_basic_type(*pointee_type_token);
 
                     Ok(self.builder.build_load(pointee_type, addr, "")?)
+                }
+
+                BuiltinOpKind::GreaterThan => {
                 }
 
                 _ => todo!("BuiltinOpKind \"{:?}\"", op),

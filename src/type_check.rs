@@ -3,7 +3,8 @@ use crate::ast::*;
 use crate::error::*;
 use crate::scope_stack::ScopeStack;
 use crate::string_interner::Symbol;
-use crate::types::{Layout, LayoutField, Signedness, Type, TypeInterner, TypeToken};
+use crate::types::is_type_coercible_to;
+use crate::types::{Layout, LayoutField, Type, TypeInterner, TypeToken};
 use std::collections::HashMap;
 
 struct TypeChecker<'a> {
@@ -19,6 +20,7 @@ struct TypeChecker<'a> {
     // checked against this.
     declared_return_type: TypeToken,
     void_token: TypeToken,
+    int_const: TypeToken,
 }
 
 impl TypeChecker<'_> {
@@ -28,6 +30,7 @@ impl TypeChecker<'_> {
         type_table: &'a mut HashMap<Symbol, TypeToken>,
     ) -> TypeChecker<'a> {
         let void_token = type_tokens.add(Type::Void);
+        let int_const = type_tokens.add(Type::IntConstant);
         TypeChecker {
             type_tokens,
             types,
@@ -36,6 +39,7 @@ impl TypeChecker<'_> {
             errors: Vec::new(),
             declared_return_type: void_token,
             void_token,
+            int_const,
         }
     }
 
@@ -92,6 +96,7 @@ impl TypeChecker<'_> {
         let dst_ty = self.type_tokens.get(&cast_type);
         let expr_ty = self.type_tokens.get(&expr);
         match (dst_ty, expr_ty) {
+            (Int { .. }, IntConstant) => true,
             (Int { .. }, Int { .. }) => true,
             (Int { .. }, Bool) => true,
             (Bool, Int { .. }) => true,
@@ -277,13 +282,19 @@ impl TypeChecker<'_> {
                         }
                     };
 
-                    if type_token != init_type_token {
+                    if !is_type_coercible_to(self.type_tokens, init_type_token, type_token) {
+                        dbg!((init_type_token, type_token));
                         self.errors.push(Error {
                             source: ErrorSource::AstNode(statement.id),
                             info: vec![
-                                ErrorInfo::Text("Type mismatch between declared type and type of initializer in set statement"),
+                                ErrorInfo::Text("Type mismatch between declared type and type of initializer in set statement. "),
+                                ErrorInfo::Type(init_type_token),
                             ],
                         });
+                    } else {
+                        // This is to change the type of an IntConstant to the destination integer
+                        // type.
+                        self.types.insert(init.id, type_token);
                     }
                 }
             }
@@ -312,17 +323,21 @@ impl TypeChecker<'_> {
                 }
 
                 match (&dst_result, &val_result) {
-                    (Ok(dst_type), Ok(val_type)) if dst_type != val_type => {
-                        self.errors.push(Error {
-                            source: ErrorSource::AstNode(statement.id),
-                            info: vec![
-                                ErrorInfo::Text("Type mismatch in set statement. "),
-                                ErrorInfo::Text("Destination type is "),
-                                ErrorInfo::Type(*dst_type),
-                                ErrorInfo::Text(", but value type is "),
-                                ErrorInfo::Type(*val_type),
-                            ],
-                        });
+                    (Ok(dst_type), Ok(val_type)) => {
+                        if !is_type_coercible_to(self.type_tokens, *val_type, *dst_type) {
+                            self.errors.push(Error {
+                                source: ErrorSource::AstNode(statement.id),
+                                info: vec![
+                                    ErrorInfo::Text("Type mismatch in set statement. "),
+                                    ErrorInfo::Text("Destination type is "),
+                                    ErrorInfo::Type(*dst_type),
+                                    ErrorInfo::Text(", but value type is "),
+                                    ErrorInfo::Type(*val_type),
+                                ],
+                            });
+                        } else {
+                            self.types.insert(val.id, *dst_type);
+                        }
                     }
                     _ => {}
                 }
@@ -351,6 +366,7 @@ impl TypeChecker<'_> {
                 }
 
                 self.visit_block(then);
+
                 if let Some(otherwise) = otherwise {
                     self.visit_block(otherwise);
                 }
@@ -367,11 +383,19 @@ impl TypeChecker<'_> {
                     None => self.void_token,
                 };
 
-                if found_return_type != self.declared_return_type {
+                if !is_type_coercible_to(
+                    self.type_tokens,
+                    found_return_type,
+                    self.declared_return_type,
+                ) {
                     self.errors.push(Error {
                         source: ErrorSource::AstNode(statement.id),
                         info: vec![ErrorInfo::Text("Return types do not match")],
                     });
+                } else {
+                    if let Some(e) = e {
+                        self.types.insert(e.id, self.declared_return_type);
+                    }
                 }
             }
             Loop(body, label) => self.visit_block(body),
@@ -383,10 +407,7 @@ impl TypeChecker<'_> {
         use ExprKind::*;
 
         let ty = match &expression.kind {
-            IntLiteral(_) => self.type_tokens.add(Type::Int {
-                signedness: Signedness::Signed,
-                width: 64,
-            }),
+            IntLiteral(_) => self.int_const,
             BoolLiteral(_) => self.type_tokens.add(Type::Bool),
             Identifier(sym) => {
                 if let Some(t) = self.scopes.get(sym) {
@@ -486,7 +507,9 @@ impl TypeChecker<'_> {
                 BuiltinOpKind::Mul
                 | BuiltinOpKind::Add
                 | BuiltinOpKind::Div
-                | BuiltinOpKind::Sub => {
+                | BuiltinOpKind::Sub
+                | BuiltinOpKind::GreaterThan
+                | BuiltinOpKind::LessThan => {
                     assert!(!args.is_empty());
 
                     let arg_types = args
@@ -500,6 +523,14 @@ impl TypeChecker<'_> {
                         return Err(Error {
                             source: ErrorSource::AstNode(expression.id),
                             info: vec![ErrorInfo::Text("Arguments must have the same type.")],
+                        });
+                    }
+
+                    let t = self.type_tokens.get(&arg_types[0]);
+                    if !matches!(t, Type::Int { .. }) {
+                        return Err(Error {
+                            source: ErrorSource::AstNode(expression.id),
+                            info: vec![ErrorInfo::Text("Only integers can be used.")],
                         });
                     }
 
@@ -554,6 +585,7 @@ impl TypeChecker<'_> {
                         .iter()
                         .map(|arg| self.visit_expr(arg))
                         .collect::<Result<Vec<_>, _>>()?;
+
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
                     let t = self.type_tokens.get(&arg_types[0]);
 
@@ -563,11 +595,12 @@ impl TypeChecker<'_> {
 
                     arg_types[0]
                 }
-                BuiltinOpKind::And => {
+                BuiltinOpKind::And | BuiltinOpKind::Or => {
                     let arg_types = args
                         .iter()
                         .map(|arg| self.visit_expr(arg))
                         .collect::<Result<Vec<_>, _>>()?;
+
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
                     let t = self.type_tokens.get(&arg_types[0]);
 
@@ -582,6 +615,7 @@ impl TypeChecker<'_> {
                         .iter()
                         .map(|arg| self.visit_expr(arg))
                         .collect::<Result<Vec<_>, _>>()?;
+
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
                     let t = self.type_tokens.get(&arg_types[0]);
 
@@ -621,11 +655,12 @@ impl TypeChecker<'_> {
                     todo!()
                 }
 
-                for (expected, actual) in params.iter().zip(&arg_types) {
-                    if expected != actual {
+                let arg_ids = args.iter().map(|arg| arg.id);
+
+                for (id, (expected, actual)) in arg_ids.zip(params.iter().zip(&arg_types)) {
+                    if !is_type_coercible_to(self.type_tokens, *actual, *expected) {
                         return Err(Error {
-                            source: ErrorSource::AstNode(expression.id), // TODO(david) supply the actual location
-                            // of the param
+                            source: ErrorSource::AstNode(expression.id),
                             info: vec![
                                 ErrorInfo::Text("Expected type "),
                                 ErrorInfo::Type(*expected),
@@ -633,6 +668,8 @@ impl TypeChecker<'_> {
                                 ErrorInfo::Type(*actual),
                             ],
                         });
+                    } else {
+                        self.types.insert(id, *expected);
                     }
                 }
 

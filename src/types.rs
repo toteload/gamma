@@ -30,6 +30,7 @@ pub enum Type {
         signedness: Signedness,
         width: u32,
     },
+    IntConstant,
     Function {
         params: Vec<TypeToken>,
         return_type: TypeToken,
@@ -50,6 +51,7 @@ impl Type {
             Pointer(_) => 4,
             Array(..) => 5,
             Layout(..) => 6,
+            IntConstant => 7,
         }
     }
 
@@ -70,6 +72,7 @@ impl Type {
             },
             Pointer(_) => 8,
             Array(_, base) => type_interner.get(base).align(type_interner),
+            IntConstant => panic!(),
         }
     }
 
@@ -98,6 +101,7 @@ impl Type {
                     .next_multiple_of(base.align(type_interner));
                 *n as u32 * base_with_padding_size
             }
+            IntConstant => panic!(),
         }
     }
 
@@ -168,6 +172,7 @@ impl Type {
 
                 s
             }
+            IntConstant => "int-constant".to_string(),
         }
     }
 }
@@ -179,7 +184,7 @@ impl Hash for Type {
         state.write_u8(x);
 
         match self {
-            Type::Void | Type::Bool => (),
+            Type::Void | Type::Bool | Type::IntConstant => (),
             Type::Function {
                 params,
                 return_type,
@@ -224,7 +229,7 @@ impl PartialEq for Type {
         }
 
         match self {
-            Bool | Void => true,
+            Bool | Void | IntConstant => true,
             Pointer(a) => {
                 let Pointer(b) = other else { unreachable!() };
                 a == b
@@ -279,44 +284,6 @@ impl PartialEq for Type {
                 signedness == s && width == w
             }
         }
-
-        /*
-        match (self, other) {
-            (Bool, _) | (Void, _) => true,
-            (Array(n, t), Array(m, u)) => n == m && t == u,
-            (Layout(_), Layout(_)) => todo!(),
-            (
-                Function {
-                    params: xparams,
-                    return_type: xreturn_type,
-                },
-                Function {
-                    params: yparams,
-                    return_type: yreturn_type,
-                },
-            ) => {
-                let same_return_type = xreturn_type == yreturn_type;
-
-                let same_params = xparams
-                    .iter()
-                    .zip(yparams)
-                    .fold(true, |acc, (x, y)| acc && x == y);
-
-                same_return_type && same_params && xparams.len() == yparams.len()
-            }
-            (Pointer(x), Pointer(y)) => x == y,
-            (
-                Int {
-                    signedness: x_signedness,
-                    width: x_width,
-                },
-                Int {
-                    signedness: y_signedness,
-                    width: y_width,
-                },
-            ) => x_signedness == y_signedness && x_width == y_width,
-        }
-        */
     }
 }
 
@@ -376,6 +343,21 @@ impl TypeInterner {
     pub fn get<'a>(&'a self, tok: &TypeToken) -> &'a Type {
         &self.types[tok.0 as usize]
     }
+}
+
+pub fn is_type_coercible_to(type_tokens: &TypeInterner, from: TypeToken, to: TypeToken) -> bool {
+    if from == to {
+        return true;
+    }
+
+    if matches!(
+        (type_tokens.get(&from), type_tokens.get(&to)),
+        (Type::IntConstant, Type::Int { .. })
+    ) {
+        return true;
+    }
+
+    false
 }
 
 #[cfg(test)]
