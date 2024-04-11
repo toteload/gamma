@@ -29,6 +29,13 @@ impl SourceSpan {
         }
     }
 
+    pub fn empty_at(loc: SourceLocation) -> SourceSpan {
+        SourceSpan {
+            start: loc,
+            end: loc,
+        }
+    }
+
     pub fn extend(&self, other: &SourceSpan) -> SourceSpan {
         debug_assert!(self.start <= other.start);
         debug_assert!(self.end <= other.end);

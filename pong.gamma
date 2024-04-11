@@ -18,8 +18,9 @@ external_fn SDL_RenderPresent(renderer: ^void): void
 layout SDL_Event
   type: 0 u32
   timestamp: 4 u32
-  window_event_id: 12 u32 # The offset could be wrong here. double check
+  window_event_id: 12 u32
 
+  # Make sure that the size of the struct matches the original
   padding: 0 [56]u8
 end
 

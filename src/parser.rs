@@ -11,8 +11,6 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct Parser<'a> {
     tokens: Peekable<Tokenizer<'a>>,
     id_generator: &'a mut NodeIdGenerator,
-
-    // TODO: Use the `nohash-hasher` Hasher, if this turns out to be kinda slow.
     spans: &'a mut HashMap<NodeId, SourceSpan>,
 }
 
@@ -51,6 +49,13 @@ impl Parser<'_> {
             id_generator,
             spans,
         }
+    }
+
+    fn try_peek(&mut self) -> Result<Token> {
+        self.tokens.peek().copied().ok_or_else(|| Error {
+            source: ErrorSource::Unspecified,
+            info: vec![ErrorInfo::Text("Unexpected end of source")],
+        })
     }
 
     fn gen_node_id(&mut self) -> NodeId {
@@ -163,15 +168,12 @@ impl Parser<'_> {
                 let name = self.parse_name()?;
 
                 let mut fields = Vec::new();
-                loop {
-                    let peeked = expect_token!(self.tokens.peek(), KeywordEnd | Identifier(_))?;
-                    if matches!(peeked.kind, KeywordEnd) {
-                        self.tokens.next();
-                        break;
-                    }
 
+                while !matches!(self.try_peek()?.kind, KeywordEnd) {
                     let name = self.parse_name()?;
+
                     expect_token!(self.tokens.next(), Colon)?;
+
                     let Token {
                         kind: IntLiteral(offset),
                         ..
@@ -179,11 +181,15 @@ impl Parser<'_> {
                     else {
                         unreachable!()
                     };
+
                     let offset = offset as u32;
+
                     let ty = self.parse_type()?;
 
                     fields.push(Field { name, offset, ty });
                 }
+
+                expect_token!(self.tokens.next(), KeywordEnd)?;
 
                 ItemKind::Layout { name, fields }
             }
@@ -262,12 +268,7 @@ impl Parser<'_> {
         expect_token!(self.tokens.next(), ParenOpen)?;
 
         let mut params = Vec::new();
-        loop {
-            let peeked = expect_token!(self.tokens.peek(), Identifier(_) | ParenClose)?;
-            if matches!(peeked.kind, ParenClose) {
-                break;
-            }
-
+        while !matches!(self.try_peek()?.kind, ParenClose) {
             let name = self.parse_name()?;
 
             expect_token!(self.tokens.next(), Colon)?;
@@ -298,12 +299,7 @@ impl Parser<'_> {
 
         let mut statements = Vec::new();
 
-        loop {
-            let peeked = expect_token!(self.tokens.peek(), _)?;
-            if matches!(peeked.kind, KeywordEnd) {
-                break;
-            }
-
+        while !matches!(self.try_peek()?.kind, KeywordEnd) {
             let statement = self.parse_statement()?;
             statements.push(statement);
         }
@@ -330,10 +326,7 @@ impl Parser<'_> {
                 .spans
                 .get(&statement.id)
                 .expect("Statement should have a span saved"),
-
-            // TODO(david) This should return an empty span, but that is currently not possible
-            // because the end of a SourceSpan is inclusive...
-            [] => SourceSpan::single(end.span.start),
+            [] => SourceSpan::empty_at(end.span.start),
         };
 
         self.spans.insert(id, span);
@@ -348,7 +341,7 @@ impl Parser<'_> {
         let id = self.gen_node_id();
         let span: SourceSpan;
 
-        let tok = *expect_token!(self.tokens.peek(), _)?;
+        let tok = self.try_peek()?;
 
         let kind = match tok.kind {
             KeywordLet => {
@@ -360,7 +353,7 @@ impl Parser<'_> {
 
                 let ty = self.parse_type()?;
 
-                let peeked = expect_token!(self.tokens.peek(), _)?;
+                let peeked = self.try_peek()?;
 
                 if matches!(peeked.kind, EqualSign) {
                     // Eat the '='
@@ -405,7 +398,7 @@ impl Parser<'_> {
 
                 let then = self.parse_block()?;
 
-                let peeked = expect_token!(self.tokens.peek(), _)?;
+                let peeked = self.try_peek()?;
 
                 let otherwise = if matches!(peeked.kind, KeywordElse) {
                     // Eat the 'else'
@@ -431,7 +424,7 @@ impl Parser<'_> {
                 self.tokens.next();
                 span = tok.span;
 
-                let peeked = expect_token!(self.tokens.peek(), _)?;
+                let peeked = self.try_peek()?;
 
                 let label = if matches!(peeked.kind, Label(_)) {
                     Some(self.parse_label()?)
@@ -445,7 +438,7 @@ impl Parser<'_> {
                 self.tokens.next();
                 span = tok.span;
 
-                let peeked = expect_token!(self.tokens.peek(), _)?;
+                let peeked = self.try_peek()?;
 
                 let label = if matches!(peeked.kind, Label(_)) {
                     Some(self.parse_label()?)
@@ -465,7 +458,7 @@ impl Parser<'_> {
             KeywordLoop => {
                 self.tokens.next();
 
-                let peeked = expect_token!(self.tokens.peek(), _)?;
+                let peeked = self.try_peek()?;
 
                 let label = if matches!(peeked.kind, Label(_)) {
                     Some(self.parse_label()?)
@@ -496,12 +489,7 @@ impl Parser<'_> {
 
         let mut args = vec![];
 
-        loop {
-            let peeked = expect_token!(self.tokens.peek(), _)?;
-            if matches!(peeked.kind, ParenClose) {
-                break;
-            }
-
+        while !matches!(self.try_peek()?.kind, ParenClose) {
             args.push(self.parse_expression()?);
         }
 
@@ -532,13 +520,12 @@ impl Parser<'_> {
                 span = tok.span;
                 let mut idents = vec![sym];
 
-                loop {
-                    let peeked = expect_token!(self.tokens.peek(), _)?;
+                while let Some(peeked) = self.tokens.peek() {
                     if !matches!(peeked.kind, Period) {
                         break;
                     }
 
-                    self.tokens.next();
+                    expect_token!(self.tokens.next(), Period)?;
 
                     let Identifier(sym) = expect_token!(self.tokens.next(), Identifier(_))?.kind
                     else {
@@ -582,7 +569,7 @@ impl Parser<'_> {
 
                 let start_span = tok.span;
 
-                let tok = *expect_token!(self.tokens.peek(), _)?;
+                let tok = self.try_peek()?;
 
                 if matches!(tok.kind, builtin_operators!() | KeywordCast) {
                     self.tokens.next();

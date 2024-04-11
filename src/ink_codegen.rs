@@ -131,7 +131,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             intrinsic.get_declaration(&module, &[]).unwrap()
         };
 
-        let void_token = type_interner.get_for_type(&Type::Void).expect("");
+        let void_token = type_interner.find_token_unchecked(&Type::Void);
 
         Self {
             ctx,
@@ -163,79 +163,63 @@ impl<'ctx> CodeGenerator<'ctx> {
 
             typetoken_to_inktype: HashMap::from([
                 (
-                    type_interner
-                        .get_for_type(&Type::Int {
-                            signedness: Signedness::Signed,
-                            width: 8,
-                        })
-                        .unwrap(),
+                    type_interner.find_token_unchecked(&Type::Int {
+                        signedness: Signedness::Signed,
+                        width: 8,
+                    }),
                     ctx.i8_type().into(),
                 ),
                 (
-                    type_interner
-                        .get_for_type(&Type::Int {
-                            signedness: Signedness::Signed,
-                            width: 16,
-                        })
-                        .unwrap(),
+                    type_interner.find_token_unchecked(&Type::Int {
+                        signedness: Signedness::Signed,
+                        width: 16,
+                    }),
                     ctx.i16_type().into(),
                 ),
                 (
-                    type_interner
-                        .get_for_type(&Type::Int {
-                            signedness: Signedness::Signed,
-                            width: 32,
-                        })
-                        .unwrap(),
+                    type_interner.find_token_unchecked(&Type::Int {
+                        signedness: Signedness::Signed,
+                        width: 32,
+                    }),
                     ctx.i32_type().into(),
                 ),
                 (
-                    type_interner
-                        .get_for_type(&Type::Int {
-                            signedness: Signedness::Signed,
-                            width: 64,
-                        })
-                        .unwrap(),
+                    type_interner.find_token_unchecked(&Type::Int {
+                        signedness: Signedness::Signed,
+                        width: 64,
+                    }),
                     ctx.i64_type().into(),
                 ),
                 (
-                    type_interner
-                        .get_for_type(&Type::Int {
-                            signedness: Signedness::Unsigned,
-                            width: 8,
-                        })
-                        .unwrap(),
+                    type_interner.find_token_unchecked(&Type::Int {
+                        signedness: Signedness::Unsigned,
+                        width: 8,
+                    }),
                     ctx.i8_type().into(),
                 ),
                 (
-                    type_interner
-                        .get_for_type(&Type::Int {
-                            signedness: Signedness::Unsigned,
-                            width: 16,
-                        })
-                        .unwrap(),
+                    type_interner.find_token_unchecked(&Type::Int {
+                        signedness: Signedness::Unsigned,
+                        width: 16,
+                    }),
                     ctx.i16_type().into(),
                 ),
                 (
-                    type_interner
-                        .get_for_type(&Type::Int {
-                            signedness: Signedness::Unsigned,
-                            width: 32,
-                        })
-                        .unwrap(),
+                    type_interner.find_token_unchecked(&Type::Int {
+                        signedness: Signedness::Unsigned,
+                        width: 32,
+                    }),
                     ctx.i32_type().into(),
                 ),
                 (
-                    type_interner
-                        .get_for_type(&Type::Int {
-                            signedness: Signedness::Unsigned,
-                            width: 64,
-                        })
-                        .unwrap(),
+                    type_interner.find_token_unchecked(&Type::Int {
+                        signedness: Signedness::Unsigned,
+                        width: 64,
+                    }),
                     ctx.i64_type().into(),
                 ),
                 (
-                    type_interner.get_for_type(&Type::Bool).unwrap(),
+                    type_interner.find_token_unchecked(&Type::Bool),
                     ctx.i8_type().into(),
                 ),
             ]),

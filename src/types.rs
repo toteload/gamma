@@ -279,44 +279,6 @@ impl PartialEq for Type {
                 signedness == s && width == w
             }
         }
-
-        /*
-        match (self, other) {
-            (Bool, _) | (Void, _) => true,
-            (Array(n, t), Array(m, u)) => n == m && t == u,
-            (Layout(_), Layout(_)) => todo!(),
-            (
-                Function {
-                    params: xparams,
-                    return_type: xreturn_type,
-                },
-                Function {
-                    params: yparams,
-                    return_type: yreturn_type,
-                },
-            ) => {
-                let same_return_type = xreturn_type == yreturn_type;
-
-                let same_params = xparams
-                    .iter()
-                    .zip(yparams)
-                    .fold(true, |acc, (x, y)| acc && x == y);
-
-                same_return_type && same_params && xparams.len() == yparams.len()
-            }
-            (Pointer(x), Pointer(y)) => x == y,
-            (
-                Int {
-                    signedness: x_signedness,
-                    width: x_width,
-                },
-                Int {
-                    signedness: y_signedness,
-                    width: y_width,
-                },
-            ) => x_signedness == y_signedness && x_width == y_width,
-        }
-        */
     }
 }
 
@@ -369,8 +331,12 @@ impl TypeInterner {
         tok
     }
 
-    pub fn get_for_type(&self, ty: &Type) -> Option<TypeToken> {
+    pub fn find_token(&self, ty: &Type) -> Option<TypeToken> {
         self.tokens.get(ty).copied()
+    }
+
+    pub fn find_token_unchecked(&self, ty: &Type) -> TypeToken {
+        *self.tokens.get(ty).expect("Type should be interned")
     }
 
     pub fn get<'a>(&'a self, tok: &TypeToken) -> &'a Type {

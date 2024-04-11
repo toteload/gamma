@@ -5,7 +5,6 @@ mod ast_visitor;
 mod compiler;
 mod error;
 mod ink_codegen;
-mod layout;
 mod parser;
 mod scope_stack;
 mod semantics;

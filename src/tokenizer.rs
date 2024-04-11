@@ -40,13 +40,32 @@ pub enum TokenKind {
     KeywordBand,
     KeywordXor,
 
+    // START - Currently unused
+    KeywordEq,
+    KeywordNe,
+    KeywordLe,
+    KeywordLt,
+    KeywordGe,
+    KeywordGt,
+    // END
+
     // Literal
     IntLiteral(i64),
     BoolLiteral(bool),
 
+    // Arithmetic operators
+    KeywordRem, // Remainder
+    Star,
+    Minus,
+    Plus,
+    Div,
+
+    // (De)referencing
+    Ampersand,
+    At,
+
     // Unorganized below
     // -----------------
-    KeywordRem, // Remainder
 
     // TODO call these keywords?
     Equal,
@@ -77,15 +96,7 @@ pub enum TokenKind {
     Period,
 
     EqualSign,
-
-    Ampersand,
-    At,
-
     Hat,
-    Star,
-    Minus,
-    Plus,
-    Div,
 }
 
 pub struct Tokenizer<'a> {
@@ -216,7 +227,6 @@ impl<'a> Iterator for Tokenizer<'a> {
                     "set"      => Token { span, kind: TokenKind::KeywordSet, },
                     "cast"     => Token { span, kind: TokenKind::KeywordCast, },
                     "end"      => Token { span, kind: TokenKind::KeywordEnd, },
-
                     "rem"      => Token { span, kind: TokenKind::KeywordRem, },
                     "and"      => Token { span, kind: TokenKind::KeywordAnd, },
                     "or"       => Token { span, kind: TokenKind::KeywordOr, },
@@ -230,7 +240,6 @@ impl<'a> Iterator for Tokenizer<'a> {
                     "lt"       => Token { span, kind: TokenKind::Less, },
                     "ge"       => Token { span, kind: TokenKind::GreaterEqual, },
                     "gt"       => Token { span, kind: TokenKind::Greater, },
-
                     "false"    => Token { span, kind: TokenKind::BoolLiteral(false), },
                     "true"     => Token { span, kind: TokenKind::BoolLiteral(true), },
                     _ => {
@@ -263,19 +272,6 @@ impl<'a> Iterator for Tokenizer<'a> {
                 }
 
                 let (end_offset, end) = self.read_while(|c| c.is_ascii_digit());
-
-                //let (mut end_offset, mut end_loc) = (offset + c.len_utf8(), start);
-                //loop {
-                //    let Some(d) = self.iter.peek() else { break; };
-
-                //    if !d.is_ascii_digit() {
-                //        break;
-                //    }
-
-                //    let b;
-                //    (_, end_loc, b) = self.advance().unwrap();
-                //    end_offset += b.len_utf8();
-                //}
 
                 let number: i64 = self.source[offset..end_offset].parse().unwrap();
                 let span = SourceSpan { start, end };
@@ -351,8 +347,9 @@ mod tests {
 
     #[test]
     fn tokenizer_creates_the_expected_tokens() {
-        let source = "fn if else + - * ; : { } ( ) void let voidlet 4687 continue return-,=       
-            int eq / ne ge le lt gt true false loop break bool int void end [ ]";
+        let source = 
+        "fn if else + - * / : { } ( ) [ ] let voidlet 4687 continue return , =       
+eq ne ge le lt gt true false loop break bool void end";
 
         let mut symbols = StringInterner::new();
         let tokenizer = Tokenizer::new(source, &mut symbols, true);
