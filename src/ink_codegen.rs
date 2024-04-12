@@ -805,7 +805,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     self.get_variable(sym).expect("Identifer should exist");
                 match val {
                     VariableValue::Stack(ptr) => Ok(self.builder.build_load(ty, ptr, "")?),
-                    _ => todo!("Retrieve value from variable"),
+                    VariableValue::Parameter(x) => Ok(x),
                 }
             }
             ExprKind::CompoundIdentifier(syms) => {
