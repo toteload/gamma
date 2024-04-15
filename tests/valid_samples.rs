@@ -6,36 +6,36 @@ use std::fs;
 fn compile(source: &str) -> String {
     let mut context = Context::new();
     let result = context.compile(
-        &source,
-        &Options {
-            target: MachineTarget::Windows,
-            enable_optimizations: false,
-            emit_llvm_ir: true,
-            emit_asm: false,
-            emit_object: false,
+        &source, 
+        &Options { 
+            target: MachineTarget::Windows, 
+            enable_optimizations: false, 
+            emit_llvm_ir: true, 
+            emit_asm: false, 
+            emit_object: false, 
         },
     );
 
-    let Ok(Output {
+    let Ok(Output { 
         llvm_ir: Some(output),
-        ..
-    }) = result
+        .. 
+    }) = result 
     else {
         let Err(errors) = result else { unreachable!() };
 
         for error in errors.iter() {
             error.print(
-                &source,
-                &context.spans,
-                &context.symbols,
+                &source, 
+                &context.spans, 
+                &context.symbols, 
                 &context.type_tokens,
             );
         }
 
         panic!(
-            "Compilation of sample resulted in {} error(s)",
+            "Compilation of sample resulted in {} error(s)", 
             errors.len(),
-        );
+        ); 
     };
 
     output
@@ -88,6 +88,13 @@ fn bitwise_operators() {
     let source = fs::read_to_string("tests/valid_samples/bitwise_operators.gamma").unwrap();
     let output = compile(&source);
     assert_snapshot!("bitwise_operators", output);
+}
+
+#[test]
+fn fibonacci() {
+    let source = fs::read_to_string("tests/valid_samples/fibonacci.gamma").unwrap();
+    let output = compile(&source);
+    assert_snapshot!("fibonacci", output);
 }
 
 #[test]

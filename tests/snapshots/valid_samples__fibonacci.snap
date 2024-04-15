@@ -1,0 +1,72 @@
+---
+source: tests/valid_samples.rs
+expression: output
+---
+; ModuleID = 'main'
+source_filename = "main"
+target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-pc-windows-msvc"
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn
+declare ptr @llvm.stacksave() #0
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn
+declare void @llvm.stackrestore(ptr) #0
+
+define i32 @fib(i32 %0) {
+entry:
+  %1 = call ptr @llvm.stacksave()
+  %2 = alloca i32, align 4
+  store i32 %0, ptr %2, align 4
+  %3 = alloca i32, align 4
+  store i32 1, ptr %3, align 4
+  %4 = alloca i32, align 4
+  store i32 1, ptr %4, align 4
+  br label %loop
+
+loop:                                             ; preds = %endif, %entry
+  %5 = call ptr @llvm.stacksave()
+  %6 = load i32, ptr %2, align 4
+  %7 = icmp eq i32 %6, 0
+  br i1 %7, label %then, label %otherwise
+
+then:                                             ; preds = %loop
+  %8 = call ptr @llvm.stacksave()
+  %9 = load i32, ptr %3, align 4
+  call void @llvm.stackrestore(ptr %1)
+  ret i32 %9
+
+otherwise:                                        ; preds = %loop
+  br label %endif
+
+endif:                                            ; preds = %otherwise
+  %10 = alloca i32, align 4
+  %11 = load i32, ptr %3, align 4
+  %12 = load i32, ptr %4, align 4
+  %13 = add i32 %11, %12
+  store i32 %13, ptr %10, align 4
+  %14 = load i32, ptr %3, align 4
+  store i32 %14, ptr %4, align 4
+  %15 = load i32, ptr %10, align 4
+  store i32 %15, ptr %3, align 4
+  %16 = load i32, ptr %2, align 4
+  %17 = sub i32 %16, 1
+  store i32 %17, ptr %2, align 4
+  call void @llvm.stackrestore(ptr %5)
+  br label %loop
+
+endloop:                                          ; No predecessors!
+  %18 = load i32, ptr %3, align 4
+  call void @llvm.stackrestore(ptr %1)
+  ret i32 %18
+}
+
+define i32 @main() {
+entry:
+  %0 = call ptr @llvm.stacksave()
+  %1 = call i32 @fib(i32 10)
+  call void @llvm.stackrestore(ptr %0)
+  ret i32 %1
+}
+
+attributes #0 = { nocallback nofree nosync nounwind willreturn }

@@ -1,0 +1,26 @@
+fn fib(n: i32): i32
+  let n: i32 = n
+  let a: i32 = (cast i32 1)
+  let b: i32 = (cast i32 1)
+
+  loop
+    if (eq n (cast i32 0))
+      return a
+    end
+
+    let c: i32 = (+ a b)
+    set b = a
+    set a = c
+    set n = (- n (cast i32 1))
+  end
+
+  # At the time of writing this I generate a basic block for after the loop.
+  # In this function this point never is reached, so it is a basic block
+  # without predecessors, which is illegal. It would be more elegant to detect
+  # this case and fix it in the compiler, but this is more pragmatic.
+  return a
+end
+
+fn main(): i32
+  return (fib (cast i32 10))
+end
