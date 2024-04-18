@@ -11,5 +11,6 @@ pub mod semantics;
 pub mod source_location;
 pub mod string_interner;
 pub mod tokenizer;
+pub mod type_annotate;
 pub mod type_check;
 pub mod types;

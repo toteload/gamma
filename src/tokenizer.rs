@@ -347,8 +347,7 @@ mod tests {
 
     #[test]
     fn tokenizer_creates_the_expected_tokens() {
-        let source = 
-        "fn if else + - * / : { } ( ) [ ] let voidlet 4687 continue return , =       
+        let source = "fn if else + - * / : { } ( ) [ ] let voidlet 4687 continue return , =       
 eq ne ge le lt gt true false loop break bool void end";
 
         let mut symbols = StringInterner::new();

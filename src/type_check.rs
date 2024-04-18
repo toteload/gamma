@@ -43,41 +43,16 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn is_valid_set_destination(&self, e: &Expr) -> bool {
+    fn is_valid_set_destination(&self, e: &Expression) -> bool {
         matches!(
             e.kind,
-            ExprKind::Identifier(_)
-                | ExprKind::CompoundIdentifier(_)
-                | ExprKind::BuiltinOp {
+            ExpressionKind::Identifier(_)
+                | ExpressionKind::CompoundIdentifier(_)
+                | ExpressionKind::BuiltinOp {
                     op: BuiltinOpKind::At,
                     ..
                 }
         )
-    }
-
-    fn get_type_token_of_type_kind(&mut self, kind: &TypeKind) -> Result<TypeToken, Symbol> {
-        match kind {
-            TypeKind::Identifier(sym) => self.type_table.get(sym).copied().ok_or(*sym),
-            TypeKind::Pointer(inner) => {
-                let inner = self.get_type_token_of_type_kind(inner)?;
-                Ok(self.type_tokens.add(Type::Pointer(inner)))
-            }
-            TypeKind::Array(size, inner) => {
-                let inner = self.get_type_token_of_type_kind(inner)?;
-                Ok(self.type_tokens.add(Type::Array(*size, inner)))
-            }
-        }
-    }
-
-    fn get_type_token_of_type_node(&mut self, ty: &crate::ast::Type) -> Result<TypeToken, Error> {
-        self.get_type_token_of_type_kind(&ty.kind)
-            .map_err(|sym| Error {
-                source: ErrorSource::AstNode(ty.id),
-                info: vec![
-                    ErrorInfo::Text("Identifier is not a valid type: "),
-                    ErrorInfo::Identifier(sym),
-                ],
-            })
     }
 
     fn get_type_token_of_sym(&self, sym: &Symbol) -> TypeToken {
@@ -113,88 +88,90 @@ impl TypeChecker<'_> {
         // 2. Register all the functions and external_fn
         // 3. Type check all the `fn` bodies.
 
-        for item in items {
-            match &item.kind {
-                ItemKind::Layout {
-                    name,
-                    fields: ast_fields,
-                } => {
-                    let fields = ast_fields
-                        .iter()
-                        .map(|Field { name, offset, ty }| {
-                            self.get_type_token_of_type_node(ty).map(|ty| LayoutField {
-                                name: name.sym,
-                                offset: *offset,
-                                ty,
+        /*
+            for item in items {
+                match &item.kind {
+                    ItemKind::Layout {
+                        name,
+                        fields: ast_fields,
+                    } => {
+                        let fields = ast_fields
+                            .iter()
+                            .map(|Field { name, offset, ty }| {
+                                self.get_type_token_of_type_node(ty).map(|ty| LayoutField {
+                                    name: name.sym,
+                                    offset: *offset,
+                                    ty,
+                                })
                             })
-                        })
-                        .collect::<Result<Vec<_>, _>>();
+                            .collect::<Result<Vec<_>, _>>();
 
-                    let Ok(fields) = fields else { todo!() };
+                        let Ok(fields) = fields else { todo!() };
 
-                    let layout_type = Type::Layout(Layout { fields });
+                        let layout_type = Type::Layout(Layout { fields });
 
-                    let layout_type_token = self.type_tokens.add(layout_type);
+                        let layout_type_token = self.type_tokens.add(layout_type);
 
-                    self.type_table.insert(name.sym, layout_type_token);
-                }
-                _ => (),
-            }
-        }
-
-        for item in items {
-            match &item.kind {
-                ItemKind::Function {
-                    name,
-                    params: param_nodes,
-                    return_type: return_type_node,
-                    ..
-                }
-                | ItemKind::ExternalFunction {
-                    name,
-                    params: param_nodes,
-                    return_type: return_type_node,
-                } => {
-                    let param_type_tokens = param_nodes
-                        .iter()
-                        .map(|p| self.get_type_token_of_type_node(&p.ty))
-                        .collect::<Result<Vec<_>, _>>();
-
-                    let Ok(param_type_tokens) = param_type_tokens else {
-                        todo!()
-                    };
-
-                    let return_type_token = self.get_type_token_of_type_node(return_type_node);
-
-                    let Ok(return_type_token) = return_type_token else {
-                        todo!()
-                    };
-
-                    for (param_node, type_token) in param_nodes.iter().zip(&param_type_tokens) {
-                        // Type annotate the parameter nodes and their type nodes
-                        self.types.insert(param_node.id, *type_token);
-                        self.types.insert(param_node.name.id, *type_token);
-                        self.types.insert(param_node.ty.id, *type_token);
+                        self.type_table.insert(name.sym, layout_type_token);
                     }
-
-                    // Type annotate node for the function's return type
-                    self.types.insert(return_type_node.id, return_type_token);
-
-                    let function_type = Type::Function {
-                        params: param_type_tokens,
-                        return_type: return_type_token,
-                    };
-
-                    let function_type_token = self.type_tokens.add(function_type);
-
-                    // Type annotate the function
-                    self.types.insert(item.id, function_type_token);
-
-                    top_scope.insert(name.sym, function_type_token);
+                    _ => (),
                 }
-                _ => (),
             }
-        }
+
+            for item in items {
+                match &item.kind {
+                    ItemKind::Function {
+                        name,
+                        params: param_nodes,
+                        return_type: return_type_node,
+                        ..
+                    }
+                    | ItemKind::ExternalFunction {
+                        name,
+                        params: param_nodes,
+                        return_type: return_type_node,
+                    } => {
+                        let param_type_tokens = param_nodes
+                            .iter()
+                            .map(|p| self.get_type_token_of_type_node(&p.ty))
+                            .collect::<Result<Vec<_>, _>>();
+
+                        let Ok(param_type_tokens) = param_type_tokens else {
+                            todo!()
+                        };
+
+                        let return_type_token = self.get_type_token_of_type_node(return_type_node);
+
+                        let Ok(return_type_token) = return_type_token else {
+                            todo!()
+                        };
+
+                        for (param_node, type_token) in param_nodes.iter().zip(&param_type_tokens) {
+                            // Type annotate the parameter nodes and their type nodes
+                            self.types.insert(param_node.id, *type_token);
+                            self.types.insert(param_node.name.id, *type_token);
+                            self.types.insert(param_node.ty.id, *type_token);
+                        }
+
+                        // Type annotate node for the function's return type
+                        self.types.insert(return_type_node.id, return_type_token);
+
+                        let function_type = Type::Function {
+                            params: param_type_tokens,
+                            return_type: return_type_token,
+                        };
+
+                        let function_type_token = self.type_tokens.add(function_type);
+
+                        // Type annotate the function
+                        self.types.insert(item.id, function_type_token);
+
+                        top_scope.insert(name.sym, function_type_token);
+                    }
+                    _ => (),
+                }
+            }
+        */
 
         self.scopes.push_scope(top_scope);
 
@@ -260,7 +237,7 @@ impl TypeChecker<'_> {
 
         match &statement.kind {
             Let { name, ty, init } => {
-                let type_token = self.get_type_token_of_type_node(ty);
+                let type_token = todo!();
 
                 let type_token = match type_token {
                     Ok(x) => x,
@@ -274,7 +251,7 @@ impl TypeChecker<'_> {
                 self.scopes.insert(name.sym, type_token);
 
                 if let Some(init) = init {
-                    let init_type_token = match self.visit_expr(init) {
+                    let init_type_token = match self.visit_expression(init) {
                         Ok(x) => x,
                         Err(e) => {
                             self.errors.push(e);
@@ -299,8 +276,8 @@ impl TypeChecker<'_> {
                 }
             }
             Set { dst, val } => {
-                let dst_result = self.visit_expr(dst);
-                let val_result = self.visit_expr(val);
+                let dst_result = self.visit_expression(dst);
+                let val_result = self.visit_expression(val);
 
                 // The types of `val` and `dst` should match. However, `dst` should also be an
                 // "L-value". Something like `set 0 = 1` would type check (in the sense that the
@@ -342,8 +319,8 @@ impl TypeChecker<'_> {
                     _ => {}
                 }
             }
-            Expr(e) => {
-                if let Err(err) = self.visit_expr(e) {
+            Expression(e) => {
+                if let Err(err) = self.visit_expression(e) {
                     self.errors.push(err);
                 }
             }
@@ -352,7 +329,7 @@ impl TypeChecker<'_> {
                 then,
                 otherwise,
             } => {
-                match self.visit_expr(cond) {
+                match self.visit_expression(cond) {
                     Ok(ty) if ty != self.type_tokens.add(Type::Bool) => {
                         self.errors.push(Error {
                             source: ErrorSource::AstNode(cond.id),
@@ -373,7 +350,7 @@ impl TypeChecker<'_> {
             }
             Return(e) => {
                 let found_return_type = match e {
-                    Some(e) => match self.visit_expr(e) {
+                    Some(e) => match self.visit_expression(e) {
                         Err(err) => {
                             self.errors.push(err);
                             return;
@@ -403,8 +380,8 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn visit_expr(&mut self, expression: &Expr) -> Result<TypeToken, Error> {
-        use ExprKind::*;
+    fn visit_expression(&mut self, expression: &Expression) -> Result<TypeToken, Error> {
+        use ExpressionKind::*;
 
         let ty = match &expression.kind {
             IntLiteral(_) => self.int_const,
@@ -451,8 +428,8 @@ impl TypeChecker<'_> {
                 ttok
             }
             Cast { ty, e } => {
-                let expr_ty_token = self.visit_expr(e)?;
-                let cast_ty_token = self.get_type_token_of_type_node(ty)?;
+                let expr_ty_token = self.visit_expression(e)?;
+                let cast_ty_token = todo!();
 
                 if !self.is_valid_type_cast(expr_ty_token, cast_ty_token) {
                     return Err(Error {
@@ -472,7 +449,7 @@ impl TypeChecker<'_> {
                 BuiltinOpKind::Equals | BuiltinOpKind::NotEquals => {
                     let arg_types = args
                         .iter()
-                        .map(|arg| self.visit_expr(arg))
+                        .map(|arg| self.visit_expression(arg))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
@@ -514,7 +491,7 @@ impl TypeChecker<'_> {
 
                     let arg_types = args
                         .iter()
-                        .map(|arg| self.visit_expr(arg))
+                        .map(|arg| self.visit_expression(arg))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
@@ -537,17 +514,17 @@ impl TypeChecker<'_> {
                     arg_types[0]
                 }
                 BuiltinOpKind::AddressOf => {
-                    let arg_type_token = self.visit_expr(&args[0])?;
+                    let arg_type_token = self.visit_expression(&args[0])?;
                     self.type_tokens.add(Type::Pointer(arg_type_token))
                 }
                 BuiltinOpKind::At => {
-                    let arg_type_token = self.visit_expr(&args[0])?;
+                    let arg_type_token = self.visit_expression(&args[0])?;
                     let ty = self.type_tokens.get(&arg_type_token);
 
                     match *ty {
                         Type::Pointer(t) => t,
                         Type::Array(_, t) => {
-                            let idx_type_token = self.visit_expr(&args[1])?;
+                            let idx_type_token = self.visit_expression(&args[1])?;
                             let ty = self.type_tokens.get(&idx_type_token);
 
                             if !matches!(ty, Type::Int { .. }) {
@@ -567,7 +544,7 @@ impl TypeChecker<'_> {
                 }
                 BuiltinOpKind::Not => {
                     let [arg] = args.as_slice() else { todo!() };
-                    let arg_type_token = self.visit_expr(&arg)?;
+                    let arg_type_token = self.visit_expression(&arg)?;
                     let ty = self.type_tokens.get(&arg_type_token);
 
                     if !matches!(ty, Type::Bool) {
@@ -583,7 +560,7 @@ impl TypeChecker<'_> {
 
                     let arg_types = args
                         .iter()
-                        .map(|arg| self.visit_expr(arg))
+                        .map(|arg| self.visit_expression(arg))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
@@ -598,7 +575,7 @@ impl TypeChecker<'_> {
                 BuiltinOpKind::And | BuiltinOpKind::Or => {
                     let arg_types = args
                         .iter()
-                        .map(|arg| self.visit_expr(arg))
+                        .map(|arg| self.visit_expression(arg))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
@@ -613,7 +590,7 @@ impl TypeChecker<'_> {
                 BuiltinOpKind::BitwiseAnd | BuiltinOpKind::BitwiseOr | BuiltinOpKind::Xor => {
                     let arg_types = args
                         .iter()
-                        .map(|arg| self.visit_expr(arg))
+                        .map(|arg| self.visit_expression(arg))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     let args_are_of_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
@@ -648,7 +625,7 @@ impl TypeChecker<'_> {
 
                 let arg_types = args
                     .iter()
-                    .map(|arg| self.visit_expr(arg))
+                    .map(|arg| self.visit_expression(arg))
                     .collect::<Result<Vec<TypeToken>, _>>()?;
 
                 if params.len() != arg_types.len() {

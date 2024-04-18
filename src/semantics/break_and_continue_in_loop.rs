@@ -17,22 +17,17 @@ impl<'a> Prover<'a> {
 }
 
 impl Visitor for Prover<'_> {
-    fn visit_function(
+    fn on_function_enter(
         &mut self,
-        _name: &Name,
-        _params: &[Param],
-        _return_type: &Type,
-        body: &Block,
+        _: &Item
     ) {
         self.loop_depth = 0;
-        self.visit_block(body);
     }
 
-    fn visit_statement(&mut self, stmt: &Statement) {
-        match stmt.kind {
+    fn on_statement_enter(&mut self, statement: &Statement) {
+        match statement.kind {
             StatementKind::Loop(block) => {
                 self.loop_depth += 1;
-                self.visit_block(block);
             }
             StatementKind::Break | StatementKind::Continue => {
                 if self.loop_depth > 0 {
@@ -51,13 +46,14 @@ impl Visitor for Prover<'_> {
 
 impl SemanticProver for Prover {
     fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Error>> {
-        self.visit_items();
+        visit_items(self, items);
 
         if !self.errors.is_empty() {
-            return Err(self.errors.clone());
+            Err(self.errors.clone())
+        } else {
+        Ok(())
         }
 
-        Ok(())
     }
 }
 

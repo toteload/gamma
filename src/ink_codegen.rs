@@ -690,8 +690,8 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .expect("There should be a basic block present after a loop"),
                 )?;
             }
-            StatementKind::Expr(e) => 'expr_block: {
-                if let ExprKind::Call { name, args } = &e.kind {
+            StatementKind::Expression(e) => 'expr_block: {
+                if let ExpressionKind::Call { name, args } = &e.kind {
                     let Some(tok) = self.node_types.get(&name.id) else {
                         todo!()
                     };
@@ -733,9 +733,9 @@ impl<'ctx> CodeGenerator<'ctx> {
         Ok(is_terminator)
     }
 
-    fn get_dst_ptr(&mut self, e: &Expr) -> Result<PointerValue<'ctx>, Error> {
+    fn get_dst_ptr(&mut self, e: &Expression) -> Result<PointerValue<'ctx>, Error> {
         match &e.kind {
-            ExprKind::Identifier(sym) => {
+            ExpressionKind::Identifier(sym) => {
                 let Variable { ty, val, .. } =
                     self.get_variable(sym).expect("Identifier should exist");
                 let VariableValue::Stack(ptr) = val else {
@@ -743,7 +743,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 };
                 Ok(ptr)
             }
-            ExprKind::CompoundIdentifier(syms) => {
+            ExpressionKind::CompoundIdentifier(syms) => {
                 let Variable {
                     ty,
                     type_token,
@@ -775,7 +775,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     _ => todo!(),
                 }
             }
-            ExprKind::BuiltinOp {
+            ExpressionKind::BuiltinOp {
                 op: BuiltinOpKind::At,
                 args,
             } => {
@@ -800,9 +800,9 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
-    fn gen_expr(&mut self, e: &Expr) -> Result<BasicValueEnum<'ctx>, Error> {
+    fn gen_expr(&mut self, e: &Expression) -> Result<BasicValueEnum<'ctx>, Error> {
         match &e.kind {
-            ExprKind::IntLiteral(x) => {
+            ExpressionKind::IntLiteral(x) => {
                 let ty = self.type_interner.get(
                     self.node_types
                         .get(&e.id)
@@ -816,10 +816,10 @@ impl<'ctx> CodeGenerator<'ctx> {
                     _ => panic!(),
                 }
             }
-            ExprKind::BoolLiteral(x) => {
+            ExpressionKind::BoolLiteral(x) => {
                 Ok(self.i64_t.const_int(if *x { 1 } else { 0 }, false).into())
             }
-            ExprKind::Identifier(sym) => {
+            ExpressionKind::Identifier(sym) => {
                 let Variable { ty, val, .. } =
                     self.get_variable(sym).expect("Identifer should exist");
                 match val {
@@ -827,7 +827,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     VariableValue::Parameter(x) => Ok(x),
                 }
             }
-            ExprKind::CompoundIdentifier(syms) => {
+            ExpressionKind::CompoundIdentifier(syms) => {
                 let Variable {
                     ty,
                     type_token,
@@ -866,7 +866,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     _ => todo!(),
                 }
             }
-            ExprKind::Cast { e: src, .. } => {
+            ExpressionKind::Cast { e: src, .. } => {
                 let src_ty_token = self.node_types.get(&src.id).unwrap();
                 let src_ty = self.type_interner.get(src_ty_token);
 
@@ -940,7 +940,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     _ => todo!("Cast from {:?} to {:?}", src_ty, dst_ty),
                 }
             }
-            ExprKind::BuiltinOp { op, args } => match op {
+            ExpressionKind::BuiltinOp { op, args } => match op {
                 BuiltinOpKind::Not => {
                     let x = self.gen_expr(&args[0])?;
                     Ok(self.builder.build_not(x.into_int_value(), "")?.into())
@@ -1097,7 +1097,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .into())
                 }
                 BuiltinOpKind::AddressOf => {
-                    let ExprKind::Identifier(sym) = args[0].kind else {
+                    let ExpressionKind::Identifier(sym) = args[0].kind else {
                         todo!()
                     };
                     let var = self.get_variable(&sym).unwrap();
@@ -1112,7 +1112,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     Ok(ptr.into())
                 }
                 BuiltinOpKind::At => {
-                    let ExprKind::Identifier(sym) = args[0].kind else {
+                    let ExpressionKind::Identifier(sym) = args[0].kind else {
                         todo!()
                     };
 
@@ -1140,13 +1140,10 @@ impl<'ctx> CodeGenerator<'ctx> {
                     Ok(self.builder.build_load(pointee_type, addr, "")?)
                 }
 
-                BuiltinOpKind::GreaterThan => {
-                }
-
                 _ => todo!("BuiltinOpKind \"{:?}\"", op),
             },
 
-            ExprKind::Call { name, args } => {
+            ExpressionKind::Call { name, args } => {
                 let args = args
                     .iter()
                     .map(|arg| self.gen_expr(arg).map(|x| x.into()))
