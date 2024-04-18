@@ -1,16 +1,16 @@
 fn main(): i32
-  let x: i64 = 0
+  let x: i32 = 0
 
-  loop @cherry
+  loop @zoop
     loop
       set x = (+ x 1)
       if (ne (rem x 10) 0)
         continue
       end
 
-      break @cherry
+      break @zoop
     end
   end
 
-  return (cast i32 x)
+  return x
 end

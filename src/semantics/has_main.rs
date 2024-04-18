@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::ast_visitor::Visitor;
+use crate::ast_visitor::{visit, Visitor};
 use crate::error::*;
 use crate::semantics::{SemanticContext, SemanticProver};
 use crate::string_interner::Symbol;
@@ -21,13 +21,11 @@ impl Prover {
 }
 
 impl Visitor for Prover {
-    fn visit_function(
-        &mut self,
-        name: &Name,
-        _params: &[Param],
-        _return_type: &Type,
-        _body: &Block,
-    ) {
+    fn on_function_enter(&mut self, function: &Item) {
+        let ItemKind::Function { name, .. } = function.kind else {
+            unreachable!()
+        };
+
         if name.sym == self.main_symbol.unwrap() {
             self.found_main_function = true;
         }
@@ -45,7 +43,7 @@ impl SemanticProver for Prover {
             return Err(vec![no_main_defined_error]);
         };
 
-        self.visit_items(items);
+        visit(self, items);
 
         if !self.found_main_function {
             return Err(vec![no_main_defined_error]);

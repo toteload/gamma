@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::ast_visitor::Visitor;
+use crate::ast_visitor::{visit, Visitor};
 use crate::error::*;
 use crate::semantics::{SemanticContext, SemanticProver};
 use crate::string_interner::Symbol;
@@ -44,103 +44,60 @@ impl<'a> Prover<'a> {
 }
 
 impl Visitor for Prover<'_> {
-    fn visit_items(&mut self, items: &[Item]) {
+    fn on_items_enter(&mut self, items: &[Item]) {
         // TODO: Check for items with the same name.
 
         let global_scope = items.iter().map(|i| i.name_sym()).collect();
         self.scopes.push(global_scope);
-
-        for item in items {
-            self.visit_item(item);
-        }
     }
 
-    fn visit_function(
-        &mut self,
-        _name: &Name,
-        params: &[Param],
-        _return_type: &Type,
-        body: &Block,
-    ) {
+    fn on_function_enter(&mut self, function: &Item) {
+        let ItemKind::Function { params, .. } = &function.kind else {
+            unreachable!()
+        };
         let param_scope_symbols = params.iter().map(|p| p.name.sym).collect();
         self.scopes.push(param_scope_symbols);
-        self.visit_block(body);
+    }
+
+    fn on_function_leave(&mut self, function: &Item) {
         self.scopes.pop();
     }
 
-    fn visit_block(&mut self, block: &Block) {
+    fn on_block_enter(&mut self, block: &Block) {
         self.scopes.push(HashSet::new());
+    }
 
-        for statement in &block.statements {
-            self.visit_statement(statement);
-        }
-
+    fn on_block_leave(&mut self, block: &Block) {
         self.scopes.pop();
     }
 
-    fn visit_statement(&mut self, stmt: &Statement) {
+    fn on_statement_enter(&mut self, statement: &Statement) {
         use StatementKind::*;
 
-        match &stmt.kind {
-            Let { name, init, .. } => {
-                self.scopes.last_mut().unwrap().insert(name.sym);
-                if let Some(init) = init {
-                    self.visit_expr(init);
-                }
-            }
-            Set { dst, val } => {
-                self.visit_expr(dst);
-                self.visit_expr(val);
-            }
-            Expr(e) => self.visit_expr(e),
-            If {
-                cond,
-                then,
-                otherwise,
-            } => {
-                self.visit_expr(cond);
-                self.visit_block(then);
-                if let Some(otherwise) = otherwise {
-                    self.visit_block(otherwise);
-                }
-            }
-            Return(Some(e)) => self.visit_expr(e),
-            Loop(body, label) => {
-                self.visit_block(body);
-            }
-            Break(_) | Continue(_) | Return(None) => (),
+        if let Let { name, init, .. } = &statement.kind {
+            self.scopes.last_mut().unwrap().insert(name.sym);
         }
     }
 
-    fn visit_expr(&mut self, e: &Expr) {
-        use ExprKind::*;
+    fn on_expression_enter(&mut self, expression: &Expression) {
+        use ExpressionKind::*;
 
-        let id = &e.id;
+        let Expression { kind, id } = expression;
 
-        match &e.kind {
-            IntLiteral(_) | BoolLiteral(_) => (),
+        match kind {
             Identifier(sym) => self.validate_sym(sym, id),
             CompoundIdentifier(idents) => self.validate_sym(&idents[0], id),
-            BuiltinOp { args, .. } => {
-                for arg in args {
-                    self.visit_expr(arg);
-                }
-            }
-            Cast { e, .. } => self.visit_expr(e),
             Call { name, args } => {
                 self.validate_sym(&name.sym, id);
-
-                for arg in args {
-                    self.visit_expr(arg);
-                }
             }
+            _ => {}
         }
     }
 }
 
 impl SemanticProver for Prover<'_> {
     fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Error>> {
-        self.visit_items(items);
+        visit(self, items);
 
         if !self.errors.is_empty() {
             return Err(self.errors.clone());

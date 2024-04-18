@@ -23,6 +23,7 @@ pub struct Layout {
 
 #[derive(Clone, Debug, Eq, Serialize)]
 pub enum Type {
+    Invalid,
     Layout(Layout),
     Void,
     Bool,

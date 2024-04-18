@@ -37,7 +37,7 @@ otherwise:                                        ; preds = %loop
 
 endif:                                            ; preds = %otherwise
   %7 = load i32, ptr %2, align 4
-  %8 = getelementptr [16 x i32], ptr %1, i32 %7
+  %8 = getelementptr [16 x i32], ptr %1, i32 0, i32 %7
   %9 = load i32, ptr %2, align 4
   store i32 %9, ptr %8, align 4
   %10 = load i32, ptr %2, align 4
@@ -52,4 +52,3 @@ endloop:                                          ; preds = %then
 }
 
 attributes #0 = { nocallback nofree nosync nounwind willreturn }
-

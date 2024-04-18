@@ -11,8 +11,10 @@ mod semantics;
 mod source_location;
 mod string_interner;
 mod tokenizer;
+mod type_annotate;
 mod type_check;
 mod type_interner;
+mod type_coercion;
 mod types;
 mod utils;
 

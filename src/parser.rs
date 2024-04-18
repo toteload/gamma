@@ -475,7 +475,7 @@ impl Parser<'_> {
             _ => {
                 let e = self.parse_expression()?;
                 span = *self.spans.get(&e.id).unwrap();
-                Expr(e.into())
+                Expression(e.into())
             }
         };
 
@@ -484,7 +484,7 @@ impl Parser<'_> {
         Ok(Statement { id, kind })
     }
 
-    fn parse_arguments(&mut self) -> Result<Vec<Expr>> {
+    fn parse_arguments(&mut self) -> Result<Vec<Expression>> {
         use TokenKind::*;
 
         let mut args = vec![];
@@ -496,7 +496,7 @@ impl Parser<'_> {
         Ok(args)
     }
 
-    fn parse_expression(&mut self) -> Result<Expr> {
+    fn parse_expression(&mut self) -> Result<Expression> {
         use TokenKind::*;
 
         let id = self.gen_node_id();
@@ -510,11 +510,11 @@ impl Parser<'_> {
         let kind = match tok.kind {
             IntLiteral(x) => {
                 span = tok.span;
-                ExprKind::IntLiteral(x)
+                ExpressionKind::IntLiteral(x)
             }
             BoolLiteral(x) => {
                 span = tok.span;
-                ExprKind::BoolLiteral(x)
+                ExpressionKind::BoolLiteral(x)
             }
             Identifier(sym) => {
                 span = tok.span;
@@ -536,10 +536,10 @@ impl Parser<'_> {
                 }
 
                 if let &[sym] = idents.as_slice() {
-                    ExprKind::Identifier(sym)
+                    ExpressionKind::Identifier(sym)
                 } else {
                     // TODO(david) set the span correctly
-                    ExprKind::CompoundIdentifier(idents)
+                    ExpressionKind::CompoundIdentifier(idents)
                 }
             }
             ParenOpen => {
@@ -579,7 +579,7 @@ impl Parser<'_> {
                     KeywordCast => {
                         let ty = self.parse_type()?;
                         let e = self.parse_expression()?;
-                        ExprKind::Cast { ty, e: e.into() }
+                        ExpressionKind::Cast { ty, e: e.into() }
                     }
 
                     op @ builtin_operators!() => {
@@ -604,14 +604,14 @@ impl Parser<'_> {
                             _ => todo!("Token {:?}", op),
                         };
 
-                        ExprKind::BuiltinOp {
+                        ExpressionKind::BuiltinOp {
                             op,
                             args: self.parse_arguments()?,
                         }
                     }
 
                     // Function call
-                    Identifier(sym) => ExprKind::Call {
+                    Identifier(sym) => ExpressionKind::Call {
                         name: self.parse_name()?,
                         args: self.parse_arguments()?,
                     },
@@ -631,6 +631,6 @@ impl Parser<'_> {
         // TODO register the span for this expression
         self.spans.insert(id, span);
 
-        Ok(Expr { id, kind })
+        Ok(Expression { id, kind })
     }
 }

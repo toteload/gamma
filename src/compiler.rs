@@ -143,6 +143,10 @@ impl Context {
 
         validate_semantics(&semantic_context, &items)?;
 
+        type_annotate();
+
+        type_coerce();
+
         type_check(
             &items,
             &mut self.type_tokens,

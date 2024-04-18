@@ -1,5 +1,6 @@
 use crate::string_interner::Symbol;
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct NodeId(u32);
@@ -24,6 +25,8 @@ impl NodeIdGenerator {
         NodeId(self.counter)
     }
 }
+
+pub type AstMap<T> = HashMap<NodeId, T>;
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct Name {
@@ -76,7 +79,6 @@ pub enum ItemKind {
     },
 }
 
-// Type has an associated TypeToken
 #[derive(Clone, Debug, Serialize)]
 pub struct Type {
     pub id: NodeId,
@@ -85,12 +87,12 @@ pub struct Type {
 
 #[derive(Clone, Debug, Serialize)]
 pub enum TypeKind {
+    Internal,
     Identifier(Symbol),
     Pointer(Box<TypeKind>),
     Array(i64, Box<TypeKind>),
 }
 
-// Param has an associated TypeToken
 #[derive(Clone, Debug, Serialize)]
 pub struct Param {
     pub id: NodeId,
@@ -109,21 +111,21 @@ pub enum StatementKind {
     Let {
         name: Name,
         ty: Type,
-        init: Option<Box<Expr>>,
+        init: Option<Box<Expression>>,
     },
     Set {
-        dst: Box<Expr>,
-        val: Box<Expr>,
+        dst: Box<Expression>,
+        val: Box<Expression>,
     },
-    Expr(Box<Expr>),
+    Expression(Box<Expression>),
     If {
-        cond: Box<Expr>,
+        cond: Box<Expression>,
         then: Block,
         otherwise: Option<Block>,
     },
     Break(Option<Label>),
     Continue(Option<Label>),
-    Return(Option<Box<Expr>>),
+    Return(Option<Box<Expression>>),
     Loop(Block, Option<Label>),
 }
 
@@ -135,41 +137,53 @@ pub struct Block {
 
 #[derive(Clone, Copy, Debug, Serialize)]
 pub enum BuiltinOpKind {
+    Not,
     Or,
     And,
+
     Xor,
     BitwiseAnd,
     BitwiseOr,
-    Not,
+
     Add,
     Sub,
     Mul,
     Div,
+    Remainder,
+
     Equals,
     NotEquals,
     LessThan,
     GreaterThan,
     LessEquals,
     GreaterEquals,
+
     AddressOf,
     At,
-    Remainder,
 }
 
-// Expr always has an associated TypeToken
 #[derive(Clone, Debug, Serialize)]
-pub struct Expr {
+pub struct Expression {
     pub id: NodeId,
-    pub kind: ExprKind,
+    pub kind: ExpressionKind,
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub enum ExprKind {
+pub enum ExpressionKind {
     IntLiteral(i64),
     BoolLiteral(bool),
     Identifier(Symbol),
     CompoundIdentifier(Vec<Symbol>),
-    BuiltinOp { op: BuiltinOpKind, args: Vec<Expr> },
-    Call { name: Name, args: Vec<Expr> },
-    Cast { ty: Type, e: Box<Expr> },
+    BuiltinOp {
+        op: BuiltinOpKind,
+        args: Vec<Expression>,
+    },
+    Call {
+        name: Name,
+        args: Vec<Expression>,
+    },
+    Cast {
+        ty: Type,
+        e: Box<Expression>,
+    },
 }
