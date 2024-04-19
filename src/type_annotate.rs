@@ -64,10 +64,9 @@ impl TypeAnnotater<'_> {
             .expect(format!("Symbol {identifier:?} should be found in scope").as_str())
     }
 
-    fn get_type_of_identifier(&self, identifier: &Symbol) -> Type {
+    fn get_type_of_identifier(&self, identifier: &Symbol) -> &Type {
         self.typetokens
             .get(&self.get_typetoken_of_identifier(identifier))
-            .clone()
     }
 }
 
@@ -136,26 +135,36 @@ impl Visitor for TypeAnnotater<'_> {
                 Not | Or | And | Equals | NotEquals | LessThan | GreaterThan | LessEquals
                 | GreaterEquals => _ = self.typetokens.add(Type::Bool),
                 AddressOf => {
-                    let arg = args[0];
-                    let ty = self.typetokens.get(self.ast_types.get(&arg.id).expect(""));
-                    self.ast_types.insert(expression.id, self.typetokens.add(Type::Pointer(ty)));
+                    let arg = &args[0];
+                    let ty = self.ast_types.get(&arg.id).expect("");
+                    self.ast_types
+                        .insert(expression.id, self.typetokens.add(Type::Pointer(*ty)));
                 }
                 At => {
-                    let pointee = args[0];
+                    let pointee = &args[0];
 
-                    let ty = self.typetokens.get(self.ast_types.get(&pointee.id).expect(""));
+                    let ty = self
+                        .typetokens
+                        .get(self.ast_types.get(&pointee.id).expect(""));
 
                     let t = match ty {
-                        Type::Pointer(t) | Type::Array(_, t) => t,
-                        _ => Type::Invalid,
+                        Type::Pointer(t) | Type::Array(_, t) => *t,
+                        _ => self.typetokens.add(Type::Invalid),
                     };
 
                     self.ast_types.insert(expression.id, t);
-                },
+                }
                 Xor | BitwiseAnd | BitwiseOr | Add | Sub | Mul | Div | Remainder => {
-                    let ty = args.iter().find(|&&arg| match!(arg, Type::Int { .. })).or(self.typetokens.add(Type::IntConstant));
+                    let ty = args
+                        .iter()
+                        .map(|arg| self.ast_types.get(&arg.id).expect(""))
+                        .copied()
+                        .find(|arg_type| {
+                            matches!(self.typetokens.get(arg_type), Type::Int { .. })
+                        })
+                        .unwrap_or(self.typetokens.add(Type::IntConstant));
                     self.ast_types.insert(expression.id, ty);
-                },
+                }
             },
             Call { name, args } => {
                 let function_type = self.get_type_of_identifier(&name.sym);
@@ -163,7 +172,7 @@ impl Visitor for TypeAnnotater<'_> {
                     panic!()
                 };
 
-                self.ast_types.insert(expression.id, return_type);
+                self.ast_types.insert(expression.id, *return_type);
             }
         }
     }

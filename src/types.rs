@@ -53,6 +53,7 @@ impl Type {
             Array(..) => 5,
             Layout(..) => 6,
             IntConstant => 7,
+            Invalid => 8,
         }
     }
 
@@ -73,7 +74,7 @@ impl Type {
             },
             Pointer(_) => 8,
             Array(_, base) => type_interner.get(base).align(type_interner),
-            IntConstant => panic!(),
+            IntConstant | Invalid => panic!(),
         }
     }
 
@@ -102,7 +103,7 @@ impl Type {
                     .next_multiple_of(base.align(type_interner));
                 *n as u32 * base_with_padding_size
             }
-            IntConstant => panic!(),
+            IntConstant | Invalid => panic!(),
         }
     }
 
@@ -174,6 +175,7 @@ impl Type {
                 s
             }
             IntConstant => "int-constant".to_string(),
+            Invalid => "invalid".to_string(),
         }
     }
 }
@@ -185,7 +187,7 @@ impl Hash for Type {
         state.write_u8(x);
 
         match self {
-            Type::Void | Type::Bool | Type::IntConstant => (),
+            Type::Void | Type::Bool | Type::IntConstant | Type::Invalid => (),
             Type::Function {
                 params,
                 return_type,
@@ -230,7 +232,7 @@ impl PartialEq for Type {
         }
 
         match self {
-            Bool | Void | IntConstant => true,
+            Bool | Void | IntConstant | Invalid => true,
             Pointer(a) => {
                 let Pointer(b) = other else { unreachable!() };
                 a == b
