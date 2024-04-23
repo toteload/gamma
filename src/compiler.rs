@@ -6,7 +6,7 @@ use crate::{
     semantics::{validate_semantics, SemanticContext},
     source_location::SourceSpan,
     string_interner::{StringInterner, Symbol},
-    type_check::type_check,
+    type_check2::type_check,
     types::{Signedness, Type, TypeInterner, TypeToken},
 };
 use inkwell::memory_buffer::MemoryBuffer;
