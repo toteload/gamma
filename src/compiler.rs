@@ -6,9 +6,9 @@ use crate::{
     semantics::{validate_semantics, SemanticContext},
     source_location::SourceSpan,
     string_interner::{StringInterner, Symbol},
-    type_check::type_check,
     type_interner::{TypeInterner, TypeToken},
     types::{Signedness, Type},
+    type_check2::type_check,
 };
 use inkwell::memory_buffer::MemoryBuffer;
 use std::collections::HashMap;

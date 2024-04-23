@@ -317,6 +317,20 @@ pub fn is_type_coercible_to(type_tokens: &TypeInterner, from: TypeToken, to: Typ
     false
 }
 
+pub fn is_valid_type_cast(from: &Type, to: &Type) -> bool {
+    use Type::*;
+
+    match (to, from) {
+        (Int { .. }, IntConstant) => true,
+        (Int { .. }, Int { .. }) => true,
+        (Int { .. }, Bool) => true,
+        (Bool, Int { .. }) => true,
+        (Pointer(_), Int { .. }) => true,
+        (Pointer(ta), Array(_, tb)) if ta == tb => true,
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

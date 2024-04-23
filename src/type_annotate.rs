@@ -159,9 +159,7 @@ impl Visitor for TypeAnnotater<'_> {
                         .iter()
                         .map(|arg| self.ast_types.get(&arg.id).expect(""))
                         .copied()
-                        .find(|arg_type| {
-                            matches!(self.typetokens.get(arg_type), Type::Int { .. })
-                        })
+                        .find(|arg_type| matches!(self.typetokens.get(arg_type), Type::Int { .. }))
                         .unwrap_or(self.typetokens.add(Type::IntConstant));
                     self.ast_types.insert(expression.id, ty);
                 }
