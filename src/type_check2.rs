@@ -1,10 +1,10 @@
 use crate::{
     ast::*,
-    ast_visitor::Visitor,
-    error::Error,
+    ast_visitor::{visit, Visitor},
+    error::{Error, ErrorSource},
     scope_stack::ScopeStack,
     string_interner::Symbol,
-    types::{Type, TypeInterner, TypeToken, is_valid_type_cast},
+    types::{is_valid_type_cast, Type, TypeInterner, TypeToken},
 };
 use std::collections::HashMap;
 
@@ -40,7 +40,12 @@ impl TypeChecker<'_> {
 
     fn check_equal_types(&mut self, left: &NodeId, right: &NodeId) {}
 
-    fn check_equal_types_at(&mut self, at: &ErrorSource, expected: TypeToken, actual: TypeToken) {
+    fn check_equal_types_at(
+        at: ErrorSource,
+        expected: &TypeToken,
+        actual: &TypeToken,
+    ) -> Option<Error> {
+        todo!()
     }
 
     fn check_set_destination_type(&mut self, dst: &Expression) {
@@ -119,10 +124,12 @@ impl Visitor for TypeChecker<'_> {
                     todo!("")
                 };
 
-                let arg_typetokens = args.iter().map(|arg| self.ast_types.get(&arg.id).expect(""));
+                let arg_typetokens = args
+                    .iter()
+                    .map(|arg| self.ast_types.get(&arg.id).expect(""));
 
                 for (expected, actual) in params.iter().zip(arg_typetokens) {
-                    self.check_equal_types(&expected, &actual);
+                    TypeChecker::check_equal_types_at(ErrorSource::Unspecified, expected, actual);
                 }
             }
             BuiltinOp { op, args } => match op {
@@ -138,7 +145,7 @@ impl Visitor for TypeChecker<'_> {
                     // base must be a pointer or an array
                     todo!();
                 }
-                _ => todo!()
+                _ => todo!(),
             },
             _ => (),
         }
@@ -147,9 +154,17 @@ impl Visitor for TypeChecker<'_> {
 
 pub fn type_check(
     items: &[Item],
-    type_tokens: &mut TypeInterner,
-    types: &mut HashMap<NodeId, TypeToken>,
-    type_table: &mut HashMap<Symbol, TypeToken>,
+    typetokens: &mut TypeInterner,
+    ast_types: &mut HashMap<NodeId, TypeToken>,
+    typetable: &mut HashMap<Symbol, TypeToken>,
 ) -> Result<(), Vec<Error>> {
-    todo!()
+    let mut type_checker = TypeChecker::new(typetokens, ast_types, typetable);
+
+    visit(&mut type_checker, items);
+
+    if !type_checker.errors.is_empty() {
+        Err(type_checker.errors)
+    } else {
+        Ok(())
+    }
 }

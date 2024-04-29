@@ -6,7 +6,9 @@ use crate::{
     semantics::{validate_semantics, SemanticContext},
     source_location::SourceSpan,
     string_interner::{StringInterner, Symbol},
+    type_annotate::type_annotate,
     type_check2::type_check,
+    type_coercion::type_coerce,
     types::{Signedness, Type, TypeInterner, TypeToken},
 };
 use inkwell::memory_buffer::MemoryBuffer;
@@ -133,7 +135,7 @@ impl Context {
             &mut self.spans,
         );
 
-        let items = parser.parse_items().map_err(|e| vec![e])?;
+        let mut items = parser.parse_items().map_err(|e| vec![e])?;
 
         let semantic_context = SemanticContext {
             symbols: &self.symbols,
@@ -141,6 +143,21 @@ impl Context {
         };
 
         validate_semantics(&semantic_context, &items)?;
+
+        type_annotate(
+            &items,
+            &mut self.type_tokens,
+            &mut self.types,
+            &mut self.type_table,
+        )?;
+
+        type_coerce(
+            &mut items,
+            &mut self.type_tokens,
+            &mut self.types,
+            &mut self.type_table,
+            &mut self.id_generator,
+        )?;
 
         type_check(
             &items,

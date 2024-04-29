@@ -46,18 +46,38 @@ pub trait VisitorMut {
 
 pub fn visit<T: Visitor>(visitor: &mut T, items: &[Item]) {
     visitor.on_items_enter(items);
+
     for item in items {
         visit_item(visitor, item);
     }
+
     visitor.on_items_leave(items);
+}
+
+pub fn visit_mut<T: VisitorMut>(visitor: &mut T, items: &mut [Item]) {
+    todo!()
+    //visitor.on_items_enter(items);
+    //for item in items {
+    //    visit_item(visitor, item);
+    //}
+    //visitor.on_items_leave(items);
 }
 
 fn visit_item<T: Visitor>(visitor: &mut T, item: &Item) {
     visitor.on_item_enter(item);
+
     match &item.kind {
         ItemKind::Function { .. } => visit_function(visitor, item),
+        ItemKind::ExternalFunction { return_type, params, .. } => {
+            visitor.on_type_enter(return_type);
+
+            for param in params.iter() {
+                visitor.on_type_enter(&param.ty)
+            }
+        }
         _ => (),
     }
+
     visitor.on_item_leave(item);
 }
 
@@ -67,14 +87,19 @@ fn visit_function<T: Visitor>(visitor: &mut T, function: &Item) {
     };
 
     visitor.on_function_enter(function);
+
     visit_block(visitor, &body);
+
     visitor.on_function_leave(function);
 }
+
 fn visit_block<T: Visitor>(visitor: &mut T, block: &Block) {
     visitor.on_block_enter(block);
+
     for statement in &block.statements {
         visit_statement(visitor, statement);
     }
+
     visitor.on_block_leave(block);
 }
 
@@ -118,7 +143,10 @@ fn visit_expression<T: Visitor>(visitor: &mut T, expression: &Expression) {
                 visit_expression(visitor, arg);
             }
         }
-        Cast { e, .. } => visit_expression(visitor, e),
+        Cast { ty, e } => {
+            visitor.on_type_enter(ty);
+            visit_expression(visitor, e);
+        }
         _ => (),
     }
 

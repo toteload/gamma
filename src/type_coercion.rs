@@ -1,6 +1,6 @@
 use crate::{
     ast::{self, *},
-    ast_visitor::{visit, VisitorMut},
+    ast_visitor::{visit_mut, VisitorMut},
     error::Error,
     scope_stack::ScopeStack,
     string_interner::Symbol,
@@ -80,6 +80,20 @@ impl VisitorMut for TypeCoercer<'_> {
     fn on_expression_enter(&mut self, expression: &mut Expression) {}
 }
 
-fn type_coerce() -> Result<(), Vec<Error>> {
-    todo!()
+pub fn type_coerce(
+    items: &mut [Item],
+    typetokens: &mut TypeInterner,
+    ast_types: &mut HashMap<NodeId, TypeToken>,
+    typetable: &mut HashMap<Symbol, TypeToken>,
+    id_generator: &mut NodeIdGenerator,
+) -> Result<(), Vec<Error>> {
+    let mut type_coercer = TypeCoercer::new(typetokens, ast_types, typetable, id_generator);
+
+    visit_mut(&mut type_coercer, items);
+
+    if !type_coercer.errors.is_empty() {
+        Err(type_coercer.errors)
+    } else {
+        Ok(())
+    }
 }

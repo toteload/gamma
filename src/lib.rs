@@ -13,4 +13,5 @@ pub mod string_interner;
 pub mod tokenizer;
 pub mod type_annotate;
 pub mod type_check2;
+pub mod type_coercion;
 pub mod types;
