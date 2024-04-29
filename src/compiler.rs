@@ -8,7 +8,9 @@ use crate::{
     string_interner::{StringInterner, Symbol},
     type_interner::{TypeInterner, TypeToken},
     types::{Signedness, Type},
+    type_annotate::type_annotate,
     type_check2::type_check,
+    type_coercion::type_coerce,
 };
 use inkwell::memory_buffer::MemoryBuffer;
 use std::collections::HashMap;
@@ -134,7 +136,7 @@ impl Context {
             &mut self.spans,
         );
 
-        let items = parser.parse_items().map_err(|e| vec![e])?;
+        let mut items = parser.parse_items().map_err(|e| vec![e])?;
 
         let semantic_context = SemanticContext {
             symbols: &self.symbols,
@@ -142,6 +144,21 @@ impl Context {
         };
 
         validate_semantics(&semantic_context, &items)?;
+
+        type_annotate(
+            &items,
+            &mut self.type_tokens,
+            &mut self.types,
+            &mut self.type_table,
+        )?;
+
+        type_coerce(
+            &mut items,
+            &mut self.type_tokens,
+            &mut self.types,
+            &mut self.type_table,
+            &mut self.id_generator,
+        )?;
 
         type_check(
             &items,

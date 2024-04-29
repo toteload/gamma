@@ -4,7 +4,7 @@ use crate::{
     error::*,
     scope_stack::ScopeStack,
     string_interner::Symbol,
-    types::{Type, TypeInterner, TypeToken},
+    types::{self, Type, TypeInterner, TypeToken},
 };
 use std::collections::HashMap;
 
@@ -72,11 +72,71 @@ impl TypeAnnotater<'_> {
 
 impl Visitor for TypeAnnotater<'_> {
     fn on_items_enter(&mut self, items: &[Item]) {
-        self.scopes.push_scope(todo!());
+        // Register all layouts in the type table.
+
+        for item in items {
+            match &item.kind {
+                ItemKind::Layout { name, fields } => {
+                    let fields = fields
+                        .iter()
+                        .map(|Field { name, offset, ty }| {
+                            self.get_typetoken_of_typenode(ty)
+                                .map(|ty| types::LayoutField {
+                                    name: name.sym,
+                                    offset: *offset,
+                                    ty,
+                                })
+                        })
+                        .collect::<Result<Vec<_>, _>>();
+
+                    let Ok(fields) = fields else { todo!() };
+
+                    let layout_type_token =
+                        self.typetokens.add(Type::Layout(types::Layout { fields }));
+                    self.typetable.insert(name.sym, layout_type_token);
+                }
+                _ => {}
+            }
+        }
+
+        // Add all functions and external functions as globally accessible variables.
+
+        let mut global_scope = HashMap::new();
+
+        for item in items {
+            match &item.kind {
+                ItemKind::Function {
+                    return_type,
+                    name,
+                    params,
+                    ..
+                }
+                | ItemKind::ExternalFunction {
+                    return_type,
+                    name,
+                    params,
+                } => {
+                        let param_typetokens = params.iter().map(|p| self.get_typetoken_of_typenode(&p.ty)).collect::<Result<Vec<_>, _>>().expect("");
+                        let return_typetoken = self.get_typetoken_of_typenode(return_type);
+                    }
+                _ => {}
+            }
+        }
+
+        self.scopes.push_scope(global_scope);
     }
 
     fn on_function_enter(&mut self, function: &Item) {
-        todo!("Add parameters to a scope");
+        let ItemKind::Function { params, .. } = &function.kind else {
+            unreachable!()
+        };
+
+        let param_scope = params
+            .iter()
+            .map(|p| (p.name.sym, *self.ast_types.get(&p.ty.id).expect("")))
+            .collect();
+
+        self.scopes.push_scope(param_scope);
     }
 
     fn on_function_leave(&mut self, _: &Item) {
