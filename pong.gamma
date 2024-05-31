@@ -56,8 +56,8 @@ fn main(): i32
   let RENDERER_ACCELERATED: u32 = 2
 
   (SDL_SetMainReady)
-
   (SDL_Init INIT_EVERYTHING)
+
   let window: ^void = (SDL_CreateWindow (cast ^u8 (cast u64 0)) WINDOWPOS_CENTERED WINDOWPOS_CENTERED 800 800 0)
   let renderer: ^void = (SDL_CreateRenderer window -1 (bor RENDERER_ACCELERATED RENDERER_PRESENTVSYNC))
 

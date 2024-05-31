@@ -6,9 +6,10 @@ use crate::{
     semantics::{validate_semantics, SemanticContext},
     source_location::SourceSpan,
     string_interner::{StringInterner, Symbol},
-    type_annotate::type_annotate,
-    type_check2::type_check,
+    type_node_annotation::annotate_type_nodes,
+    type_annotation::type_annotate,
     type_coercion::type_coerce,
+    type_check2::type_check,
     types::{Signedness, Type, TypeInterner, TypeToken},
 };
 use inkwell::memory_buffer::MemoryBuffer;
@@ -143,6 +144,13 @@ impl Context {
         };
 
         validate_semantics(&semantic_context, &items)?;
+
+        annotate_type_nodes(
+            &items,
+            &mut self.type_tokens,
+            &mut self.types,
+            &mut self.type_table,
+        )?;
 
         type_annotate(
             &items,

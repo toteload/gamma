@@ -1,10 +1,10 @@
 use crate::{
     ast::*,
-    ast_visitor::{visit, Visitor},
     error::{Error, ErrorSource},
     scope_stack::ScopeStack,
     string_interner::Symbol,
     types::{is_valid_type_cast, Type, TypeInterner, TypeToken},
+    visitor::Visitor,
 };
 use std::collections::HashMap;
 
@@ -87,13 +87,18 @@ impl Visitor for TypeChecker<'_> {
         self.scopes.pop();
     }
 
-    fn on_statement_enter(&mut self, statement: &Statement) {
+    fn on_statement_leave(&mut self, statement: &Statement) {
         use StatementKind::*;
 
         match &statement.kind {
             Let { name, ty, init } => {
-                self.scopes
-                    .insert(name.sym, *self.ast_types.get(&ty.id).expect(""));
+                self.scopes.insert(
+                    name.sym,
+                    *self
+                        .ast_types
+                        .get(&ty.id)
+                        .expect("Type node should have a registered type"),
+                );
 
                 if let Some(init) = init {
                     self.check_equal_types(&ty.id, &init.id);
@@ -134,11 +139,11 @@ impl Visitor for TypeChecker<'_> {
             }
             BuiltinOp { op, args } => match op {
                 Not | Or | And | Equals | NotEquals | LessThan | GreaterThan | LessEquals
-                | GreaterEquals => {}
+                | GreaterEquals => todo!(),
                 AddressOf => {
                     assert!(args.len() == 1);
 
-                    todo!()
+                    todo!("Check if the this is something you can take the address of")
                 }
                 At => {
                     let base = &args[0];
@@ -160,7 +165,7 @@ pub fn type_check(
 ) -> Result<(), Vec<Error>> {
     let mut type_checker = TypeChecker::new(typetokens, ast_types, typetable);
 
-    visit(&mut type_checker, items);
+    type_checker.visit_items(items);
 
     if !type_checker.errors.is_empty() {
         Err(type_checker.errors)

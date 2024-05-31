@@ -1,8 +1,8 @@
 use crate::ast::*;
-use crate::ast_visitor::{visit, Visitor};
 use crate::error::*;
 use crate::semantics::{SemanticContext, SemanticProver};
 use crate::string_interner::Symbol;
+use crate::visitor::Visitor;
 
 pub struct Prover {
     main_symbol: Option<Symbol>,
@@ -43,7 +43,7 @@ impl SemanticProver for Prover {
             return Err(vec![no_main_defined_error]);
         };
 
-        visit(self, items);
+        self.visit_items(items);
 
         if !self.found_main_function {
             return Err(vec![no_main_defined_error]);
