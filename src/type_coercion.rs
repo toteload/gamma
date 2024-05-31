@@ -1,10 +1,10 @@
 use crate::{
     ast::{self, *},
-    ast_visitor::{visit_mut, VisitorMut},
     error::Error,
     scope_stack::ScopeStack,
     string_interner::Symbol,
     types::{Type, TypeInterner, TypeToken},
+    visitor_mut::VisitorMut,
 };
 use std::collections::HashMap;
 
@@ -89,7 +89,7 @@ pub fn type_coerce(
 ) -> Result<(), Vec<Error>> {
     let mut type_coercer = TypeCoercer::new(typetokens, ast_types, typetable, id_generator);
 
-    visit_mut(&mut type_coercer, items);
+    type_coercer.visit_items(items);
 
     if !type_coercer.errors.is_empty() {
         Err(type_coercer.errors)

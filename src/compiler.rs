@@ -8,9 +8,10 @@ use crate::{
     string_interner::{StringInterner, Symbol},
     type_interner::{TypeInterner, TypeToken},
     types::{Signedness, Type},
-    type_annotate::type_annotate,
-    type_check2::type_check,
+    type_node_annotation::annotate_type_nodes,
+    type_annotation::type_annotate,
     type_coercion::type_coerce,
+    type_check2::type_check,
 };
 use inkwell::memory_buffer::MemoryBuffer;
 use std::collections::HashMap;
@@ -144,6 +145,13 @@ impl Context {
         };
 
         validate_semantics(&semantic_context, &items)?;
+
+        annotate_type_nodes(
+            &items,
+            &mut self.type_tokens,
+            &mut self.types,
+            &mut self.type_table,
+        )?;
 
         type_annotate(
             &items,

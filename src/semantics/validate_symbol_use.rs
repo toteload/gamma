@@ -1,8 +1,8 @@
 use crate::ast::*;
-use crate::ast_visitor::{visit, Visitor};
 use crate::error::*;
 use crate::semantics::{SemanticContext, SemanticProver};
 use crate::string_interner::Symbol;
+use crate::visitor::Visitor;
 use std::collections::HashSet;
 
 pub struct Prover<'a> {
@@ -97,7 +97,7 @@ impl Visitor for Prover<'_> {
 
 impl SemanticProver for Prover<'_> {
     fn verify(&mut self, items: &[Item]) -> Result<(), Vec<Error>> {
-        visit(self, items);
+        self.visit_items(items);
 
         if !self.errors.is_empty() {
             return Err(self.errors.clone());
