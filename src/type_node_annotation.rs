@@ -58,9 +58,9 @@ impl TypeNodeAnnotater<'_> {
         to_resolve: &Symbol,
         layouts: &HashMap<Symbol, (NodeId, &[Field])>,
         history: &mut Vec<Symbol>,
-    ) -> Result<(), Vec<Symbol>> {
-        if self.typetable.contains_key(to_resolve) {
-            return Ok(());
+    ) -> Result<TypeToken, Vec<Symbol>> {
+        if let Some(tok) = self.typetable.get(to_resolve) {
+            return Ok(*tok);
         }
 
         if let Some(idx) = history.iter().position(|x| x == to_resolve) {
@@ -70,33 +70,43 @@ impl TypeNodeAnnotater<'_> {
         history.push(*to_resolve);
 
         let Some((id, ast_fields)) = layouts.get(to_resolve) else {
-            todo!()
+            todo!("symbol {} should be for a layout", to_resolve.0)
         };
 
+        fn find_type_identifier(ty: &TypeKind) -> Option<Symbol> {
+            use TypeKind::*;
+
+            match ty {
+                Internal => None,
+                Identifier(sym) => Some(*sym),
+                Pointer(base) | Array(_, base) => find_type_identifier(base),
+            }
+        }
+
         for field in ast_fields.iter() {
-            self.resolve_layout(&field.name.sym, layouts, history)?;
+            if let Some(sym) = find_type_identifier(&field.ty.kind) {
+                let tok = self.resolve_layout(&sym, layouts, history)?;
+                self.ast_types.insert(field.ty.id, tok);
+            }
         }
 
         history.pop();
 
         let fields = ast_fields
             .iter()
-            .map(|field| {
-                let name = field.name.sym;
-
-                LayoutField {
-                    name,
-                    offset: field.offset,
-                    ty: *self.typetable.get(&name).unwrap(),
-                }
+            .map(|field| LayoutField {
+                name: field.name.sym,
+                offset: field.offset,
+                ty: *self.ast_types.get(&field.ty.id).unwrap(),
             })
             .collect();
         let layout_type = Type::Layout(Layout { fields });
         let tok = self.typetokens.add(layout_type);
 
         self.typetable.insert(*to_resolve, tok);
+        self.ast_types.insert(*id, tok);
 
-        return Ok(());
+        return Ok(tok);
     }
 
     fn resolve_typenodes_with_userdefined_types(&mut self, items: &[Item]) {

@@ -1,22 +1,16 @@
 fn main(): i32
-    let i: i32 = (cast i32 0)
+    let i: i32 = 0
 
     loop
-        if (eq i (cast i32 10))
-            break
-        end
-
-        let j: i32 = (cast i32 0)
+        if (eq i 10) break end
+        let j: i32 = 0
 
         loop
-            if (eq j (cast i32 10))
-                break
-            end
-
-            set j = (+ j (cast i32 1))
+            if (eq j 10) break end
+            set j = (+ j 1)
         end
 
-        set i = (+ i (cast i32 1))
+        set i = (+ i 1)
     end
 
     return i

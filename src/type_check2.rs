@@ -38,7 +38,20 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn check_equal_types(&mut self, left: &NodeId, right: &NodeId) {}
+    fn typetoken_of_node(&self, node: &NodeId) -> TypeToken {
+        *self.ast_types.get(node).expect("")
+    }
+
+    fn check_equal_types(&mut self, left: &NodeId, right: &NodeId) {
+        let a = self.typetoken_of_node(left);
+        let b = self.typetoken_of_node(right);
+
+        if a == b {
+            return;
+        }
+
+        todo!()
+    }
 
     fn check_equal_types_at(
         at: ErrorSource,
@@ -76,6 +89,15 @@ impl TypeChecker<'_> {
 
         todo!()
     }
+
+    fn check_all_args_are_same_type(&self, args: &[Expression]) {
+        let arg_types = args
+            .iter()
+            .map(|arg| *self.ast_types.get(&arg.id).unwrap())
+            .collect::<Vec<_>>();
+        let all_are_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
+        assert!(all_are_same_type, "{:?}", args);
+    }
 }
 
 impl Visitor for TypeChecker<'_> {
@@ -85,6 +107,17 @@ impl Visitor for TypeChecker<'_> {
 
     fn on_block_leave(&mut self, _: &Block) {
         self.scopes.pop();
+    }
+
+    fn on_function_enter(&mut self, function: &Item) {
+        let Type::Function { return_type, .. } = self.type_of_node(&function.id) else {
+            panic!()
+        };
+        self.declared_return_type = Some(*return_type);
+    }
+
+    fn on_function_leave(&mut self, _: &Item) {
+        self.declared_return_type = None;
     }
 
     fn on_statement_leave(&mut self, statement: &Statement) {
@@ -109,9 +142,15 @@ impl Visitor for TypeChecker<'_> {
                 self.check_equal_types(&dst.id, &val.id);
             }
             If { cond, .. } => {
-                todo!("Make sure that cond is Bool");
+                assert!(matches!(self.typetokens.get(self.ast_types.get(&cond.id).unwrap()), Type::Bool))
             }
-            Return(e) => todo!(),
+            Return(e) => match (e, self.declared_return_type) {
+                (Some(e), Some(expected)) => {
+                    assert!(*self.ast_types.get(&e.id).unwrap() == expected);
+                }
+                (None, None) => {}
+                _ => todo!(),
+            },
             _ => (),
         }
     }
@@ -138,8 +177,17 @@ impl Visitor for TypeChecker<'_> {
                 }
             }
             BuiltinOp { op, args } => match op {
-                Not | Or | And | Equals | NotEquals | LessThan | GreaterThan | LessEquals
-                | GreaterEquals => todo!(),
+                Not => todo!(),
+                Or | And => todo!(),
+                Equals | NotEquals | LessThan | GreaterThan | LessEquals | GreaterEquals => {
+                    self.check_all_args_are_same_type(args);
+                }
+                BitwiseAnd | BitwiseOr | Xor => {
+                    self.check_all_args_are_same_type(args);
+                }
+                Add | Sub | Mul | Div | Remainder => {
+                    self.check_all_args_are_same_type(args);
+                }
                 AddressOf => {
                     assert!(args.len() == 1);
 
@@ -148,9 +196,8 @@ impl Visitor for TypeChecker<'_> {
                 At => {
                     let base = &args[0];
                     // base must be a pointer or an array
-                    todo!();
+                    todo!("Check if base is a pointer or an array");
                 }
-                _ => todo!(),
             },
             _ => (),
         }

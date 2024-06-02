@@ -10,8 +10,8 @@ use crate::{
     types::{Signedness, Type},
     type_node_annotation::annotate_type_nodes,
     type_annotation::type_annotate,
-    type_coercion::type_coerce,
     type_check2::type_check,
+    type_coercion::type_coerce,
 };
 use inkwell::memory_buffer::MemoryBuffer;
 use std::collections::HashMap;

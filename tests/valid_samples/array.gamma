@@ -1,16 +1,16 @@
 fn main(): i32
     let xs: [16]i32
 
-    let i: i32 = (cast i32 0)
+    let i: i32 = 0
 
     loop
-        if (eq i (cast i32 16))
+        if (eq i 16)
             break
         end
 
         set (@ xs i) = i
-        set i = (+ i (cast i32 1))
+        set i = (+ i 1)
     end
 
-    return (cast i32 0) 
+    return 0
 end

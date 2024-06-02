@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 
 #[derive(PartialEq, Debug, Clone, Copy, Hash, Eq, PartialOrd, Ord, Serialize)]
-pub struct Symbol(u32);
+pub struct Symbol(pub u32);
 
 #[derive(Serialize)]
 pub struct StringInterner {
@@ -49,6 +49,16 @@ impl StringInterner {
 
     pub fn get(&self, symbol: &Symbol) -> &str {
         &self.strings[symbol.0 as usize]
+    }
+
+    pub fn to_string(&self) -> String {
+        let mut out = String::new();
+
+        for (i, s) in self.strings.iter().enumerate() {
+            out.push_str(&format!("{i:4} = {s}\n"));
+        }
+
+        out
     }
 }
 

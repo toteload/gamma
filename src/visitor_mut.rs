@@ -24,7 +24,7 @@ pub trait VisitorMut {
     fn visit_items(&mut self, items: &mut [Item]) {
         self.on_items_enter(items);
 
-        for item in items {
+        for item in items.iter_mut() {
             self.visit_item(item);
         }
 
@@ -36,14 +36,14 @@ pub trait VisitorMut {
 
         match &mut item.kind {
             ItemKind::Function {
-                mut return_type,
-                mut params,
+                ref mut return_type,
+                ref mut params,
                 ..
             } => {
                 self.on_type_enter(return_type);
 
-                for param in params.iter() {
-                    self.on_type_enter(&param.ty)
+                for param in params.iter_mut() {
+                    self.on_type_enter(&mut param.ty)
                 }
 
                 self.visit_function(item);
@@ -55,8 +55,8 @@ pub trait VisitorMut {
             } => {
                 self.on_type_enter(return_type);
 
-                for param in params.iter() {
-                    self.on_type_enter(&param.ty)
+                for param in params.iter_mut() {
+                    self.on_type_enter(&mut param.ty)
                 }
             }
             _ => (),
@@ -66,13 +66,13 @@ pub trait VisitorMut {
     }
 
     fn visit_function(&mut self, function: &mut Item) {
-        let ItemKind::Function { body, .. } = &function.kind else {
+        self.on_function_enter(function);
+
+        let ItemKind::Function { body, .. } = &mut function.kind else {
             unreachable!()
         };
 
-        self.on_function_enter(function);
-
-        self.visit_block(&body);
+        self.visit_block(body);
 
         self.on_function_leave(function);
     }
@@ -80,7 +80,7 @@ pub trait VisitorMut {
     fn visit_block(&mut self, block: &mut Block) {
         self.on_block_enter(block);
 
-        for statement in &block.statements {
+        for statement in block.statements.iter_mut() {
             self.visit_statement(statement);
         }
 
@@ -92,7 +92,7 @@ pub trait VisitorMut {
 
         self.on_statement_enter(statement);
 
-        match &statement.kind {
+        match &mut statement.kind {
             Let { ty, init, .. } => {
                 self.on_type_enter(ty);
                 if let Some(e) = init {
@@ -127,9 +127,9 @@ pub trait VisitorMut {
 
         self.on_expression_enter(expression);
 
-        match &expression.kind {
+        match &mut expression.kind {
             BuiltinOp { args, .. } | Call { args, .. } => {
-                for arg in args {
+                for arg in args.iter_mut() {
                     self.visit_expression(arg);
                 }
             }
@@ -143,4 +143,3 @@ pub trait VisitorMut {
         self.on_expression_leave(expression);
     }
 }
-

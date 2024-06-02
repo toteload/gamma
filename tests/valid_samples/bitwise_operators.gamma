@@ -2,5 +2,5 @@ fn main(): i32
   let a: i64 = (band 342 234)
   let b: i64 = (bor 234 356246)
   let c: i64 = (xor 23423 53421)
-  return (cast i32 0)
+  return 0
 end

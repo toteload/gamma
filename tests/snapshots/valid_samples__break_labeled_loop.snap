@@ -16,8 +16,8 @@ declare void @llvm.stackrestore(ptr) #0
 define i32 @main() {
 entry:
   %0 = call ptr @llvm.stacksave()
-  %1 = alloca i64, align 8
-  store i64 0, ptr %1, align 4
+  %1 = alloca i32, align 4
+  store i32 0, ptr %1, align 4
   br label %loop
 
 loop:                                             ; preds = %endloop1, %entry
@@ -26,12 +26,12 @@ loop:                                             ; preds = %endloop1, %entry
 
 loop2:                                            ; preds = %then, %loop
   %3 = call ptr @llvm.stacksave()
-  %4 = load i64, ptr %1, align 4
-  %5 = add i64 %4, 1
-  store i64 %5, ptr %1, align 4
-  %6 = load i64, ptr %1, align 4
-  %7 = srem i64 %6, 10
-  %8 = icmp ne i64 %7, 0
+  %4 = load i32, ptr %1, align 4
+  %5 = add i32 %4, 1
+  store i32 %5, ptr %1, align 4
+  %6 = load i32, ptr %1, align 4
+  %7 = srem i32 %6, 10
+  %8 = icmp ne i32 %7, 0
   br i1 %8, label %then, label %otherwise
 
 then:                                             ; preds = %loop2
@@ -51,10 +51,9 @@ endloop1:                                         ; No predecessors!
   br label %loop
 
 endloop:                                          ; preds = %endif
-  %10 = load i64, ptr %1, align 4
-  %11 = trunc i64 %10 to i32
+  %10 = load i32, ptr %1, align 4
   call void @llvm.stackrestore(ptr %0)
-  ret i32 %11
+  ret i32 %10
 }
 
 attributes #0 = { nocallback nofree nosync nounwind willreturn }
