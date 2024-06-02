@@ -106,7 +106,7 @@ impl TypeNodeAnnotater<'_> {
         self.typetable.insert(*to_resolve, tok);
         self.ast_types.insert(*id, tok);
 
-        return Ok(tok);
+        Ok(tok)
     }
 
     fn resolve_typenodes_with_userdefined_types(&mut self, items: &[Item]) {

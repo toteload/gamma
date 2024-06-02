@@ -142,7 +142,10 @@ impl Visitor for TypeChecker<'_> {
                 self.check_equal_types(&dst.id, &val.id);
             }
             If { cond, .. } => {
-                assert!(matches!(self.typetokens.get(self.ast_types.get(&cond.id).unwrap()), Type::Bool))
+                assert!(matches!(
+                    self.typetokens.get(self.ast_types.get(&cond.id).unwrap()),
+                    Type::Bool
+                ))
             }
             Return(e) => match (e, self.declared_return_type) {
                 (Some(e), Some(expected)) => {

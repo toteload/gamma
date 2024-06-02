@@ -72,7 +72,7 @@ pub trait Visitor {
 
         self.on_function_enter(function);
 
-        self.visit_block(&body);
+        self.visit_block(body);
 
         self.on_function_leave(function);
     }

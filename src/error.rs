@@ -72,12 +72,8 @@ impl Error {
                     print!("\"{text}\"");
                 }
                 AstNode(id) => {
-                    let span = spans.get(&id).unwrap();
-                    let line = source
-                        .lines()
-                        .skip(span.start.line as usize - 1)
-                        .next()
-                        .unwrap();
+                    let span = spans.get(id).unwrap();
+                    let line = source.lines().nth(span.start.line as usize - 1).unwrap();
                     let text = &line[span.start.col as usize - 1..span.end.col as usize];
                     print!("\"{text}\"");
                 }
