@@ -11,9 +11,9 @@ mod source_location;
 mod string_interner;
 mod tokenizer;
 mod type_annotation;
-mod type_node_annotation;
-mod type_coercion;
 mod type_check2;
+mod type_coercion;
+mod type_node_annotation;
 mod types;
 mod utils;
 mod visitor;
@@ -97,17 +97,20 @@ fn main() -> Result<()> {
         },
     );
 
-    let Ok(output) = result else {
-        let Err(errors) = result else { unreachable!() };
-        for e in errors {
-            e.print(
-                &source,
-                &compiler_context.spans,
-                &compiler_context.symbols,
-                &compiler_context.type_tokens,
-            );
+    let output = match result {
+        Ok(x) => x,
+        Err(errors) => {
+            for e in errors {
+                e.print(
+                    &source,
+                    &compiler_context.spans,
+                    &compiler_context.symbols,
+                    &compiler_context.type_tokens,
+                );
+            }
+            println!("{}", compiler_context.symbols.to_string());
+            return Ok(());
         }
-        return Ok(());
     };
 
     // Instructions for building an executable on Windows:

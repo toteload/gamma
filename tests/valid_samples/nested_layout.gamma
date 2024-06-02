@@ -1,11 +1,11 @@
-layout Head
-  eyes: 0 u32
-  teeth: 4 u32
-end
-
 layout Monster
   head: 0 Head
   limbs: 8 u32
+end
+
+layout Head
+  eyes: 0 u32
+  teeth: 4 u32
 end
 
 fn main(): i32

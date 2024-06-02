@@ -6,10 +6,10 @@ use crate::{
     semantics::{validate_semantics, SemanticContext},
     source_location::SourceSpan,
     string_interner::{StringInterner, Symbol},
-    type_node_annotation::annotate_type_nodes,
     type_annotation::type_annotate,
-    type_coercion::type_coerce,
     type_check2::type_check,
+    type_coercion::type_coerce,
+    type_node_annotation::annotate_type_nodes,
     types::{Signedness, Type, TypeInterner, TypeToken},
 };
 use inkwell::memory_buffer::MemoryBuffer;

@@ -116,7 +116,24 @@ impl Visitor for TypeAnnotater<'_> {
             IntLiteral(_) => self.typetokens.add(Type::IntConstant),
             BoolLiteral(_) => self.typetokens.add(Type::Bool),
             Identifier(sym) => self.scopes.get(sym).copied().expect(""),
-            CompoundIdentifier(idents) => todo!(),
+            CompoundIdentifier(idents) => {
+                let Some(t) = self.scopes.get(&idents[0]) else {
+                    panic!();
+                };
+
+                let mut tok = *t;
+                for sym in idents[1..].iter() {
+                    let Type::Layout(layout) = self.typetokens.get(&tok) else {
+                        panic!()
+                    };
+                    let Some(field) = layout.fields.iter().find(|field| field.name == *sym) else {
+                        todo!();
+                    };
+                    tok = field.ty;
+                }
+
+                tok
+            }
             Cast { ty, e } => *self.ast_types.get(&ty.id).expect(""),
             BuiltinOp { op, args } => match op {
                 Not | Or | And | Equals | NotEquals | LessThan | GreaterThan | LessEquals
@@ -141,8 +158,8 @@ impl Visitor for TypeAnnotater<'_> {
                 Xor | BitwiseAnd | BitwiseOr | Add | Sub | Mul | Div | Remainder => args
                     .iter()
                     .map(|arg| self.ast_types.get(&arg.id).expect(""))
-                    .copied()
                     .find(|arg_type| matches!(self.typetokens.get(arg_type), Type::Int { .. }))
+                    .copied()
                     .unwrap_or(self.typetokens.add(Type::IntConstant)),
             },
             Call { name, args } => {

@@ -87,6 +87,7 @@ pub struct Type {
 
 #[derive(Clone, Debug, Serialize)]
 pub enum TypeKind {
+    // `Internal` is a special value for compiler added type nodes.
     Internal,
     Identifier(Symbol),
     Pointer(Box<TypeKind>),
