@@ -170,7 +170,7 @@ impl Type {
                             .to_string(type_interner, string_interner)
                     ));
                 }
-                s.push_str("}");
+                s.push('}');
 
                 s
             }

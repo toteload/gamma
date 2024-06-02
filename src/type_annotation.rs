@@ -35,7 +35,7 @@ impl TypeAnnotater<'_> {
         self.scopes
             .get(identifier)
             .copied()
-            .expect(format!("Symbol {identifier:?} should be found in scope").as_str())
+            .unwrap_or_else(|| panic!("Symbol {:?} should be found in scope", identifier))
     }
 
     fn get_type_of_identifier(&self, identifier: &Symbol) -> &Type {
@@ -104,7 +104,7 @@ impl Visitor for TypeAnnotater<'_> {
             } => {
                 self.scopes.insert(sym, *self.ast_types.get(&id).unwrap());
             }
-            _ => (),
+            _ => {}
         }
     }
 

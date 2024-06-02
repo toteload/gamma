@@ -248,7 +248,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
         LayoutAccessData {
             byte_offset: offset,
-            align: self.type_interner.get(&current).align(&self.type_interner),
+            align: self.type_interner.get(&current).align(self.type_interner),
             basic_type: self.get_ink_basic_type(current),
         }
     }
@@ -364,7 +364,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let basic_type: BasicTypeEnum<'ctx> = self.i8_t.array_type(byte_size).into();
                 let aligned_byte_size = byte_size.next_multiple_of(align);
                 let basic_type_with_align_padding = if byte_size == aligned_byte_size {
-                    basic_type.into()
+                    basic_type
                 } else {
                     self.i8_t.array_type(aligned_byte_size).into()
                 };
