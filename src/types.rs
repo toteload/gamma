@@ -40,6 +40,11 @@ pub enum Type {
     Array(i64, TypeToken),
 }
 
+pub const U64: Type = Type::Int {
+    signedness: Signedness::Unsigned,
+    width: 64,
+};
+
 impl Type {
     pub fn kind_u8(&self) -> u8 {
         use Type::*;

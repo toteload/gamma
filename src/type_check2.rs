@@ -198,8 +198,10 @@ impl Visitor for TypeChecker<'_> {
                 }
                 At => {
                     let base = &args[0];
-                    // base must be a pointer or an array
-                    todo!("Check if base is a pointer or an array");
+                    assert!(matches!(
+                        self.typetokens.get(self.ast_types.get(&base.id).unwrap()),
+                        Type::Pointer(_) | Type::Array(_, _)
+                    ));
                 }
             },
             _ => (),

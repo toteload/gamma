@@ -1,9 +1,8 @@
 use crate::{
     ast::{self, *},
     error::Error,
-    scope_stack::ScopeStack,
     string_interner::Symbol,
-    types::{Type, TypeInterner, TypeToken},
+    types::{Type, TypeInterner, TypeToken, U64},
     visitor_mut::VisitorMut,
 };
 use std::collections::HashMap;
@@ -15,7 +14,7 @@ struct TypeCoercer<'a> {
     typetable:    &'a mut HashMap<Symbol, TypeToken>,
     id_generator: &'a mut NodeIdGenerator,
 
-    scopes:               ScopeStack<Symbol, TypeToken>,
+    functions:            HashMap<Symbol, TypeToken>,
     errors:               Vec<Error>,
     declared_return_type: Option<TypeToken>,
 }
@@ -34,7 +33,7 @@ impl TypeCoercer<'_> {
             typetable,
             id_generator,
 
-            scopes: ScopeStack::new(),
+            functions: HashMap::new(),
             errors: Vec::new(),
             declared_return_type: None,
         }
@@ -96,6 +95,18 @@ impl TypeCoercer<'_> {
 }
 
 impl VisitorMut for TypeCoercer<'_> {
+    fn on_items_enter(&mut self, items: &mut [Item]) {
+        for item in items {
+            match &item.kind {
+                ItemKind::Function { name, .. } | ItemKind::ExternalFunction { name, .. } => {
+                    self.functions
+                        .insert(name.sym, *self.ast_types.get(&item.id).unwrap());
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn on_function_enter(&mut self, function: &mut Item) {
         let Type::Function { return_type, .. } = self.type_of_node(&function.id) else {
             panic!()
@@ -165,9 +176,28 @@ impl VisitorMut for TypeCoercer<'_> {
                         self.coerce_expression(non_const_arg_typetok, arg);
                     }
                 }
+                At => {
+                    if let [_, idx] = args.as_mut_slice() {
+                        let u = self.typetokens.add(U64);
+                        self.coerce_expression(u, idx);
+                    }
+                }
+                AddressOf => todo!("type coercion address of"),
                 _ => todo!("op {op:?}"),
             },
-            Call { .. } => todo!("implement function calls"),
+            Call { name, args } => {
+                let Type::Function { params, .. } =
+                    self.typetokens.get(self.functions.get(&name.sym).unwrap())
+                else {
+                    panic!()
+                };
+
+                for (ty, arg) in params.iter().zip(args.iter_mut()) {
+                    self.coerce_expression(*ty, arg);
+                }
+
+                todo!("implement function calls");
+            }
             Cast { ty, e } => {
                 self.on_type_enter(ty);
                 self.visit_expression(e);
