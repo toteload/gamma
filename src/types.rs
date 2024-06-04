@@ -1,6 +1,6 @@
 use crate::string_interner::{StringInterner, Symbol};
+use crate::type_interner::{TypeInterner, TypeToken};
 use serde::Serialize;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -296,56 +296,6 @@ impl PartialEq for Layout {
         b.sort();
 
         a.into_iter().eq(b)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
-pub struct TypeToken(u32);
-
-#[derive(Serialize)]
-pub struct TypeInterner {
-    tokens: HashMap<Type, TypeToken>,
-    types: Vec<Type>,
-}
-
-impl Default for TypeInterner {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TypeInterner {
-    pub fn new() -> TypeInterner {
-        TypeInterner {
-            tokens: HashMap::new(),
-            types: Vec::new(),
-        }
-    }
-
-    pub fn add(&mut self, ty: Type) -> TypeToken {
-        if let Some(tok) = self.tokens.get(&ty) {
-            return *tok;
-        }
-
-        let tok = TypeToken(self.types.len() as u32);
-
-        self.types.push(ty.clone());
-
-        self.tokens.insert(ty, tok);
-
-        tok
-    }
-
-    pub fn find_token(&self, ty: &Type) -> Option<TypeToken> {
-        self.tokens.get(ty).copied()
-    }
-
-    pub fn find_token_unchecked(&self, ty: &Type) -> TypeToken {
-        *self.tokens.get(ty).expect("Type should be interned")
-    }
-
-    pub fn get<'a>(&'a self, tok: &TypeToken) -> &'a Type {
-        &self.types[tok.0 as usize]
     }
 }
 

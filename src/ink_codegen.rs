@@ -1,7 +1,8 @@
 use crate::ast::*;
 use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
-use crate::types::{Signedness, Type, TypeInterner, TypeToken};
+use crate::type_interner::*;
+use crate::types::{Signedness, Type};
 use inkwell::targets::TargetMachine;
 use inkwell::types::PointerType;
 use inkwell::{
@@ -1138,9 +1139,6 @@ impl<'ctx> CodeGenerator<'ctx> {
                     let pointee_type = self.get_ink_basic_type(*pointee_type_token);
 
                     Ok(self.builder.build_load(pointee_type, addr, "")?)
-                }
-
-                BuiltinOpKind::GreaterThan => {
                 }
 
                 _ => todo!("BuiltinOpKind \"{:?}\"", op),

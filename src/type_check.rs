@@ -3,8 +3,9 @@ use crate::ast::*;
 use crate::error::*;
 use crate::scope_stack::ScopeStack;
 use crate::string_interner::Symbol;
+use crate::type_interner::{TypeInterner, TypeToken};
 use crate::types::is_type_coercible_to;
-use crate::types::{Layout, LayoutField, Type, TypeInterner, TypeToken};
+use crate::types::{Layout, LayoutField, Type};
 use std::collections::HashMap;
 
 struct TypeChecker<'a> {

@@ -7,7 +7,8 @@ use crate::{
     source_location::SourceSpan,
     string_interner::{StringInterner, Symbol},
     type_check::type_check,
-    types::{Signedness, Type, TypeInterner, TypeToken},
+    type_interner::{TypeInterner, TypeToken},
+    types::{Signedness, Type},
 };
 use inkwell::memory_buffer::MemoryBuffer;
 use std::collections::HashMap;
@@ -52,7 +53,7 @@ impl Default for Context {
 impl Context {
     pub fn new() -> Self {
         let mut symbols = StringInterner::new();
-        let mut type_tokens = TypeInterner::new();
+        let type_tokens = TypeInterner::new();
 
         let type_table = HashMap::from([
             (

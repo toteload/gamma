@@ -12,6 +12,7 @@ mod source_location;
 mod string_interner;
 mod tokenizer;
 mod type_check;
+mod type_interner;
 mod types;
 mod utils;
 
