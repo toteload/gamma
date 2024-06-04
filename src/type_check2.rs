@@ -101,6 +101,22 @@ impl TypeChecker<'_> {
 }
 
 impl Visitor for TypeChecker<'_> {
+    fn on_items_enter(&mut self, items: &[Item]) {
+        let mut global_scope = HashMap::new();
+
+        for item in items {
+            match &item.kind {
+                ItemKind::Function { name, .. } | ItemKind::ExternalFunction { name, .. } => {
+                    global_scope
+                        .insert(name.sym, *self.ast_types.get(&item.id).unwrap());
+                }
+                _ => {}
+            }
+        }
+
+        self.scopes.push_scope(global_scope);
+    }
+
     fn on_block_enter(&mut self, _: &Block) {
         self.scopes.push_empty_scope();
     }
