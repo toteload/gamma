@@ -1,5 +1,5 @@
 use crate::{
-    ast::{NodeId, NodeIdGenerator},
+    ast::{AstMap, NodeId, NodeIdGenerator},
     error::Error,
     ink_codegen::{CodeGenerator, MachineTarget},
     parser::Parser,
@@ -9,8 +9,9 @@ use crate::{
     type_annotation::type_annotate,
     type_check2::type_check,
     type_coercion::type_coerce,
+    type_interner::{TypeInterner, TypeToken},
     type_node_annotation::annotate_type_nodes,
-    types::{Signedness, Type, TypeInterner, TypeToken},
+    types::{Signedness, Type},
 };
 use inkwell::memory_buffer::MemoryBuffer;
 use std::collections::HashMap;
@@ -31,13 +32,13 @@ pub struct Output {
 
 pub struct Context {
     pub id_generator: NodeIdGenerator,
-
     pub symbols: StringInterner,
     pub type_tokens: TypeInterner,
+
     pub type_table: HashMap<Symbol, TypeToken>,
 
-    pub spans: HashMap<NodeId, SourceSpan>,
-    pub types: HashMap<NodeId, TypeToken>,
+    pub spans: AstMap<SourceSpan>,
+    pub types: AstMap<TypeToken>,
 }
 
 impl From<Error> for Vec<Error> {
@@ -55,7 +56,7 @@ impl Default for Context {
 impl Context {
     pub fn new() -> Self {
         let mut symbols = StringInterner::new();
-        let mut type_tokens = TypeInterner::new();
+        let type_tokens = TypeInterner::new();
 
         let type_table = HashMap::from([
             (
@@ -163,7 +164,6 @@ impl Context {
             &mut items,
             &mut self.type_tokens,
             &mut self.types,
-            &mut self.type_table,
             &mut self.id_generator,
         )?;
 

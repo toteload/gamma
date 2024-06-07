@@ -1,12 +1,13 @@
 use crate::string_interner::Symbol;
 use serde::Serialize;
+use std::cell::Cell;
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct NodeId(u32);
 
 pub struct NodeIdGenerator {
-    counter: u32,
+    counter: Cell<u32>,
 }
 
 impl Default for NodeIdGenerator {
@@ -17,12 +18,14 @@ impl Default for NodeIdGenerator {
 
 impl NodeIdGenerator {
     pub fn new() -> NodeIdGenerator {
-        NodeIdGenerator { counter: 0 }
+        NodeIdGenerator {
+            counter: Cell::new(0),
+        }
     }
 
-    pub fn gen_id(&mut self) -> NodeId {
-        self.counter += 1;
-        NodeId(self.counter)
+    pub fn gen_id(&self) -> NodeId {
+        self.counter.replace(self.counter.get() + 1);
+        NodeId(self.counter.get())
     }
 }
 

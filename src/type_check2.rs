@@ -3,7 +3,8 @@ use crate::{
     error::{Error, ErrorSource},
     scope_stack::ScopeStack,
     string_interner::Symbol,
-    types::{is_valid_type_cast, Type, TypeInterner, TypeToken},
+    type_interner::{TypeInterner, TypeToken},
+    types::{is_valid_type_cast, is_addressable, Type},
     visitor::Visitor,
 };
 use std::collections::HashMap;
@@ -58,7 +59,14 @@ impl TypeChecker<'_> {
         expected: &TypeToken,
         actual: &TypeToken,
     ) -> Option<Error> {
-        todo!()
+        if actual == expected {
+            return None;
+        }
+
+        Some(Error {
+            source: at,
+            info: vec![],
+        })
     }
 
     fn check_set_destination_type(&mut self, dst: &Expression) {
@@ -101,6 +109,21 @@ impl TypeChecker<'_> {
 }
 
 impl Visitor for TypeChecker<'_> {
+    fn on_items_enter(&mut self, items: &[Item]) {
+        let mut global_scope = HashMap::new();
+
+        for item in items {
+            match &item.kind {
+                ItemKind::Function { name, .. } | ItemKind::ExternalFunction { name, .. } => {
+                    global_scope.insert(name.sym, *self.ast_types.get(&item.id).unwrap());
+                }
+                _ => {}
+            }
+        }
+
+        self.scopes.push_scope(global_scope);
+    }
+
     fn on_block_enter(&mut self, _: &Block) {
         self.scopes.push_empty_scope();
     }
@@ -193,13 +216,14 @@ impl Visitor for TypeChecker<'_> {
                 }
                 AddressOf => {
                     assert!(args.len() == 1);
-
-                    todo!("Check if the this is something you can take the address of")
+                    assert!(is_addressable(&args[0]));
                 }
                 At => {
                     let base = &args[0];
-                    // base must be a pointer or an array
-                    todo!("Check if base is a pointer or an array");
+                    assert!(matches!(
+                        self.typetokens.get(self.ast_types.get(&base.id).unwrap()),
+                        Type::Pointer(_) | Type::Array(_, _)
+                    ));
                 }
             },
             _ => (),

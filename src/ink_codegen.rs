@@ -1,7 +1,8 @@
 use crate::ast::*;
 use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
-use crate::types::{Signedness, Type, TypeInterner, TypeToken};
+use crate::type_interner::*;
+use crate::types::{Signedness, Type};
 use inkwell::targets::TargetMachine;
 use inkwell::types::PointerType;
 use inkwell::{
@@ -461,7 +462,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     self.add_to_current_scope(
                         param.name.sym,
                         Variable {
-                            type_token: *self.node_types.get(&param.id).unwrap(),
+                            type_token: *self.node_types.get(&param.ty.id).unwrap(),
                             ty: val.get_type(),
                             val: VariableValue::Parameter(val),
                         },

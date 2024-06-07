@@ -1,6 +1,7 @@
 use crate::ast::NodeId;
 use crate::source_location::SourceSpan;
 use crate::string_interner::{StringInterner, Symbol};
+use crate::type_interner::*;
 use crate::types::*;
 use std::collections::HashMap;
 

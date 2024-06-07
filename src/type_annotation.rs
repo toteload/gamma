@@ -3,15 +3,18 @@ use crate::{
     error::*,
     scope_stack::ScopeStack,
     string_interner::Symbol,
-    types::{Type, TypeInterner, TypeToken},
+    type_interner::{TypeInterner, TypeToken},
+    types::Type,
     visitor::Visitor,
 };
 use std::collections::HashMap;
 
 struct TypeAnnotater<'a> {
-    typetokens: &'a mut TypeInterner,
+    typetokens: &'a TypeInterner,
+
     ast_types: &'a mut AstMap<TypeToken>,
-    typetable: &'a mut HashMap<Symbol, TypeToken>,
+    typetable: &'a HashMap<Symbol, TypeToken>,
+
     scopes: ScopeStack<Symbol, TypeToken>,
     errors: Vec<Error>,
 }

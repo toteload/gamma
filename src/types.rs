@@ -1,6 +1,7 @@
 use crate::string_interner::{StringInterner, Symbol};
+use crate::type_interner::{TypeInterner, TypeToken};
+use crate::ast;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -39,6 +40,11 @@ pub enum Type {
     Pointer(TypeToken),
     Array(i64, TypeToken),
 }
+
+pub const U64: Type = Type::Int {
+    signedness: Signedness::Unsigned,
+    width: 64,
+};
 
 impl Type {
     pub fn kind_u8(&self) -> u8 {
@@ -302,56 +308,6 @@ impl PartialEq for Layout {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
-pub struct TypeToken(u32);
-
-#[derive(Serialize)]
-pub struct TypeInterner {
-    tokens: HashMap<Type, TypeToken>,
-    types: Vec<Type>,
-}
-
-impl Default for TypeInterner {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TypeInterner {
-    pub fn new() -> TypeInterner {
-        TypeInterner {
-            tokens: HashMap::new(),
-            types: Vec::new(),
-        }
-    }
-
-    pub fn add(&mut self, ty: Type) -> TypeToken {
-        if let Some(tok) = self.tokens.get(&ty) {
-            return *tok;
-        }
-
-        let tok = TypeToken(self.types.len() as u32);
-
-        self.types.push(ty.clone());
-
-        self.tokens.insert(ty, tok);
-
-        tok
-    }
-
-    pub fn find_token(&self, ty: &Type) -> Option<TypeToken> {
-        self.tokens.get(ty).copied()
-    }
-
-    pub fn find_token_unchecked(&self, ty: &Type) -> TypeToken {
-        *self.tokens.get(ty).expect("Type should be interned")
-    }
-
-    pub fn get<'a>(&'a self, tok: &TypeToken) -> &'a Type {
-        &self.types[tok.0 as usize]
-    }
-}
-
 pub fn is_type_coercible_to(type_tokens: &TypeInterner, from: TypeToken, to: TypeToken) -> bool {
     if from == to {
         return true;
@@ -381,63 +337,6 @@ pub fn is_valid_type_cast(from: &Type, to: &Type) -> bool {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn basic_type_interner_usage() {
-        use Type::*;
-
-        let mut interner = TypeInterner::new();
-
-        let a = interner.add(Void);
-        let b = interner.add(Bool);
-        let c = interner.add(Int {
-            signedness: Signedness::Unsigned,
-            width: 32,
-        });
-
-        assert_eq!(a.0, 0);
-        assert_eq!(b.0, 1);
-        assert_eq!(c.0, 2);
-
-        assert_ne!(a, b);
-        assert_ne!(a, c);
-        assert_ne!(b, c);
-
-        assert_eq!(interner.get(&a), &Void);
-        assert_eq!(interner.get(&b), &Bool);
-        assert_eq!(
-            interner.get(&c),
-            &Int {
-                signedness: Signedness::Unsigned,
-                width: 32
-            }
-        );
-
-        let d = interner.add(Function {
-            params: vec![c, c, c],
-            return_type: b,
-        });
-
-        assert_ne!(a, d);
-        assert_ne!(b, d);
-        assert_ne!(c, d);
-
-        assert_eq!(d.0, 3);
-
-        let e = interner.add(Bool);
-
-        assert_eq!(b, e);
-
-        let f = interner.add(Function {
-            params: vec![c, c, c, c],
-            return_type: b,
-        });
-
-        assert_ne!(d, f);
-
-        assert_eq!(f.0, 4);
-    }
+pub fn is_addressable(e: &ast::Expression) -> bool {
+    matches!(e.kind, ast::ExpressionKind::Identifier(_))
 }
