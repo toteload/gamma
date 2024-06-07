@@ -1,5 +1,6 @@
 use crate::string_interner::{StringInterner, Symbol};
 use crate::type_interner::{TypeInterner, TypeToken};
+use crate::ast;
 use serde::Serialize;
 use std::hash::{Hash, Hasher};
 
@@ -336,63 +337,6 @@ pub fn is_valid_type_cast(from: &Type, to: &Type) -> bool {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn basic_type_interner_usage() {
-        use Type::*;
-
-        let mut interner = TypeInterner::new();
-
-        let a = interner.add(Void);
-        let b = interner.add(Bool);
-        let c = interner.add(Int {
-            signedness: Signedness::Unsigned,
-            width: 32,
-        });
-
-        assert_eq!(a.0, 0);
-        assert_eq!(b.0, 1);
-        assert_eq!(c.0, 2);
-
-        assert_ne!(a, b);
-        assert_ne!(a, c);
-        assert_ne!(b, c);
-
-        assert_eq!(interner.get(&a), &Void);
-        assert_eq!(interner.get(&b), &Bool);
-        assert_eq!(
-            interner.get(&c),
-            &Int {
-                signedness: Signedness::Unsigned,
-                width: 32
-            }
-        );
-
-        let d = interner.add(Function {
-            params: vec![c, c, c],
-            return_type: b,
-        });
-
-        assert_ne!(a, d);
-        assert_ne!(b, d);
-        assert_ne!(c, d);
-
-        assert_eq!(d.0, 3);
-
-        let e = interner.add(Bool);
-
-        assert_eq!(b, e);
-
-        let f = interner.add(Function {
-            params: vec![c, c, c, c],
-            return_type: b,
-        });
-
-        assert_ne!(d, f);
-
-        assert_eq!(f.0, 4);
-    }
+pub fn is_addressable(e: &ast::Expression) -> bool {
+    matches!(e.kind, ast::ExpressionKind::Identifier(_))
 }

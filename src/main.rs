@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
 mod ast;
+mod ast_helpers;
 mod compiler;
 mod error;
 mod ink_codegen;
@@ -10,16 +11,17 @@ mod semantics;
 mod source_location;
 mod string_interner;
 mod tokenizer;
-mod type_interner;
-mod type_check2;
 mod type_annotation;
 mod type_check2;
 mod type_coercion;
+mod type_interner;
 mod type_node_annotation;
 mod types;
 mod utils;
 mod visitor;
 mod visitor_mut;
+mod visitor_mut_with_context;
+mod visitor_with_context;
 
 use anyhow::Result;
 use clap::Parser as ClapParser;

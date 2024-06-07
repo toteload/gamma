@@ -1,17 +1,17 @@
 use crate::{
-    ast::{NodeId, NodeIdGenerator},
+    ast::{AstMap, NodeId, NodeIdGenerator},
     error::Error,
     ink_codegen::{CodeGenerator, MachineTarget},
     parser::Parser,
     semantics::{validate_semantics, SemanticContext},
     source_location::SourceSpan,
     string_interner::{StringInterner, Symbol},
-    type_interner::{TypeInterner, TypeToken},
-    types::{Signedness, Type},
-    type_node_annotation::annotate_type_nodes,
     type_annotation::type_annotate,
     type_check2::type_check,
     type_coercion::type_coerce,
+    type_interner::{TypeInterner, TypeToken},
+    type_node_annotation::annotate_type_nodes,
+    types::{Signedness, Type},
 };
 use inkwell::memory_buffer::MemoryBuffer;
 use std::collections::HashMap;
@@ -32,13 +32,13 @@ pub struct Output {
 
 pub struct Context {
     pub id_generator: NodeIdGenerator,
-
     pub symbols: StringInterner,
     pub type_tokens: TypeInterner,
+
     pub type_table: HashMap<Symbol, TypeToken>,
 
-    pub spans: HashMap<NodeId, SourceSpan>,
-    pub types: HashMap<NodeId, TypeToken>,
+    pub spans: AstMap<SourceSpan>,
+    pub types: AstMap<TypeToken>,
 }
 
 impl From<Error> for Vec<Error> {
@@ -164,7 +164,6 @@ impl Context {
             &mut items,
             &mut self.type_tokens,
             &mut self.types,
-            &mut self.type_table,
             &mut self.id_generator,
         )?;
 

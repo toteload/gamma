@@ -462,7 +462,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     self.add_to_current_scope(
                         param.name.sym,
                         Variable {
-                            type_token: *self.node_types.get(&param.id).unwrap(),
+                            type_token: *self.node_types.get(&param.ty.id).unwrap(),
                             ty: val.get_type(),
                             val: VariableValue::Parameter(val),
                         },

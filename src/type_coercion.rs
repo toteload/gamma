@@ -1,18 +1,19 @@
 use crate::{
     ast::{self, *},
+    ast_helpers::{coerce_expression, is_int_const, type_of_node},
     error::Error,
     string_interner::Symbol,
-    types::{Type, TypeInterner, TypeToken, U64},
-    visitor_mut::VisitorMut,
+    type_interner::{TypeInterner, TypeToken},
+    types::{Type, U64},
+    visitor_mut_with_context::VisitorMutWithContext,
 };
 use std::collections::HashMap;
 
 #[rustfmt::skip]
 struct Context<'a> {
-    typetokens:   &'a mut TypeInterner,
+    typetokens:   &'a TypeInterner,
+    id_generator: &'a NodeIdGenerator,
     ast_types:    &'a mut AstMap<TypeToken>,
-    typetable:    &'a mut HashMap<Symbol, TypeToken>,
-    id_generator: &'a mut NodeIdGenerator,
 }
 
 #[rustfmt::skip]
@@ -32,61 +33,7 @@ impl TypeCoercer {
     }
 }
 
-fn is_int_const(ctx: &Context, id: &NodeId) -> bool {
-    matches!(
-        ctx.typetokens.get(ctx.ast_types.get(id).expect("")),
-        Type::IntConstant
-    )
-}
-
-fn type_of_node<'a>(ctx: &'a Context, id: &NodeId) -> &'a Type {
-    ctx.typetokens.get(ctx.ast_types.get(id).expect(""))
-}
-
-fn coerce_expression(ctx: &mut Context, dst_type: TypeToken, e: &mut Expression) {
-    use ExpressionKind::*;
-
-    match &mut e.kind {
-        IntLiteral(_) => inject_coercion_type_cast(ctx, dst_type, e),
-        BuiltinOp { op, args } => {
-            for arg in args.iter_mut() {
-                coerce_expression(ctx, dst_type, arg);
-            }
-
-            if is_int_const(ctx, &e.id) {
-                inject_coercion_type_cast(ctx, dst_type, e);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn inject_coercion_type_cast(ctx: &mut Context, dst_type: TypeToken, e: &mut Expression) {
-    let expr_id = ctx.id_generator.gen_id();
-    let type_id = ctx.id_generator.gen_id();
-
-    ctx.ast_types.insert(expr_id, dst_type);
-    ctx.ast_types.insert(type_id, dst_type);
-
-    unsafe {
-        let tmp = Box::new(std::ptr::read(e));
-
-        let cast = ast::Expression {
-            id: expr_id,
-            kind: ExpressionKind::Cast {
-                ty: ast::Type {
-                    id: type_id,
-                    kind: TypeKind::Internal,
-                },
-                e: tmp,
-            },
-        };
-
-        std::ptr::write(e, cast);
-    }
-}
-
-impl VisitorMut<Context<'_>> for TypeCoercer {
+impl VisitorMutWithContext<Context<'_>> for TypeCoercer {
     fn on_items_enter(&mut self, ctx: &mut Context, items: &mut [Item]) {
         for item in items {
             match &item.kind {
@@ -100,7 +47,9 @@ impl VisitorMut<Context<'_>> for TypeCoercer {
     }
 
     fn on_function_enter(&mut self, ctx: &mut Context, function: &mut Item) {
-        let Type::Function { return_type, .. } = type_of_node(ctx, &function.id) else {
+        let Type::Function { return_type, .. } =
+            type_of_node(ctx.typetokens, ctx.ast_types, &function.id)
+        else {
             panic!()
         };
         self.declared_return_type = Some(*return_type);
@@ -114,15 +63,28 @@ impl VisitorMut<Context<'_>> for TypeCoercer {
                 ty,
                 init: Some(init),
                 ..
-            } if is_int_const(ctx, &init.id) => {
+            } if is_int_const(ctx.typetokens, ctx.ast_types, &init.id) => {
                 let dst_type = ctx.ast_types.get(&ty.id).expect("");
-                coerce_expression(ctx, *dst_type, init);
+                coerce_expression(
+                    ctx.id_generator,
+                    ctx.typetokens,
+                    ctx.ast_types,
+                    *dst_type,
+                    init,
+                );
             }
-            Set { dst, val } if is_int_const(ctx, &val.id) => {
-                todo!()
+            Set { dst, val } if is_int_const(ctx.typetokens, ctx.ast_types, &val.id) => {
+                let dst_type = todo!();
+                coerce_expression(ctx.id_generator, ctx.typetokens, ctx.ast_types, dst_type, val);
             }
-            Return(Some(e)) if is_int_const(ctx, &e.id) => {
-                coerce_expression(ctx, self.declared_return_type.unwrap(), e);
+            Return(Some(e)) if is_int_const(ctx.typetokens, ctx.ast_types, &e.id) => {
+                coerce_expression(
+                    ctx.id_generator,
+                    ctx.typetokens,
+                    ctx.ast_types,
+                    self.declared_return_type.unwrap(),
+                    e,
+                );
             }
 
             Let { init: Some(e), .. } => self.visit_expression(ctx, e),
@@ -165,30 +127,33 @@ impl VisitorMut<Context<'_>> for TypeCoercer {
                     };
 
                     for arg in args.iter_mut() {
-                        coerce_expression(ctx, non_const_arg_typetok, arg);
+                        coerce_expression(
+                            ctx.id_generator,
+                            ctx.typetokens,
+                            ctx.ast_types,
+                            non_const_arg_typetok,
+                            arg,
+                        );
                     }
                 }
                 At => {
                     if let [_, idx] = args.as_mut_slice() {
                         let u = ctx.typetokens.add(U64);
-                        coerce_expression(ctx, u, idx);
+                        coerce_expression(ctx.id_generator, ctx.typetokens, ctx.ast_types, u, idx);
                     }
                 }
-                AddressOf => todo!("type coercion address of"),
+                AddressOf => {}
                 _ => todo!("op {op:?}"),
             },
             Call { name, args } => {
-                let params = {
-                    let Type::Function { params, .. } =
-                        ctx.typetokens.get(self.functions.get(&name.sym).unwrap())
-                    else {
-                        panic!()
-                    };
-                    params.clone()
+                let Type::Function { params, .. } =
+                    ctx.typetokens.get(self.functions.get(&name.sym).unwrap())
+                else {
+                    panic!()
                 };
 
                 for (ty, arg) in params.iter().zip(args.iter_mut()) {
-                    coerce_expression(ctx, *ty, arg);
+                    coerce_expression(ctx.id_generator, ctx.typetokens, ctx.ast_types, *ty, arg);
                 }
             }
             Cast { ty, e } => {
@@ -203,15 +168,13 @@ impl VisitorMut<Context<'_>> for TypeCoercer {
 #[rustfmt::skip]
 pub fn type_coerce(
     items:        &mut [Item],
-    typetokens:   &mut TypeInterner,
+    typetokens:   &TypeInterner,
     ast_types:    &mut HashMap<NodeId, TypeToken>,
-    typetable:    &mut HashMap<Symbol, TypeToken>,
-    id_generator: &mut NodeIdGenerator,
+    id_generator: &NodeIdGenerator,
 ) -> Result<(), Vec<Error>> {
     let mut ctx = Context {
         typetokens,
         ast_types,
-        typetable,
         id_generator,
     };
 
