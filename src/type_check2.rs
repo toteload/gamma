@@ -1,10 +1,11 @@
 use crate::{
     ast::*,
+    ast_helpers::typetoken_of_node,
     error::{Error, ErrorSource},
     scope_stack::ScopeStack,
     string_interner::Symbol,
     type_interner::{TypeInterner, TypeToken},
-    types::{is_valid_type_cast, is_addressable, Type},
+    types::{is_addressable, is_valid_type_cast, Type},
     visitor::Visitor,
 };
 use std::collections::HashMap;
@@ -106,6 +107,10 @@ impl TypeChecker<'_> {
         let all_are_same_type = arg_types.windows(2).all(|w| w[0] == w[1]);
         assert!(all_are_same_type, "{:?}", args);
     }
+
+    fn check_node_is_type_bool(&mut self, id: &NodeId) {
+        assert!(typetoken_of_node(self.ast_types, id) == self.typetokens.add(Type::Bool));
+    }
 }
 
 impl Visitor for TypeChecker<'_> {
@@ -203,16 +208,26 @@ impl Visitor for TypeChecker<'_> {
                 }
             }
             BuiltinOp { op, args } => match op {
-                Not => todo!(),
-                Or | And => todo!(),
+                Not => {
+                    assert!(args.len() == 1);
+                    self.check_node_is_type_bool(&args[0].id);
+                }
+                Or | And => {
+                    for arg in args.iter() {
+                        self.check_node_is_type_bool(&arg.id);
+                    }
+                }
                 Equals | NotEquals | LessThan | GreaterThan | LessEquals | GreaterEquals => {
                     self.check_all_args_are_same_type(args);
+                    // TODO make sure that the types are comparable
                 }
                 BitwiseAnd | BitwiseOr | Xor => {
                     self.check_all_args_are_same_type(args);
+                    // TODO make sure that the types can use bitwise ops
                 }
                 Add | Sub | Mul | Div | Remainder => {
                     self.check_all_args_are_same_type(args);
+                    // TODO make sure that the types can use arithmetic ops
                 }
                 AddressOf => {
                     assert!(args.len() == 1);

@@ -10,7 +10,7 @@ use crate::{
 use std::collections::HashMap;
 
 struct TypeNodeAnnotater {
-    userdefined_type_refs: Vec<(NodeId, Symbol)>,
+    userdefined_type_refs: Vec<(NodeId, TypeKind)>,
     errors: Vec<Error>,
 }
 
@@ -124,7 +124,7 @@ impl TypeNodeAnnotater {
     ) {
         match get_typetoken_of_typekind(typetokens, typetable, &ty.kind) {
             Ok(typetoken) => _ = ast_types.insert(ty.id, typetoken),
-            Err(sym) => self.userdefined_type_refs.push((ty.id, sym)),
+            Err(_) => self.userdefined_type_refs.push((ty.id, ty.kind.clone())),
         }
     }
 
@@ -178,8 +178,11 @@ impl TypeNodeAnnotater {
             }
         }
 
-        for (id, sym) in self.userdefined_type_refs.iter() {
-            ast_types.insert(*id, *typetable.get(sym).unwrap());
+        for (id, tykind) in self.userdefined_type_refs.iter() {
+            let Ok(tok) = get_typetoken_of_typekind(typetokens, typetable, &tykind) else {
+                todo!()
+            };
+            ast_types.insert(*id, tok);
         }
     }
 }

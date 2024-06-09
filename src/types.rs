@@ -1,6 +1,6 @@
+use crate::ast;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::type_interner::{TypeInterner, TypeToken};
-use crate::ast;
 use serde::Serialize;
 use std::hash::{Hash, Hasher};
 
@@ -332,6 +332,7 @@ pub fn is_valid_type_cast(from: &Type, to: &Type) -> bool {
         (Int { .. }, Bool) => true,
         (Bool, Int { .. }) => true,
         (Pointer(_), Int { .. }) => true,
+        (Pointer(_), IntConstant) => true,
         (Pointer(ta), Array(_, tb)) if ta == tb => true,
         _ => false,
     }

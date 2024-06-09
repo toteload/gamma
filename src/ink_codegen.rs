@@ -91,6 +91,8 @@ pub struct CodeGenerator<'ctx> {
     current_basic_block: Option<BasicBlock<'ctx>>,
 
     functions: HashMap<Symbol, FunctionValue<'ctx>>,
+    function_typetokens: HashMap<Symbol, TypeToken>,
+
     scopes: Vec<Scope<'ctx>>,
 
     llvm_stacksave: FunctionValue<'ctx>,
@@ -144,6 +146,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             current_basic_block: None,
 
             functions: HashMap::new(),
+            function_typetokens: HashMap::new(),
             scopes: Vec::new(),
 
             llvm_stacksave,
@@ -301,6 +304,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
 
         let ty = self.type_interner.get(&token);
+        println!("{ty:?}");
 
         let t = match ty {
             Type::Pointer(_) => self.ptr_t.into(),
@@ -693,7 +697,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             }
             StatementKind::Expression(e) => 'expr_block: {
                 if let ExpressionKind::Call { name, args } = &e.kind {
-                    let Some(tok) = self.node_types.get(&name.id) else {
+                    let Some(tok) = self.function_typetokens.get(&name.sym) else {
                         todo!()
                     };
                     if self.is_type_token_void_function(*tok) {
@@ -938,6 +942,11 @@ impl<'ctx> CodeGenerator<'ctx> {
                         )?
                         .into()),
 
+                    (Type::IntConstant, Type::Pointer(_)) => Ok(self
+                        .builder
+                        .build_int_to_ptr(val.into_int_value(), self.ptr_t, "")?
+                        .into()),
+
                     _ => todo!("Cast from {:?} to {:?}", src_ty, dst_ty),
                 }
             }
@@ -983,6 +992,38 @@ impl<'ctx> CodeGenerator<'ctx> {
                             )?
                             .into())
                     }
+                }
+                BuiltinOpKind::GreaterThan | BuiltinOpKind::LessThan => {
+                    // For now only support two operands at a time
+                    assert_eq!(args.len(), 2);
+
+                    let x = self.gen_expr(&args[0])?;
+                    let y = self.gen_expr(&args[1])?;
+
+                    let is_signed = {
+                        let tok = self.node_types.get(&args[0].id).unwrap();
+                        let ty = self.type_interner.get(tok);
+                        matches!(
+                            ty,
+                            &Type::Int {
+                                signedness: Signedness::Signed,
+                                ..
+                            }
+                        )
+                    };
+
+                    let predicate = match (op, is_signed) {
+                        (BuiltinOpKind::GreaterThan, true) => IntPredicate::SGT,
+                        (BuiltinOpKind::GreaterThan, false) => IntPredicate::UGT,
+                        (BuiltinOpKind::LessThan, true) => IntPredicate::SLT,
+                        (BuiltinOpKind::LessThan, false) => IntPredicate::ULT,
+                        _ => todo!(),
+                    };
+
+                    Ok(self
+                        .builder
+                        .build_int_compare(predicate, x.into_int_value(), y.into_int_value(), "")?
+                        .into())
                 }
                 BuiltinOpKind::Add => {
                     assert!(!args.is_empty());
@@ -1175,6 +1216,8 @@ impl<'ctx> CodeGenerator<'ctx> {
                         self.module
                             .add_function(self.symbols.get(&name.sym), function_type, None);
                     self.functions.insert(name.sym, f);
+                    self.function_typetokens
+                        .insert(name.sym, *self.node_types.get(&item.id).unwrap());
                 }
                 ItemKind::Layout { .. } => (),
             }

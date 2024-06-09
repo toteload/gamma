@@ -1,6 +1,6 @@
 use crate::{
-    ast::{self, *},
-    ast_helpers::{coerce_expression, is_int_const, type_of_node},
+    ast::*,
+    ast_helpers::{coerce_expression, is_int_const, type_of_node, typetoken_of_node},
     error::Error,
     string_interner::Symbol,
     type_interner::{TypeInterner, TypeToken},
@@ -74,8 +74,14 @@ impl VisitorMutWithContext<Context<'_>> for TypeCoercer {
                 );
             }
             Set { dst, val } if is_int_const(ctx.typetokens, ctx.ast_types, &val.id) => {
-                let dst_type = todo!();
-                coerce_expression(ctx.id_generator, ctx.typetokens, ctx.ast_types, dst_type, val);
+                let dst_type = typetoken_of_node(ctx.ast_types, &dst.id);
+                coerce_expression(
+                    ctx.id_generator,
+                    ctx.typetokens,
+                    ctx.ast_types,
+                    dst_type,
+                    val,
+                );
             }
             Return(Some(e)) if is_int_const(ctx.typetokens, ctx.ast_types, &e.id) => {
                 coerce_expression(
@@ -116,7 +122,7 @@ impl VisitorMutWithContext<Context<'_>> for TypeCoercer {
         match &mut expression.kind {
             BuiltinOp { op, args } => match op {
                 Equals | NotEquals | LessThan | GreaterThan | LessEquals | GreaterEquals | Add
-                | Sub | Mul | Div | Remainder => {
+                | Sub | Mul | Div | Remainder | BitwiseOr | BitwiseAnd | Xor => {
                     let Some(non_const_arg_typetok) = args
                         .iter()
                         .map(|arg| ctx.ast_types.get(&arg.id).expect(""))
@@ -142,8 +148,11 @@ impl VisitorMutWithContext<Context<'_>> for TypeCoercer {
                         coerce_expression(ctx.id_generator, ctx.typetokens, ctx.ast_types, u, idx);
                     }
                 }
-                AddressOf => {}
-                _ => todo!("op {op:?}"),
+                AddressOf | Not | Or | And => {
+                    for arg in args.iter_mut() {
+                        self.visit_expression(ctx, arg);
+                    }
+                }
             },
             Call { name, args } => {
                 let Type::Function { params, .. } =

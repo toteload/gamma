@@ -72,7 +72,7 @@ mod tests {
     fn basic_type_interner_usage() {
         use Type::*;
 
-        let mut interner = TypeInterner::new();
+        let interner = TypeInterner::new();
 
         let a = interner.add(Void);
         let b = interner.add(Bool);

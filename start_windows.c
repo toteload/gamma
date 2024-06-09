@@ -6,6 +6,6 @@
 // This is the Gamma main function
 extern int32_t main();
 
-void start(void) {
-    ExitProcess(main());
+int (void) {
+    return main();
 }

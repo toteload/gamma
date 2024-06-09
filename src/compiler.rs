@@ -1,5 +1,5 @@
 use crate::{
-    ast::{AstMap, NodeId, NodeIdGenerator},
+    ast::{AstMap, NodeIdGenerator},
     error::Error,
     ink_codegen::{CodeGenerator, MachineTarget},
     parser::Parser,
@@ -138,6 +138,8 @@ impl Context {
         );
 
         let mut items = parser.parse_items().map_err(|e| vec![e])?;
+
+        println!("{}", self.symbols.to_string());
 
         let semantic_context = SemanticContext {
             symbols: &self.symbols,

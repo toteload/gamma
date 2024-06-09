@@ -166,6 +166,7 @@ impl Visitor for TypeAnnotater<'_> {
                     .unwrap_or(self.typetokens.add(Type::IntConstant)),
             },
             Call { name, args } => {
+                //self.get_typetoken_of_identifier(&name.sym)
                 let function_type = self.get_type_of_identifier(&name.sym);
                 let Type::Function { return_type, .. } = function_type else {
                     panic!()

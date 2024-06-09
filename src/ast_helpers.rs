@@ -32,12 +32,18 @@ pub fn is_int_const(typetokens: &TypeInterner, ast_types: &AstMap<TypeToken>, id
     )
 }
 
+pub fn typetoken_of_node(ast_types: &AstMap<TypeToken>, id: &NodeId) -> TypeToken {
+    *ast_types
+        .get(id)
+        .expect("Node should have an associated TypeToken")
+}
+
 pub fn type_of_node<'a>(
     typetokens: &'a TypeInterner,
     ast_types: &AstMap<TypeToken>,
     id: &NodeId,
 ) -> &'a Type {
-    typetokens.get(ast_types.get(id).expect(""))
+    typetokens.get(&typetoken_of_node(ast_types, id))
 }
 
 pub fn coerce_expression(
