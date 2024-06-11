@@ -253,6 +253,18 @@ impl<'a> Iterator for Tokenizer<'a> {
             }
 
             '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '-' => 'number_block: {
+                if c == '0' && self.iter.peek().map_or(false, |&c| c == 'x') {
+                    self.advance();
+                    let (end_offset, end) = self.read_while(|c| c.is_ascii_hexdigit());
+
+                    let val: i64 = i64::from_str_radix(&self.source[offset+2..end_offset], 16).unwrap();
+                    let span = SourceSpan { start, end };
+                    break 'number_block Token {
+                        span,
+                        kind: TokenKind::IntLiteral(val),
+                    };
+                }
+
                 if c == '-' {
                     if self.iter.peek().map_or(false, |c| c.is_ascii_digit()) {
                         // negative number

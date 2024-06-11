@@ -1,0 +1,24 @@
+---
+source: tests/valid_samples.rs
+expression: output
+---
+; ModuleID = 'main'
+source_filename = "main"
+target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-pc-windows-msvc"
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn
+declare ptr @llvm.stacksave() #0
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn
+declare void @llvm.stackrestore(ptr) #0
+
+define i32 @main() {
+entry:
+  %0 = call ptr @llvm.stacksave()
+  %1 = alloca [128 x i8], align 8
+  call void @llvm.stackrestore(ptr %0)
+  ret i32 0
+}
+
+attributes #0 = { nocallback nofree nosync nounwind willreturn }

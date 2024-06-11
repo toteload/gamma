@@ -117,3 +117,10 @@ fn break_labeled_loop() {
     let output = compile(&source);
     assert_snapshot!("break_labeled_loop", output);
 }
+
+#[test]
+fn layout_with_array() {
+    let source = fs::read_to_string("tests/valid_samples/layout_with_array.gamma").unwrap();
+    let output = compile(&source);
+    assert_snapshot!("layout_with_array", output);
+}

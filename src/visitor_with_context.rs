@@ -59,7 +59,11 @@ pub trait VisitorWithContext<Ctx> {
                     self.on_type_enter(ctx, &param.ty)
                 }
             }
-            _ => (),
+            ItemKind::Layout { fields, .. } => {
+                for Field { ty, .. } in fields.iter() {
+                    self.on_type_enter(ctx, ty);
+                }
+            }
         }
 
         self.on_item_leave(ctx, item);

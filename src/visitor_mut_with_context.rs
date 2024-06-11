@@ -59,7 +59,11 @@ pub trait VisitorMutWithContext<Ctx> {
                     self.on_type_enter(ctx, &mut param.ty)
                 }
             }
-            _ => (),
+            ItemKind::Layout { fields, .. } => {
+                for field in fields.iter_mut() {
+                    self.on_type_enter(ctx, &mut field.ty);
+                }
+            }
         }
 
         self.on_item_leave(ctx, item);

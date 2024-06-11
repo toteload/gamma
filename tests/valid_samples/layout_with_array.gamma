@@ -1,0 +1,9 @@
+layout Snake
+  xs: 0 [32][2]i16
+  p: 0 ^i32
+end
+
+fn main(): i32
+  let s: Snake
+  return 0
+end

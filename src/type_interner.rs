@@ -1,3 +1,4 @@
+use crate::string_interner::StringInterner;
 use crate::types::Type;
 use serde::Serialize;
 use std::cell::Cell;
@@ -60,6 +61,15 @@ impl TypeInterner {
     pub fn get(&self, tok: &TypeToken) -> &Type {
         let types = unsafe { &(*self.types.as_ptr()) };
         &types[tok.0 as usize]
+    }
+
+    pub fn to_string(&self, symbols: &StringInterner) -> String {
+        let mut s = String::new();
+        let types = unsafe { &(*self.types.as_ptr()) };
+        for (i, t) in types.iter().enumerate() {
+            s += format!("{} = {}\n", i, t.to_string(self, symbols)).as_str();
+        }
+        s
     }
 }
 

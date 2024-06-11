@@ -98,6 +98,7 @@ pub struct CodeGenerator<'ctx> {
     llvm_stacksave: FunctionValue<'ctx>,
     llvm_stackrestore: FunctionValue<'ctx>,
 
+    bool_t: IntType<'ctx>,
     i8_t: IntType<'ctx>,
     i16_t: IntType<'ctx>,
     i32_t: IntType<'ctx>,
@@ -152,6 +153,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             llvm_stacksave,
             llvm_stackrestore,
 
+            bool_t: ctx.bool_type(),
             i8_t: ctx.i8_type(),
             i16_t: ctx.i16_type(),
             i32_t: ctx.i32_type(),
@@ -524,7 +526,18 @@ impl<'ctx> CodeGenerator<'ctx> {
                 then,
                 otherwise,
             } => {
-                let cond_val = self.gen_expr(cond)?;
+                let cond_val = 'blk: {
+                    let val = self.gen_expr(cond)?;
+                    let bitwidth = val.get_type().into_int_type().get_bit_width();
+
+                    if bitwidth == 1 {
+                        break 'blk val;
+                    }
+
+                    self.builder
+                        .build_int_truncate_or_bit_cast(val.into_int_value(), self.bool_t, "")?
+                        .into()
+                };
 
                 let end_block = self.add_basic_block("endif");
                 let otherwise_block = self.add_basic_block("otherwise");

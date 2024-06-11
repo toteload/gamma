@@ -47,9 +47,16 @@ fn resolve_layout(
     }
 
     for field in ast_fields.iter() {
-        if let Some(sym) = find_type_identifier(&field.ty.kind) {
-            let tok = resolve_layout(typetokens, typetable, ast_types, &sym, layouts, history)?;
-            ast_types.insert(field.ty.id, tok);
+        // If the type of this field is based on a layout type, then we recurse.
+        let Some(sym) = find_type_identifier(&field.ty.kind) else {
+            continue;
+        };
+        if layouts.contains_key(&sym) {
+            resolve_layout(typetokens, typetable, ast_types, &sym, layouts, history)?;
+            ast_types.insert(
+                field.ty.id,
+                get_typetoken_of_typekind(typetokens, typetable, &field.ty.kind).unwrap(),
+            );
         }
     }
 
@@ -122,9 +129,15 @@ impl TypeNodeAnnotater {
         ast_types: &mut AstMap<TypeToken>,
         ty: &ast::Type,
     ) {
+        println!("try {ty:#?}");
         match get_typetoken_of_typekind(typetokens, typetable, &ty.kind) {
-            Ok(typetoken) => _ = ast_types.insert(ty.id, typetoken),
-            Err(_) => self.userdefined_type_refs.push((ty.id, ty.kind.clone())),
+            Ok(typetoken) => {
+                ast_types.insert(ty.id, typetoken);
+            }
+            Err(_) => {
+                println!("typetoken not found for typekind");
+                self.userdefined_type_refs.push((ty.id, ty.kind.clone()));
+            }
         }
     }
 
@@ -161,6 +174,9 @@ impl TypeNodeAnnotater {
                 layouts.insert(name.sym, (item.id, &fields));
             }
         }
+
+        println!("{layouts:?}");
+        println!("{:?}", self.userdefined_type_refs);
 
         let mut history = Vec::new();
         for layout in layouts.keys() {

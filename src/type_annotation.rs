@@ -130,7 +130,7 @@ impl Visitor for TypeAnnotater<'_> {
                         panic!()
                     };
                     let Some(field) = layout.fields.iter().find(|field| field.name == *sym) else {
-                        todo!();
+                        todo!("referenced field not found in layout");
                     };
                     tok = field.ty;
                 }
