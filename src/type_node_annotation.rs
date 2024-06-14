@@ -201,7 +201,9 @@ impl TypeNodeAnnotater {
 
         for (id, tykind) in self.userdefined_type_refs.iter() {
             match get_typetoken_of_typekind(typetokens, typetable, &tykind) {
-                Ok(tok) => { ast_types.insert(*id, tok); },
+                Ok(tok) => {
+                    ast_types.insert(*id, tok);
+                }
                 Err(sym) => {
                     self.errors.push(Error {
                         source: ErrorSource::AstNode(*id),

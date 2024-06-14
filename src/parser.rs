@@ -17,13 +17,20 @@ pub struct Parser<'a> {
 macro_rules! expect_token {
     // The pattern matching code for `pattern` is taken from:
     // https://doc.rust-lang.org/src/core/macros/mod.rs.html#342
-    ($token:expr, $(|)? $( $pattern:pat_param )|+ $( if $guard: expr )? $(,)?) => {
+    ($phase:expr, $token:expr, $(|)? $( $pattern:pat_param )|+ $( if $guard: expr )? $(,)?) => {
         if let Some(tok) = $token {
             let token_matches_pattern = matches!(tok.kind, $( $pattern )|+ $( if $guard )?);
             if !token_matches_pattern {
                 Err(Error {
                     source: ErrorSource::Span(tok.span),
-                    info: vec![ErrorInfo::Text("Encountered unexpected token "), ErrorInfo::SourceText(tok.span)],
+                    info: vec![
+                        ErrorInfo::Text("Encountered unexpected token "),
+                        ErrorInfo::SourceText(tok.span),
+                        ErrorInfo::Text(" while parsing "),
+                        ErrorInfo::Text($phase),
+                        ErrorInfo::Text(". Expected pattern "),
+                        ErrorInfo::Text(stringify!( $( $pattern )|+ )),
+                    ],
                 })
             } else {
                 Ok(tok)
@@ -80,7 +87,7 @@ impl Parser<'_> {
     fn parse_label(&mut self) -> Result<Label> {
         use TokenKind::*;
 
-        let label_token = expect_token!(self.tokens.next(), Label(_))?;
+        let label_token = expect_token!("label", self.tokens.next(), Label(_))?;
 
         let Label(sym) = label_token.kind else {
             unreachable!()
@@ -98,7 +105,7 @@ impl Parser<'_> {
     fn parse_name(&mut self) -> Result<Name> {
         use TokenKind::*;
 
-        let name_token = expect_token!(self.tokens.next(), Identifier(_))?;
+        let name_token = expect_token!("name", self.tokens.next(), Identifier(_))?;
 
         let Identifier(sym) = name_token.kind else {
             unreachable!()
@@ -117,6 +124,7 @@ impl Parser<'_> {
         use TokenKind::*;
 
         let tok = expect_token!(
+            "item",
             self.tokens.next(),
             KeywordFn | KeywordExternalFn | KeywordLayout
         )?;
@@ -128,7 +136,7 @@ impl Parser<'_> {
 
                 let params = self.parse_params()?;
 
-                expect_token!(self.tokens.next(), Colon)?;
+                expect_token!("colon before return type of function", self.tokens.next(), Colon)?;
 
                 let return_type = self.parse_type()?;
 
@@ -150,7 +158,7 @@ impl Parser<'_> {
 
                 let params = self.parse_params()?;
 
-                expect_token!(self.tokens.next(), Colon)?;
+                expect_token!("color before return type of external function", self.tokens.next(), Colon)?;
 
                 let return_type = self.parse_type()?;
 
@@ -172,12 +180,12 @@ impl Parser<'_> {
                 while !matches!(self.try_peek()?.kind, KeywordEnd) {
                     let name = self.parse_name()?;
 
-                    expect_token!(self.tokens.next(), Colon)?;
+                    expect_token!("color after layout field name", self.tokens.next(), Colon)?;
 
                     let Token {
                         kind: IntLiteral(offset),
                         ..
-                    } = expect_token!(self.tokens.next(), IntLiteral(_))?
+                    } = expect_token!("layout field offset", self.tokens.next(), IntLiteral(_))?
                     else {
                         unreachable!()
                     };
@@ -189,7 +197,7 @@ impl Parser<'_> {
                     fields.push(Field { name, offset, ty });
                 }
 
-                expect_token!(self.tokens.next(), KeywordEnd)?;
+                expect_token!("end keyword for layout", self.tokens.next(), KeywordEnd)?;
 
                 ItemKind::Layout { name, fields }
             }
@@ -204,17 +212,17 @@ impl Parser<'_> {
     fn parse_array_type(&mut self) -> Result<(SourceSpan, TypeKind)> {
         use TokenKind::*;
 
-        let Token { span: start, .. } = expect_token!(self.tokens.next(), BracketOpen)?;
+        let Token { span: start, .. } = expect_token!("opening bracket for array type", self.tokens.next(), BracketOpen)?;
 
         let Token {
             kind: IntLiteral(size),
             ..
-        } = expect_token!(self.tokens.next(), IntLiteral(_))?
+        } = expect_token!("size of array type", self.tokens.next(), IntLiteral(_))?
         else {
             unreachable!()
         };
 
-        expect_token!(self.tokens.next(), BracketClose)?;
+        expect_token!("closing bracket for array type", self.tokens.next(), BracketClose)?;
 
         let (end, base_type) = self.parse_base_type()?;
 
@@ -224,9 +232,7 @@ impl Parser<'_> {
     }
 
     fn parse_pointer_type(&mut self) -> Result<(SourceSpan, TypeKind)> {
-        use TokenKind::*;
-
-        let Token { span: start, .. } = expect_token!(self.tokens.next(), Hat)?;
+        let Token { span: start, .. } = expect_token!("hat for pointer type", self.tokens.next(), TokenKind::Hat)?;
 
         let (end, base_type) = self.parse_base_type()?;
 
@@ -239,7 +245,7 @@ impl Parser<'_> {
         use TokenKind::*;
 
         let Token { kind, span } =
-            *expect_token!(self.tokens.peek(), Hat | BracketOpen | Identifier(_))?;
+            *expect_token!("start of a type", self.tokens.peek(), Hat | BracketOpen | Identifier(_))?;
 
         match kind {
             Hat => self.parse_pointer_type(),
@@ -265,13 +271,13 @@ impl Parser<'_> {
     fn parse_params(&mut self) -> Result<Vec<Param>> {
         use TokenKind::*;
 
-        expect_token!(self.tokens.next(), ParenOpen)?;
+        expect_token!("opening parenthesis for function parameters", self.tokens.next(), ParenOpen)?;
 
         let mut params = Vec::new();
         while !matches!(self.try_peek()?.kind, ParenClose) {
             let name = self.parse_name()?;
 
-            expect_token!(self.tokens.next(), Colon)?;
+            expect_token!("colon delimiting parameter name and type", self.tokens.next(), Colon)?;
 
             let ty = self.parse_type()?;
 
@@ -289,7 +295,7 @@ impl Parser<'_> {
             }
         }
 
-        expect_token!(self.tokens.next(), ParenClose)?;
+        expect_token!("closing parenthesis for function parameters", self.tokens.next(), ParenClose)?;
 
         Ok(params)
     }
@@ -304,7 +310,7 @@ impl Parser<'_> {
             statements.push(statement);
         }
 
-        let end = expect_token!(self.tokens.next(), KeywordEnd)?;
+        let end = expect_token!("end keyword for block", self.tokens.next(), KeywordEnd)?;
 
         let id = self.gen_node_id();
 
@@ -349,7 +355,7 @@ impl Parser<'_> {
 
                 let name = self.parse_name()?;
 
-                expect_token!(self.tokens.next(), Colon)?;
+                expect_token!("colon after name in let statement", self.tokens.next(), Colon)?;
 
                 let ty = self.parse_type()?;
 
@@ -383,7 +389,7 @@ impl Parser<'_> {
 
                 let dst: Box<_> = self.parse_expression()?.into();
 
-                expect_token!(self.tokens.next(), EqualSign)?;
+                expect_token!("= in set statement", self.tokens.next(), EqualSign)?;
 
                 let val: Box<_> = self.parse_expression()?.into();
 
@@ -496,6 +502,29 @@ impl Parser<'_> {
         Ok(args)
     }
 
+    fn parse_accessor(&mut self) -> Result<Accessor> {
+        let tok = self.try_peek()?;
+
+        let id = self.id_generator.gen_id();
+
+        if let TokenKind::FieldAccessor { field, full } = tok.kind {
+            self.tokens.next();
+            return Ok(Accessor::Field(FieldAccessor { id, field, full }));
+        }
+
+        Ok(Accessor::Expr(self.parse_expression()?))
+    }
+
+    fn parse_accessors(&mut self) -> Result<Vec<Accessor>> {
+        let mut accessors = Vec::new();
+
+        while !matches!(self.try_peek()?.kind, TokenKind::ParenClose) {
+            accessors.push(self.parse_accessor()?);
+        }
+
+        Ok(accessors)
+    }
+
     fn parse_expression(&mut self) -> Result<Expression> {
         use TokenKind::*;
 
@@ -503,6 +532,7 @@ impl Parser<'_> {
         let span: SourceSpan;
 
         let tok = expect_token!(
+            "expression",
             self.tokens.next(),
             IntLiteral(_) | BoolLiteral(_) | Identifier(_) | ParenOpen
         )?;
@@ -518,29 +548,11 @@ impl Parser<'_> {
             }
             Identifier(sym) => {
                 span = tok.span;
-                let mut idents = vec![sym];
+                //let Identifier(sym) = expect_token!("", self.tokens.next(), Identifier(_))?.kind else {
+                //    unreachable!()
+                //};
 
-                while let Some(peeked) = self.tokens.peek() {
-                    if !matches!(peeked.kind, Period) {
-                        break;
-                    }
-
-                    expect_token!(self.tokens.next(), Period)?;
-
-                    let Identifier(sym) = expect_token!(self.tokens.next(), Identifier(_))?.kind
-                    else {
-                        unreachable!()
-                    };
-
-                    idents.push(sym);
-                }
-
-                if let &[sym] = idents.as_slice() {
-                    ExpressionKind::Identifier(sym)
-                } else {
-                    // TODO(david) set the span correctly
-                    ExpressionKind::CompoundIdentifier(idents)
-                }
+                ExpressionKind::Identifier(sym)
             }
             ParenOpen => {
                 macro_rules! builtin_operators {
@@ -553,39 +565,53 @@ impl Parser<'_> {
                             | Star
                             | Div
                             | KeywordRem
-                            | Equal
-                            | NotEqual
-                            | Less
-                            | Greater
-                            | LessEqual
-                            | GreaterEqual
+                            | KeywordEq
+                            | KeywordNe
+                            | KeywordLt
+                            | KeywordGt
+                            | KeywordLe
+                            | KeywordGe
                             | KeywordNot
                             | Minus
                             | Plus
                             | Ampersand
-                            | At
                     };
                 }
 
                 let start_span = tok.span;
 
-                let tok = self.try_peek()?;
+                let tok = expect_token!(
+                    "expression call",
+                    self.tokens.peek().copied(),
+                    builtin_operators!() | KeywordCast | At | Identifier(_)
+                )?;
 
-                if matches!(tok.kind, builtin_operators!() | KeywordCast) {
+                if matches!(tok.kind, builtin_operators!() | KeywordCast | At) {
                     self.tokens.next();
                 }
 
                 let e = match tok.kind {
                     KeywordCast => {
                         let ty = self.parse_type()?;
-                        let e = self.parse_expression()?;
-                        ExpressionKind::Cast { ty, e: e.into() }
+                        let e = self.parse_expression()?.into();
+                        ExpressionKind::Cast { ty, e }
                     }
 
+                    At => {
+                        let base = self.parse_expression()?.into();
+                        let accessors = self.parse_accessors()?;
+                        ExpressionKind::Access { base, accessors }
+                    }
+
+                    // Builtin operator call
                     op @ builtin_operators!() => {
                         let op = match op {
-                            Equal => BuiltinOpKind::Equals,
-                            NotEqual => BuiltinOpKind::NotEquals,
+                            KeywordEq => BuiltinOpKind::Equals,
+                            KeywordNe => BuiltinOpKind::NotEquals,
+                            KeywordGt => BuiltinOpKind::GreaterThan,
+                            KeywordLt => BuiltinOpKind::LessThan,
+                            KeywordGe => BuiltinOpKind::GreaterEquals,
+                            KeywordLe => BuiltinOpKind::LessEquals,
                             Star => BuiltinOpKind::Mul,
                             Div => BuiltinOpKind::Div,
                             KeywordBor => BuiltinOpKind::BitwiseOr,
@@ -595,13 +621,10 @@ impl Parser<'_> {
                             KeywordNot => BuiltinOpKind::Not,
                             KeywordXor => BuiltinOpKind::Xor,
                             KeywordRem => BuiltinOpKind::Remainder,
-                            Greater => BuiltinOpKind::GreaterThan,
-                            Less => BuiltinOpKind::LessThan,
                             Minus => BuiltinOpKind::Sub,
                             Plus => BuiltinOpKind::Add,
                             Ampersand => BuiltinOpKind::AddressOf,
-                            At => BuiltinOpKind::At,
-                            _ => todo!("Token {:?}", op),
+                            _ => panic!(),
                         };
 
                         ExpressionKind::BuiltinOp {
@@ -619,13 +642,14 @@ impl Parser<'_> {
                     _ => todo!("{:?}", tok.kind),
                 };
 
-                let end_token = expect_token!(self.tokens.next(), ParenClose)?;
+                let end_token = expect_token!("closing parenthesis in expression", self.tokens.next(), ParenClose)?;
 
                 span = start_span.extend(&end_token.span);
 
                 e
             }
-            _ => todo!("Token \"{:?}\"", tok),
+
+            _ => todo!("Unexpected token: report error"),
         };
 
         // TODO register the span for this expression

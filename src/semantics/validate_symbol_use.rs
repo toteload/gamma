@@ -86,7 +86,6 @@ impl Visitor for Prover<'_> {
 
         match kind {
             Identifier(sym) => self.validate_sym(sym, id),
-            CompoundIdentifier(idents) => self.validate_sym(&idents[0], id),
             Call { name, args } => {
                 self.validate_sym(&name.sym, id);
             }

@@ -112,7 +112,7 @@ fn main() -> Result<()> {
                     &compiler_context.type_tokens,
                 );
             }
-            println!("{}", compiler_context.symbols.to_string());
+            //println!("{}", compiler_context.symbols.to_string());
             return Ok(());
         }
     };

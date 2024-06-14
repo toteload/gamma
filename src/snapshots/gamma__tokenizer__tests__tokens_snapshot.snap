@@ -445,4 +445,20 @@ expression: tokens
     ),
     kind: KeywordEnd,
   ),
+  Token(
+    span: SourceSpan(
+      start: SourceLocation(
+        line: 2,
+        col: 55,
+      ),
+      end: SourceLocation(
+        line: 2,
+        col: 62,
+      ),
+    ),
+    kind: FieldAccessor(
+      full: Symbol(3),
+      field: Symbol(4),
+    ),
+  ),
 ]

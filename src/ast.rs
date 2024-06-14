@@ -163,7 +163,19 @@ pub enum BuiltinOpKind {
     GreaterEquals,
 
     AddressOf,
-    At,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FieldAccessor {
+    pub id: NodeId,
+    pub field: Symbol,
+    pub full: Symbol,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum Accessor {
+    Field(FieldAccessor),
+    Expr(Expression),
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -177,7 +189,10 @@ pub enum ExpressionKind {
     IntLiteral(i64),
     BoolLiteral(bool),
     Identifier(Symbol),
-    CompoundIdentifier(Vec<Symbol>),
+    Access {
+        base: Box<Expression>,
+        accessors: Vec<Accessor>,
+    },
     BuiltinOp {
         op: BuiltinOpKind,
         args: Vec<Expression>,

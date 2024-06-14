@@ -119,6 +119,10 @@ impl Visitor for TypeAnnotater<'_> {
             IntLiteral(_) => self.typetokens.add(Type::IntConstant),
             BoolLiteral(_) => self.typetokens.add(Type::Bool),
             Identifier(sym) => self.scopes.get(sym).copied().expect(""),
+            Access { base, accessors } => {
+                todo!()
+            }
+            /*
             CompoundIdentifier(idents) => {
                 let Some(t) = self.scopes.get(&idents[0]) else {
                     panic!();
@@ -145,6 +149,7 @@ impl Visitor for TypeAnnotater<'_> {
 
                 tok
             }
+            */
             Cast { ty, e } => *self.ast_types.get(&ty.id).expect(""),
             BuiltinOp { op, args } => match op {
                 Not | Or | And | Equals | NotEquals | LessThan | GreaterThan | LessEquals
@@ -154,6 +159,7 @@ impl Visitor for TypeAnnotater<'_> {
                     let ty = self.ast_types.get(&arg.id).expect("");
                     self.typetokens.add(Type::Pointer(*ty))
                 }
+                /*
                 At => {
                     let pointee = &args[0];
 
@@ -166,6 +172,7 @@ impl Visitor for TypeAnnotater<'_> {
                         _ => self.typetokens.add(Type::Invalid),
                     }
                 }
+                */
                 Xor | BitwiseAnd | BitwiseOr | Add | Sub | Mul | Div | Remainder => args
                     .iter()
                     .map(|arg| self.ast_types.get(&arg.id).expect(""))

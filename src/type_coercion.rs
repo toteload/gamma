@@ -142,12 +142,14 @@ impl VisitorMutWithContext<Context<'_>> for TypeCoercer {
                         );
                     }
                 }
+                /*
                 At => {
                     if let [_, idx] = args.as_mut_slice() {
                         let u = ctx.typetokens.add(U64);
                         coerce_expression(ctx.id_generator, ctx.typetokens, ctx.ast_types, u, idx);
                     }
                 }
+                */
                 AddressOf | Not | Or | And => {
                     for arg in args.iter_mut() {
                         self.visit_expression(ctx, arg);

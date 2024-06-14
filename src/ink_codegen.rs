@@ -773,6 +773,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 };
                 Ok(ptr)
             }
+            /*
             ExpressionKind::CompoundIdentifier(syms) => {
                 let Variable {
                     ty,
@@ -826,6 +827,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     })
                 }
             }
+            */
             _ => todo!("Get pointer for expression: {:?}", e.kind),
         }
     }
@@ -857,6 +859,10 @@ impl<'ctx> CodeGenerator<'ctx> {
                     VariableValue::Parameter(x) => Ok(x),
                 }
             }
+            ExpressionKind::Access { base, accessors } => {
+                todo!()
+            }
+            /*
             ExpressionKind::CompoundIdentifier(syms) => {
                 let Variable {
                     ty,
@@ -896,6 +902,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     _ => todo!(),
                 }
             }
+            */
             ExpressionKind::Cast { e: src, .. } => {
                 let src_ty_token = self.node_types.get(&src.id).unwrap();
                 let src_ty = self.type_interner.get(src_ty_token);
@@ -1178,6 +1185,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                     Ok(ptr.into())
                 }
+                /*
                 BuiltinOpKind::At => {
                     let ExpressionKind::Identifier(sym) = args[0].kind else {
                         todo!()
@@ -1206,7 +1214,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                     Ok(self.builder.build_load(pointee_type, addr, "")?)
                 }
-
+                */
                 _ => todo!("BuiltinOpKind \"{:?}\"", op),
             },
 

@@ -80,7 +80,7 @@ fn main(): i32
     return -1
   end
 
-  let window:   ^void = (SDL_CreateWindow (cast ^u8 (cast u64 0)) WINDOWPOS_CENTERED WINDOWPOS_CENTERED 800 800 0)
+  let window: ^void = (SDL_CreateWindow (cast ^u8 (cast u64 0)) WINDOWPOS_CENTERED WINDOWPOS_CENTERED 800 800 0)
   if (eq window (cast ^void 0))
     return -2
   end
@@ -91,23 +91,23 @@ fn main(): i32
   end
 
   let game: Game
-  set game.y0      = 400
-  set game.y1      = 400
-  set game.ball.x  = 400
-  set game.ball.y  = 400
-  set game.ball.vx = 4
-  set game.ball.vy = 4
+  set (@ game .y0      ) = 400
+  set (@ game .y1      ) = 400
+  set (@ game .ball .x ) = 400
+  set (@ game .ball .y ) = 400
+  set (@ game .ball .vx) = 4
+  set (@ game .ball .vy) = 4
 
   let field: SDL_Rect
-  set field.x = 0
-  set field.y = 0
-  set field.w = 800
-  set field.h = 800
+  set (@ field .x) = 0
+  set (@ field .y) = 0
+  set (@ field .w) = 800
+  set (@ field .h) = 800
 
   let button_down0: bool = false
   let button_down1: bool = false
-  let button_up0: bool = false
-  let button_up1: bool = false
+  let button_up0:   bool = false
+  let button_up1:   bool = false
 
   loop @game_loop
     loop
@@ -117,55 +117,56 @@ fn main(): i32
         break
       end
 
-      if (eq event.type EVENT_QUIT)
+      if (eq (@ event .type) EVENT_QUIT)
         break @game_loop
       end
 
-      if (eq event.type EVENT_KEYDOWN)
-        if (eq event.key.keysym.sym KEY_W) set button_up1   = true end
-        if (eq event.key.keysym.sym KEY_S) set button_down1 = true end
+      if (eq (@ event .type) EVENT_KEYDOWN)
+        if (eq (@ event .key .keysym .sym) KEY_W) set button_up1   = true end
+        if (eq (@ event .key .keysym .sym) KEY_S) set button_down1 = true end
       end
 
-      if (eq event.type EVENT_KEYUP)
-        if (eq event.key.keysym.sym KEY_W) set button_up1   = false end
-        if (eq event.key.keysym.sym KEY_S) set button_down1 = false end
+      if (eq (@ event .type) EVENT_KEYUP)
+        if (eq (@ event .key .keysym .sym) KEY_W) set button_up1   = false end
+        if (eq (@ event .key .keysym .sym) KEY_S) set button_down1 = false end
       end
     end
 
-    if button_up1   set game.y0 = (- game.y0 10) end
-    if button_down1 set game.y0 = (+ game.y0 10) end
+    if button_up1   set (@ game .y0) = (- (@ game .y0) 10) end
+    if button_down1 set (@ game .y0) = (+ (@ game .y0) 10) end
 
     (SDL_SetRenderDrawColor renderer 0 0 0 0)
     (SDL_RenderClear        renderer)
-
     (SDL_SetRenderDrawColor renderer 255 255 255 255)
 
     let r: SDL_Rect
-    set r.x = 10
-    set r.y = game.y0
-    set r.w = 20
-    set r.h = 80
+
+    set (@ r .x) = 10
+    set (@ r .y) = (@ game .y0)
+    set (@ r .w) = 20
+    set (@ r .h) = 80
 
     (SDL_RenderFillRect renderer (& r))
 
-    set game.ball.x = (+ game.ball.x game.ball.vx)
-    set game.ball.y = (+ game.ball.y game.ball.vy)
+    set (@ game .ball .x) = (+ (@ game .ball .x) (@ game .ball .vx))
+    set (@ game .ball .y) = (+ (@ game .ball .y) (@ game .ball .vy))
 
-    if (or (gt game.ball.x 800) 
-           (lt game.ball.x 0))
-      set game.ball.vx = (* -1 game.ball.vx)
+    if (or (gt (@ game .ball .x) 800) 
+           (lt (@ game .ball .x) 0))
+      set (@ game .ball .vx) = (* -1 (@ game .ball .vx))
     end
 
-    if (or (gt game.ball.y 800) 
-           (lt game.ball.y 0))
-      set game.ball.vy = (* -1 game.ball.vy)
+    if (or (gt (@ game .ball .y) 800) 
+           (lt (@ game .ball .y) 0))
+      set (@ game .ball .vy) = (* -1 (@ game .ball .vy))
     end
 
     let r: SDL_Rect
-    set r.x = game.ball.x
-    set r.y = game.ball.y
-    set r.w = 20
-    set r.h = 20
+
+    set (@ r .x) = (@ game .ball .x)
+    set (@ r .y) = (@ game .ball .y)
+    set (@ r .w) = 20
+    set (@ r .h) = 20
     (SDL_RenderFillRect renderer (& r))
 
     (SDL_RenderPresent renderer)

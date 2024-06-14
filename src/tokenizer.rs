@@ -64,16 +64,10 @@ pub enum TokenKind {
     Ampersand,
     At,
 
+    FieldAccessor { full: Symbol, field: Symbol },
+
     // Unorganized below
     // -----------------
-
-    // TODO call these keywords?
-    Equal,
-    NotEqual,
-    LessEqual,
-    Less,
-    GreaterEqual,
-    Greater,
 
     Identifier(Symbol),
     Label(Symbol),
@@ -93,7 +87,6 @@ pub enum TokenKind {
     Colon,
 
     Comma,
-    Period,
 
     EqualSign,
     Hat,
@@ -159,7 +152,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     // Return str offset and Location of the last character of the identifier
-    fn read_identifier(&mut self) -> (usize, SourceLocation) {
+    fn read_rest_of_identifier(&mut self) -> (usize, SourceLocation) {
         while let Some(c) = self.iter.peek() {
             if !is_identifier_rest_char(*c) {
                 break;
@@ -204,7 +197,7 @@ impl<'a> Iterator for Tokenizer<'a> {
         let tok = match c {
             // Identifier or keyword.
             _ if is_identifier_start_char(c) => {
-                let (end_offset, end_loc) = self.read_identifier();
+                let (end_offset, end_loc) = self.read_rest_of_identifier();
 
                 let identifier = &self.source[offset..end_offset];
 
@@ -234,12 +227,12 @@ impl<'a> Iterator for Tokenizer<'a> {
                     "xor"      => Token { span, kind: TokenKind::KeywordXor, },
                     "bor"      => Token { span, kind: TokenKind::KeywordBor, },
                     "band"     => Token { span, kind: TokenKind::KeywordBand, },
-                    "eq"       => Token { span, kind: TokenKind::Equal, },
-                    "ne"       => Token { span, kind: TokenKind::NotEqual, },
-                    "le"       => Token { span, kind: TokenKind::LessEqual, },
-                    "lt"       => Token { span, kind: TokenKind::Less, },
-                    "ge"       => Token { span, kind: TokenKind::GreaterEqual, },
-                    "gt"       => Token { span, kind: TokenKind::Greater, },
+                    "eq"       => Token { span, kind: TokenKind::KeywordEq, },
+                    "ne"       => Token { span, kind: TokenKind::KeywordNe, },
+                    "le"       => Token { span, kind: TokenKind::KeywordLe, },
+                    "lt"       => Token { span, kind: TokenKind::KeywordLt, },
+                    "ge"       => Token { span, kind: TokenKind::KeywordGe, },
+                    "gt"       => Token { span, kind: TokenKind::KeywordGt, },
                     "false"    => Token { span, kind: TokenKind::BoolLiteral(false), },
                     "true"     => Token { span, kind: TokenKind::BoolLiteral(true), },
                     _ => {
@@ -303,8 +296,26 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let comment = &self.source[offset..end_offset];
                 let sym = self.str_interner.add(comment);
                 Token {
-                    span: dbg!(SourceSpan { start, end }),
+                    span: SourceSpan { start, end },
                     kind: TokenKind::LineComment(sym),
+                }
+            }
+
+            // Field accessor
+            '.' => {
+                if !self.iter.peek().map_or(true, |&c| is_identifier_start_char(c)) {
+                    // EOF or accessor doesn't start with a valid character
+                    todo!()
+                }
+
+                let (end_offset, end) = self.read_rest_of_identifier();
+
+                let full = self.str_interner.add(&self.source[offset..end_offset]);
+                let field = self.str_interner.add(&self.source[offset+1..end_offset]);
+
+                Token {
+                    span: SourceSpan { start, end },
+                    kind: TokenKind::FieldAccessor{full, field},
                 }
             }
 
@@ -319,7 +330,6 @@ impl<'a> Iterator for Tokenizer<'a> {
             ']' => Token { span: SourceSpan::single(start), kind: TokenKind::BracketClose, },
 
             ',' => Token { span: SourceSpan::single(start), kind: TokenKind::Comma, },
-            '.' => Token { span: SourceSpan::single(start), kind: TokenKind::Period, },
 
             '=' => Token { span: SourceSpan::single(start), kind: TokenKind::EqualSign, },
 
@@ -332,7 +342,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             '@' =>
                 match self.iter.peek() {
                     Some(d) if is_identifier_start_char(*d) => {
-                        let (end_offset, end) = self.read_identifier();
+                        let (end_offset, end) = self.read_rest_of_identifier();
                         let identifier = &self.source[offset..end_offset];
                         let span = SourceSpan { start, end };
                         let sym = self.str_interner.add(identifier);
@@ -360,7 +370,7 @@ mod tests {
     #[test]
     fn tokenizer_creates_the_expected_tokens() {
         let source = "fn if else + - * / : { } ( ) [ ] let voidlet 4687 continue return , =       
-eq ne ge le lt gt true false loop break bool void end";
+eq ne ge le lt gt true false loop break bool void end .finger";
 
         let mut symbols = StringInterner::new();
         let tokenizer = Tokenizer::new(source, &mut symbols, true);

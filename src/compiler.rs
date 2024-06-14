@@ -139,7 +139,7 @@ impl Context {
 
         let mut items = parser.parse_items().map_err(|e| vec![e])?;
 
-        println!("{items:#?}");
+        //println!("{items:#?}");
 
         let semantic_context = SemanticContext {
             symbols: &self.symbols,
@@ -155,7 +155,7 @@ impl Context {
             &mut self.type_table,
         )?;
 
-        println!("{}", self.type_tokens.to_string(&self.symbols));
+        //println!("{}", self.type_tokens.to_string(&self.symbols));
 
         type_annotate(
             &items,
