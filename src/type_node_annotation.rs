@@ -33,7 +33,7 @@ fn resolve_layout(
     history.push(*to_resolve);
 
     let Some((id, ast_fields)) = layouts.get(to_resolve) else {
-        todo!("symbol {} should be for a layout", to_resolve.0)
+        panic!("This should never happen")
     };
 
     fn find_type_identifier(ty: &TypeKind) -> Option<Symbol> {
@@ -190,15 +190,28 @@ impl TypeNodeAnnotater {
                 &layouts,
                 &mut history,
             ) {
-                todo!()
+                self.errors.push(Error {
+                    source: todo!(),
+                    info: vec![ErrorInfo::Text(
+                        "A cycle was detected when trying to resolve a layout",
+                    )],
+                });
             }
         }
 
         for (id, tykind) in self.userdefined_type_refs.iter() {
-            let Ok(tok) = get_typetoken_of_typekind(typetokens, typetable, &tykind) else {
-                todo!()
-            };
-            ast_types.insert(*id, tok);
+            match get_typetoken_of_typekind(typetokens, typetable, &tykind) {
+                Ok(tok) => { ast_types.insert(*id, tok); },
+                Err(sym) => {
+                    self.errors.push(Error {
+                        source: ErrorSource::AstNode(*id),
+                        info: vec![
+                            ErrorInfo::Text("Undefined type used "),
+                            ErrorInfo::Identifier(sym),
+                        ],
+                    });
+                }
+            }
         }
     }
 }
@@ -227,7 +240,7 @@ pub fn annotate_type_nodes(
     annotater.resolve_typenodes_with_userdefined_types(typetokens, ast_types, typetable, items);
 
     if !annotater.errors.is_empty() {
-        todo!()
+        return Err(annotater.errors);
     }
 
     annotate_functions(typetokens, ast_types, items);

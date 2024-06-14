@@ -1,0 +1,21 @@
+layout Nail
+  color: 0 u32
+end
+
+layout Finger
+  len: 0 i32
+  nail: 4 Nail
+end
+
+layout Hand
+  fingers: 0 [5]Finger
+end
+
+fn main(): i32
+  let xs: [10]i32
+  let p: ^i32 = (cast ^i32 xs)
+  let q: ^i32 = (& (@ xs 4))
+  let hand: Hand
+  let middle_finger_nail_color: u32 = (@ hand .fingers 2 .nail .color)
+  return 0
+end

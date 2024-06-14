@@ -132,8 +132,8 @@ fn main(): i32
       end
     end
 
-    if button_up1   set game.y0 = (+ game.y0 1) end
-    if button_down1 set game.y0 = (- game.y0 1) end
+    if button_up1   set game.y0 = (- game.y0 10) end
+    if button_down1 set game.y0 = (+ game.y0 10) end
 
     (SDL_SetRenderDrawColor renderer 0 0 0 0)
     (SDL_RenderClear        renderer)

@@ -130,7 +130,15 @@ impl Visitor for TypeAnnotater<'_> {
                         panic!()
                     };
                     let Some(field) = layout.fields.iter().find(|field| field.name == *sym) else {
-                        todo!("referenced field not found in layout");
+                        self.errors.push(Error {
+                            source: ErrorSource::AstNode(expression.id),
+                            info: vec![
+                                ErrorInfo::Text("Field "),
+                                ErrorInfo::Identifier(*sym),
+                                ErrorInfo::Text(" not found"),
+                            ],
+                        });
+                        return;
                     };
                     tok = field.ty;
                 }

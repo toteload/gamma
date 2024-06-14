@@ -521,6 +521,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .build_call(self.llvm_stackrestore, &[restore_point.into()], "")?;
                 self.builder.build_return(Some(&val))?;
             }
+            StatementKind::Return(None) => todo!("Implement return void"),
             StatementKind::If {
                 cond,
                 then,
@@ -607,7 +608,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 } else {
                     let res = unsafe { end_block.delete() };
                     if res.is_err() {
-                        todo!()
+                        panic!("Basic block should have a parent")
                     }
                 }
             }
@@ -711,7 +712,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             StatementKind::Expression(e) => 'expr_block: {
                 if let ExpressionKind::Call { name, args } = &e.kind {
                     let Some(tok) = self.function_typetokens.get(&name.sym) else {
-                        todo!()
+                        panic!("Function should be registered")
                     };
                     if self.is_type_token_void_function(*tok) {
                         let args = args
@@ -727,13 +728,25 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                 self.gen_expr(e)?;
             }
-            StatementKind::Continue(None) => {
-                let loop_scope = self
-                    .scopes
-                    .iter()
-                    .rev()
-                    .find(|scope| scope.kind == ScopeKind::Loop)
-                    .expect("");
+            StatementKind::Continue(label) => {
+                let loop_scope = if let Some(label) = label {
+                    self.scopes
+                        .iter()
+                        .rev()
+                        .find(|scope| {
+                            scope.kind == ScopeKind::Loop
+                                && scope.label.is_some()
+                                && scope.label.unwrap() == label.sym
+                        })
+                        .expect("There should exist a loop scope")
+                } else {
+                    self.scopes
+                        .iter()
+                        .rev()
+                        .find(|scope| scope.kind == ScopeKind::Loop)
+                        .expect("There should exist a loop scope")
+                };
+
                 let restore_point = loop_scope.stack_restorepoint.expect("");
 
                 self.builder
@@ -741,7 +754,6 @@ impl<'ctx> CodeGenerator<'ctx> {
                 self.builder
                     .build_unconditional_branch(loop_scope.block_loop_start.expect(""))?;
             }
-            _ => todo!("Statement \"{:?}\"", stmt.kind),
         }
 
         let is_terminator = matches!(
@@ -940,7 +952,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                         .into()),
 
                     (Type::Array(_, _), Type::Pointer(_)) => {
-                        todo!()
+                        todo!("Array to pointer cast")
                         //let base_type = val.into_array_value().get_type().get_element_type();
                         //Ok(self.builder.build_bitcast(val, base_type.ptr_type(AddressSpace::default()), "")?.into())
                     }
