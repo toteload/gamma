@@ -136,7 +136,11 @@ impl Parser<'_> {
 
                 let params = self.parse_params()?;
 
-                expect_token!("colon before return type of function", self.tokens.next(), Colon)?;
+                expect_token!(
+                    "colon before return type of function",
+                    self.tokens.next(),
+                    Colon
+                )?;
 
                 let return_type = self.parse_type()?;
 
@@ -158,7 +162,11 @@ impl Parser<'_> {
 
                 let params = self.parse_params()?;
 
-                expect_token!("color before return type of external function", self.tokens.next(), Colon)?;
+                expect_token!(
+                    "color before return type of external function",
+                    self.tokens.next(),
+                    Colon
+                )?;
 
                 let return_type = self.parse_type()?;
 
@@ -212,7 +220,11 @@ impl Parser<'_> {
     fn parse_array_type(&mut self) -> Result<(SourceSpan, TypeKind)> {
         use TokenKind::*;
 
-        let Token { span: start, .. } = expect_token!("opening bracket for array type", self.tokens.next(), BracketOpen)?;
+        let Token { span: start, .. } = expect_token!(
+            "opening bracket for array type",
+            self.tokens.next(),
+            BracketOpen
+        )?;
 
         let Token {
             kind: IntLiteral(size),
@@ -222,7 +234,11 @@ impl Parser<'_> {
             unreachable!()
         };
 
-        expect_token!("closing bracket for array type", self.tokens.next(), BracketClose)?;
+        expect_token!(
+            "closing bracket for array type",
+            self.tokens.next(),
+            BracketClose
+        )?;
 
         let (end, base_type) = self.parse_base_type()?;
 
@@ -232,7 +248,8 @@ impl Parser<'_> {
     }
 
     fn parse_pointer_type(&mut self) -> Result<(SourceSpan, TypeKind)> {
-        let Token { span: start, .. } = expect_token!("hat for pointer type", self.tokens.next(), TokenKind::Hat)?;
+        let Token { span: start, .. } =
+            expect_token!("hat for pointer type", self.tokens.next(), TokenKind::Hat)?;
 
         let (end, base_type) = self.parse_base_type()?;
 
@@ -244,8 +261,11 @@ impl Parser<'_> {
     fn parse_base_type(&mut self) -> Result<(SourceSpan, TypeKind)> {
         use TokenKind::*;
 
-        let Token { kind, span } =
-            *expect_token!("start of a type", self.tokens.peek(), Hat | BracketOpen | Identifier(_))?;
+        let Token { kind, span } = *expect_token!(
+            "start of a type",
+            self.tokens.peek(),
+            Hat | BracketOpen | Identifier(_)
+        )?;
 
         match kind {
             Hat => self.parse_pointer_type(),
@@ -271,13 +291,21 @@ impl Parser<'_> {
     fn parse_params(&mut self) -> Result<Vec<Param>> {
         use TokenKind::*;
 
-        expect_token!("opening parenthesis for function parameters", self.tokens.next(), ParenOpen)?;
+        expect_token!(
+            "opening parenthesis for function parameters",
+            self.tokens.next(),
+            ParenOpen
+        )?;
 
         let mut params = Vec::new();
         while !matches!(self.try_peek()?.kind, ParenClose) {
             let name = self.parse_name()?;
 
-            expect_token!("colon delimiting parameter name and type", self.tokens.next(), Colon)?;
+            expect_token!(
+                "colon delimiting parameter name and type",
+                self.tokens.next(),
+                Colon
+            )?;
 
             let ty = self.parse_type()?;
 
@@ -295,7 +323,11 @@ impl Parser<'_> {
             }
         }
 
-        expect_token!("closing parenthesis for function parameters", self.tokens.next(), ParenClose)?;
+        expect_token!(
+            "closing parenthesis for function parameters",
+            self.tokens.next(),
+            ParenClose
+        )?;
 
         Ok(params)
     }
@@ -355,7 +387,11 @@ impl Parser<'_> {
 
                 let name = self.parse_name()?;
 
-                expect_token!("colon after name in let statement", self.tokens.next(), Colon)?;
+                expect_token!(
+                    "colon after name in let statement",
+                    self.tokens.next(),
+                    Colon
+                )?;
 
                 let ty = self.parse_type()?;
 
@@ -642,7 +678,11 @@ impl Parser<'_> {
                     _ => todo!("{:?}", tok.kind),
                 };
 
-                let end_token = expect_token!("closing parenthesis in expression", self.tokens.next(), ParenClose)?;
+                let end_token = expect_token!(
+                    "closing parenthesis in expression",
+                    self.tokens.next(),
+                    ParenClose
+                )?;
 
                 span = start_span.extend(&end_token.span);
 

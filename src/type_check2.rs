@@ -71,7 +71,9 @@ impl TypeChecker<'_> {
     }
 
     fn check_set_destination_type(&mut self, dst: &Expression) {
-        if matches!(dst.kind, ExpressionKind::Identifier(_)) {
+        use ExpressionKind::*;
+
+        if matches!(dst.kind, Identifier(_) | Access { .. }) {
             return;
         }
 

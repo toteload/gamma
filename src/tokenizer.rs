@@ -68,7 +68,6 @@ pub enum TokenKind {
 
     // Unorganized below
     // -----------------
-
     Identifier(Symbol),
     Label(Symbol),
 

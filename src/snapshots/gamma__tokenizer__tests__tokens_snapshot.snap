@@ -287,7 +287,7 @@ expression: tokens
         col: 3,
       ),
     ),
-    kind: Equal,
+    kind: KeywordEq,
   ),
   Token(
     span: SourceSpan(
@@ -300,7 +300,7 @@ expression: tokens
         col: 6,
       ),
     ),
-    kind: NotEqual,
+    kind: KeywordNe,
   ),
   Token(
     span: SourceSpan(
@@ -313,7 +313,7 @@ expression: tokens
         col: 9,
       ),
     ),
-    kind: GreaterEqual,
+    kind: KeywordGe,
   ),
   Token(
     span: SourceSpan(
@@ -326,7 +326,7 @@ expression: tokens
         col: 12,
       ),
     ),
-    kind: LessEqual,
+    kind: KeywordLe,
   ),
   Token(
     span: SourceSpan(
@@ -339,7 +339,7 @@ expression: tokens
         col: 15,
       ),
     ),
-    kind: Less,
+    kind: KeywordLt,
   ),
   Token(
     span: SourceSpan(
@@ -352,7 +352,7 @@ expression: tokens
         col: 18,
       ),
     ),
-    kind: Greater,
+    kind: KeywordGt,
   ),
   Token(
     span: SourceSpan(

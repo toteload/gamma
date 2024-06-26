@@ -232,6 +232,20 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
+    fn determine_access_offset(&mut self, base_typetoken: TypeToken, accessors: &[Accessor]) -> LayoutAccessData {
+        let mut current = base_typetoken;
+        let mut byte_offset = 0;
+
+        for accessor in accessors {
+            let ty = self.type_interner.get(&current);
+
+            match accessor {
+                Accessor::Field(FieldAccessor { field, id, .. }) => {}
+                Accessor::Expr(e) => {}
+            }
+        }
+    }
+
     fn get_layout_access_data(
         &mut self,
         layout_type_token: TypeToken,
@@ -772,6 +786,17 @@ impl<'ctx> CodeGenerator<'ctx> {
                     panic!("Tried to get dst of non-stack variable")
                 };
                 Ok(ptr)
+            }
+            ExpressionKind::Access { base, accessors } => {
+                let base_val = self.gen_expr(base)?;
+                if accessors.is_empty() {
+                    return Ok(self
+                        .builder
+                        .build_load(self.get_inktype_of_node(base.id), base_val.into_pointer_value(), "")?
+                        .into_pointer_value());
+                }
+
+                todo!()
             }
             /*
             ExpressionKind::CompoundIdentifier(syms) => {

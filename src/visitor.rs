@@ -141,6 +141,15 @@ pub trait Visitor {
                 self.on_type_enter(ty);
                 self.visit_expression(e);
             }
+            Access { base, accessors } => {
+                self.visit_expression(base);
+
+                for accessor in accessors.iter() {
+                    if let Accessor::Expr(e) = accessor {
+                        self.visit_expression(e);
+                    }
+                }
+            }
             _ => (),
         }
 

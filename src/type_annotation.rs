@@ -1,5 +1,6 @@
 use crate::{
     ast::*,
+    ast_helpers::{type_of_node, typetoken_of_node},
     error::*,
     scope_stack::ScopeStack,
     string_interner::Symbol,
@@ -8,6 +9,35 @@ use crate::{
     visitor::Visitor,
 };
 use std::collections::HashMap;
+
+fn verify_access(
+    typetokens: &TypeInterner,
+    ast_types: &AstMap<TypeToken>,
+    t: TypeToken,
+    accessor: &Accessor,
+) -> Result<TypeToken, Error> {
+    let ty = typetokens.get(&t);
+
+    match (ty, accessor) {
+        (Type::Pointer(t) | Type::Array(_, t), Accessor::Expr(e)) => {
+            if type_of_node(typetokens, ast_types, &e.id).is_integer() {
+                Ok(*t)
+            } else {
+                todo!()
+            }
+        }
+        (Type::Layout(layout), Accessor::Field(field)) => {
+            if let Some(accessed_field) = layout.fields.iter().find(|f| f.name == field.field) {
+                Ok(accessed_field.ty)
+            } else {
+                todo!()
+            }
+        }
+        _ => {
+            todo!()
+        }
+    }
+}
 
 struct TypeAnnotater<'a> {
     typetokens: &'a TypeInterner,
@@ -120,7 +150,23 @@ impl Visitor for TypeAnnotater<'_> {
             BoolLiteral(_) => self.typetokens.add(Type::Bool),
             Identifier(sym) => self.scopes.get(sym).copied().expect(""),
             Access { base, accessors } => {
-                todo!()
+                let base_type = typetoken_of_node(self.ast_types, &base.id);
+
+                if accessors.is_empty() {
+                    todo!()
+                }
+
+                let mut tok = base_type;
+                for accessor in accessors.iter() {
+                    match verify_access(self.typetokens, self.ast_types, tok, accessor) {
+                        Ok(t) => tok = t,
+                        Err(err) => {
+                            self.errors.push(err);
+                            break;
+                        }
+                    }
+                }
+                tok
             }
             /*
             CompoundIdentifier(idents) => {

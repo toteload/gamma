@@ -47,6 +47,14 @@ pub const U64: Type = Type::Int {
 };
 
 impl Type {
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Type::Int { .. } | Type::IntConstant)
+    }
+
+    pub fn is_layout(&self) -> bool {
+        matches!(self, Type::Layout { .. })
+    }
+
     pub fn kind_u8(&self) -> u8 {
         use Type::*;
 
