@@ -2,7 +2,7 @@ use crate::ast::*;
 use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::type_interner::*;
-use crate::types::{Signedness, Type};
+use crate::types::{Signedness, Type, Layout};
 use inkwell::targets::TargetMachine;
 use inkwell::types::PointerType;
 use inkwell::{
@@ -232,18 +232,29 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
-    fn determine_access_offset(&mut self, base_typetoken: TypeToken, accessors: &[Accessor]) -> LayoutAccessData {
+    fn determine_access_offset(
+        &mut self,
+        base_typetoken: TypeToken,
+        accessors: &[Accessor],
+    ) -> LayoutAccessData {
         let mut current = base_typetoken;
         let mut byte_offset = 0;
 
         for accessor in accessors {
             let ty = self.type_interner.get(&current);
 
-            match accessor {
-                Accessor::Field(FieldAccessor { field, id, .. }) => {}
-                Accessor::Expr(e) => {}
+            match (ty, accessor) {
+                (Type::Layout(Layout { fields }), Accessor::Field(FieldAccessor { field, id, .. })) => {
+                    todo!()
+                }
+                (Type::Pointer(inner) | Type::Array(_, inner), Accessor::Expr(e)) => {
+                    todo!()
+                }
+                _ => panic!("Illegal access"),
             }
         }
+
+        todo!()
     }
 
     fn get_layout_access_data(
@@ -790,10 +801,15 @@ impl<'ctx> CodeGenerator<'ctx> {
             ExpressionKind::Access { base, accessors } => {
                 let base_val = self.gen_expr(base)?;
                 if accessors.is_empty() {
-                    return Ok(self
-                        .builder
-                        .build_load(self.get_inktype_of_node(base.id), base_val.into_pointer_value(), "")?
-                        .into_pointer_value());
+                    todo!()
+                    //return Ok(self
+                    //    .builder
+                    //    .build_load(
+                    //        self.get_inktype_of_node(base.id),
+                    //        base_val.into_pointer_value(),
+                    //        "",
+                    //    )?
+                    //    .into_pointer_value());
                 }
 
                 todo!()

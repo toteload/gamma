@@ -6,7 +6,7 @@ use crate::{
     string_interner::Symbol,
     type_interner::{TypeInterner, TypeToken},
     types::Type,
-    visitor::Visitor,
+    visitor_with_context::VisitorWithContext,
 };
 use std::collections::HashMap;
 
@@ -39,26 +39,21 @@ fn verify_access(
     }
 }
 
-struct TypeAnnotater<'a> {
+struct TypeAnnotaterContext<'a> {
     typetokens: &'a TypeInterner,
+    typetable:  &'a HashMap<Symbol, TypeToken>,
+    ast_types:  &'a mut AstMap<TypeToken>,
+}
 
-    ast_types: &'a mut AstMap<TypeToken>,
-    typetable: &'a HashMap<Symbol, TypeToken>,
-
+struct TypeAnnotater {
     scopes: ScopeStack<Symbol, TypeToken>,
     errors: Vec<Error>,
 }
 
-impl TypeAnnotater<'_> {
-    fn new<'a>(
-        typetokens: &'a mut TypeInterner,
-        ast_types: &'a mut AstMap<TypeToken>,
-        typetable: &'a mut HashMap<Symbol, TypeToken>,
-    ) -> TypeAnnotater<'a> {
+impl TypeAnnotater {
+    fn new(
+    ) -> TypeAnnotater {
         TypeAnnotater {
-            typetokens,
-            ast_types,
-            typetable,
             scopes: ScopeStack::new(),
             errors: Vec::new(),
         }
@@ -77,8 +72,8 @@ impl TypeAnnotater<'_> {
     }
 }
 
-impl Visitor for TypeAnnotater<'_> {
-    fn on_items_enter(&mut self, items: &[Item]) {
+impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
+    fn on_items_enter(&mut self, ctx: &mut TypeAnnotaterContext, items: &[Item]) {
         // Add all functions and external functions as globally accessible variables.
 
         let mut global_scope = HashMap::new();
@@ -88,10 +83,10 @@ impl Visitor for TypeAnnotater<'_> {
                 ItemKind::Function { name, .. } | ItemKind::ExternalFunction { name, .. } => {
                     global_scope.insert(
                         name.sym,
-                        self.ast_types
-                            .get(&item.id)
-                            .copied()
-                            .expect("Item should have a type"),
+                        ctx.ast_types
+                           .get(&item.id)
+                           .copied()
+                           .expect("Item should have a type"),
                     );
                 }
                 _ => {}
@@ -101,32 +96,32 @@ impl Visitor for TypeAnnotater<'_> {
         self.scopes.push_scope(global_scope);
     }
 
-    fn on_function_enter(&mut self, function: &Item) {
+    fn on_function_enter(&mut self, ctx: &mut TypeAnnotaterContext, function: &Item) {
         let ItemKind::Function { params, .. } = &function.kind else {
             unreachable!()
         };
 
         let param_scope = params
             .iter()
-            .map(|p| (p.name.sym, *self.ast_types.get(&p.ty.id).expect("")))
+            .map(|p| (p.name.sym, *ctx.ast_types.get(&p.ty.id).expect("")))
             .collect();
 
         self.scopes.push_scope(param_scope);
     }
 
-    fn on_function_leave(&mut self, _: &Item) {
+    fn on_function_leave(&mut self, ctx: &mut TypeAnnotaterContext, _: &Item) {
         self.scopes.pop();
     }
 
-    fn on_block_enter(&mut self, _: &Block) {
+    fn on_block_enter(&mut self, ctx: &mut TypeAnnotaterContext, _: &Block) {
         self.scopes.push_empty_scope();
     }
 
-    fn on_block_leave(&mut self, _: &Block) {
+    fn on_block_leave(&mut self, ctx: &mut TypeAnnotaterContext, _: &Block) {
         self.scopes.pop();
     }
 
-    fn on_statement_enter(&mut self, statement: &Statement) {
+    fn on_statement_enter(&mut self, ctx: &mut TypeAnnotaterContext, statement: &Statement) {
         use StatementKind::*;
 
         match statement.kind {
@@ -135,22 +130,22 @@ impl Visitor for TypeAnnotater<'_> {
                 ty: crate::ast::Type { id, .. },
                 ..
             } => {
-                self.scopes.insert(sym, *self.ast_types.get(&id).unwrap());
+                self.scopes.insert(sym, *ctx.ast_types.get(&id).unwrap());
             }
             _ => {}
         }
     }
 
-    fn on_expression_leave(&mut self, expression: &Expression) {
+    fn on_expression_leave(&mut self, ctx: &mut TypeAnnotaterContext, expression: &Expression) {
         use BuiltinOpKind::*;
         use ExpressionKind::*;
 
         let typetoken = match &expression.kind {
-            IntLiteral(_) => self.typetokens.add(Type::IntConstant),
-            BoolLiteral(_) => self.typetokens.add(Type::Bool),
+            IntLiteral(_) => ctx.typetokens.add(Type::IntConstant),
+            BoolLiteral(_) => ctx.typetokens.add(Type::Bool),
             Identifier(sym) => self.scopes.get(sym).copied().expect(""),
             Access { base, accessors } => {
-                let base_type = typetoken_of_node(self.ast_types, &base.id);
+                let base_type = typetoken_of_node(ctx.ast_types, &base.id);
 
                 if accessors.is_empty() {
                     todo!()
@@ -158,7 +153,7 @@ impl Visitor for TypeAnnotater<'_> {
 
                 let mut tok = base_type;
                 for accessor in accessors.iter() {
-                    match verify_access(self.typetokens, self.ast_types, tok, accessor) {
+                    match verify_access(ctx.typetokens, ctx.ast_types, tok, accessor) {
                         Ok(t) => tok = t,
                         Err(err) => {
                             self.errors.push(err);
@@ -168,63 +163,21 @@ impl Visitor for TypeAnnotater<'_> {
                 }
                 tok
             }
-            /*
-            CompoundIdentifier(idents) => {
-                let Some(t) = self.scopes.get(&idents[0]) else {
-                    panic!();
-                };
-
-                let mut tok = *t;
-                for sym in idents[1..].iter() {
-                    let Type::Layout(layout) = self.typetokens.get(&tok) else {
-                        panic!()
-                    };
-                    let Some(field) = layout.fields.iter().find(|field| field.name == *sym) else {
-                        self.errors.push(Error {
-                            source: ErrorSource::AstNode(expression.id),
-                            info: vec![
-                                ErrorInfo::Text("Field "),
-                                ErrorInfo::Identifier(*sym),
-                                ErrorInfo::Text(" not found"),
-                            ],
-                        });
-                        return;
-                    };
-                    tok = field.ty;
-                }
-
-                tok
-            }
-            */
-            Cast { ty, e } => *self.ast_types.get(&ty.id).expect(""),
+            Cast { ty, e } => *ctx.ast_types.get(&ty.id).expect(""),
             BuiltinOp { op, args } => match op {
                 Not | Or | And | Equals | NotEquals | LessThan | GreaterThan | LessEquals
-                | GreaterEquals => self.typetokens.add(Type::Bool),
+                | GreaterEquals => ctx.typetokens.add(Type::Bool),
                 AddressOf => {
                     let arg = &args[0];
-                    let ty = self.ast_types.get(&arg.id).expect("");
-                    self.typetokens.add(Type::Pointer(*ty))
+                    let ty = ctx.ast_types.get(&arg.id).expect("");
+                    ctx.typetokens.add(Type::Pointer(*ty))
                 }
-                /*
-                At => {
-                    let pointee = &args[0];
-
-                    let ty = self
-                        .typetokens
-                        .get(self.ast_types.get(&pointee.id).expect(""));
-
-                    match ty {
-                        Type::Pointer(t) | Type::Array(_, t) => *t,
-                        _ => self.typetokens.add(Type::Invalid),
-                    }
-                }
-                */
                 Xor | BitwiseAnd | BitwiseOr | Add | Sub | Mul | Div | Remainder => args
                     .iter()
-                    .map(|arg| self.ast_types.get(&arg.id).expect(""))
-                    .find(|arg_type| matches!(self.typetokens.get(arg_type), Type::Int { .. }))
+                    .map(|arg| ctx.ast_types.get(&arg.id).expect(""))
+                    .find(|arg_type| matches!(ctx.typetokens.get(arg_type), Type::Int { .. }))
                     .copied()
-                    .unwrap_or(self.typetokens.add(Type::IntConstant)),
+                    .unwrap_or(ctx.typetokens.add(Type::IntConstant)),
             },
             Call { name, args } => {
                 //self.get_typetoken_of_identifier(&name.sym)
@@ -237,7 +190,24 @@ impl Visitor for TypeAnnotater<'_> {
             }
         };
 
-        self.ast_types.insert(expression.id, typetoken);
+        ctx.ast_types.insert(expression.id, typetoken);
+    }
+}
+
+struct AccessAnnotater {
+    errors: Vec<Error>,
+}
+
+struct AccessAnnotaterContext<'a> {
+    typetokens: &'a TypeInterner,
+    ast_types:  &'a AstMap<TypeToken>,
+}
+
+impl AccessAnnotater {
+    fn new() -> AccessAnnotater {
+        AccessAnnotater {
+            errors: Vec::new(),
+        }
     }
 }
 
