@@ -129,13 +129,11 @@ impl TypeNodeAnnotater {
         ast_types: &mut AstMap<TypeToken>,
         ty: &ast::Type,
     ) {
-        println!("try {ty:#?}");
         match get_typetoken_of_typekind(typetokens, typetable, &ty.kind) {
             Ok(typetoken) => {
                 ast_types.insert(ty.id, typetoken);
             }
             Err(_) => {
-                println!("typetoken not found for typekind");
                 self.userdefined_type_refs.push((ty.id, ty.kind.clone()));
             }
         }
@@ -174,9 +172,6 @@ impl TypeNodeAnnotater {
                 layouts.insert(name.sym, (item.id, &fields));
             }
         }
-
-        println!("{layouts:?}");
-        println!("{:?}", self.userdefined_type_refs);
 
         let mut history = Vec::new();
         for layout in layouts.keys() {

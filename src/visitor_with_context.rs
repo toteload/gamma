@@ -141,7 +141,15 @@ pub trait VisitorWithContext<Ctx> {
                 self.on_type_enter(ctx, ty);
                 self.visit_expression(ctx, e);
             }
-            _ => (),
+            Access { base, accessors } => {
+                self.visit_expression(ctx, base);
+                for accessor in accessors {
+                    if let Accessor::Expr(e) = accessor {
+                        self.visit_expression(ctx, e);
+                    }
+                }
+            }
+            IntLiteral(_) | BoolLiteral(_) | Identifier(_) => {}
         }
 
         self.on_expression_leave(ctx, expression);

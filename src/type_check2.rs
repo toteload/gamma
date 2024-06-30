@@ -236,7 +236,11 @@ impl Visitor for TypeChecker<'_> {
                   }
                   */
             },
-            _ => (),
+            Access { base, accessors } => {
+                let tok = self.ast_types.get(&base.id).unwrap();
+                todo!()
+            }
+            IntLiteral(_) | BoolLiteral(_) | Identifier(_) => {}
         }
     }
 }

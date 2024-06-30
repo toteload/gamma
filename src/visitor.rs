@@ -143,14 +143,13 @@ pub trait Visitor {
             }
             Access { base, accessors } => {
                 self.visit_expression(base);
-
-                for accessor in accessors.iter() {
+                for accessor in accessors {
                     if let Accessor::Expr(e) = accessor {
                         self.visit_expression(e);
                     }
                 }
             }
-            _ => (),
+            IntLiteral(_) | BoolLiteral(_) | Identifier(_) => {}
         }
 
         self.on_expression_leave(expression);

@@ -141,7 +141,15 @@ pub trait VisitorMut {
                 self.on_type_enter(ty);
                 self.visit_expression(e);
             }
-            _ => (),
+            Access { base, accessors } => {
+                self.visit_expression(base);
+                for accessor in accessors {
+                    if let Accessor::Expr(e) = accessor {
+                        self.visit_expression(e);
+                    }
+                }
+            }
+            IntLiteral(_) | BoolLiteral(_) | Identifier(_) => {}
         }
 
         self.on_expression_leave(expression);
