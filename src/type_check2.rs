@@ -226,19 +226,11 @@ impl Visitor for TypeChecker<'_> {
                 AddressOf => {
                     assert!(args.len() == 1);
                     assert!(is_addressable(&args[0]));
-                } /*
-                  At => {
-                      let base = &args[0];
-                      assert!(matches!(
-                          self.typetokens.get(self.ast_types.get(&base.id).unwrap()),
-                          Type::Pointer(_) | Type::Array(_, _)
-                      ));
-                  }
-                  */
+                }
             },
             Access { base, accessors } => {
                 let tok = self.ast_types.get(&base.id).unwrap();
-                todo!()
+                //todo!()
             }
             IntLiteral(_) | BoolLiteral(_) | Identifier(_) => {}
         }

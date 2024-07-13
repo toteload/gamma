@@ -65,11 +65,6 @@ impl TypeAnnotater {
             .copied()
             .unwrap_or_else(|| panic!("Symbol {:?} should be found in scope", identifier))
     }
-
-    fn get_type_of_identifier(&self, identifier: &Symbol) -> &Type {
-        self.typetokens
-            .get(&self.get_typetoken_of_identifier(identifier))
-    }
 }
 
 impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
@@ -180,8 +175,7 @@ impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
                     .unwrap_or(ctx.typetokens.add(Type::IntConstant)),
             },
             Call { name, args } => {
-                //self.get_typetoken_of_identifier(&name.sym)
-                let function_type = self.get_type_of_identifier(&name.sym);
+                let function_type = ctx.typetokens.get(&self.get_typetoken_of_identifier(&name.sym));
                 let Type::Function { return_type, .. } = function_type else {
                     panic!()
                 };
@@ -194,13 +188,13 @@ impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
     }
 }
 
-struct AccessAnnotater {
-    errors: Vec<Error>,
-}
-
 struct AccessAnnotaterContext<'a> {
     typetokens: &'a TypeInterner,
     ast_types:  &'a AstMap<TypeToken>,
+}
+
+struct AccessAnnotater {
+    errors: Vec<Error>,
 }
 
 impl AccessAnnotater {
@@ -211,18 +205,28 @@ impl AccessAnnotater {
     }
 }
 
+//impl VisitorWithContext<AccessAnnotaterContext<'_>> for AccessAnnotater {
+//    fn on_expression_leave(&mut self, ctx: AccessAnnotaterContext, expression: &Expression) {
+//        use ExpressionKind::*;
+//
+//        match &expression.kind {
+//        }
+//    }
+//}
+
 pub fn type_annotate(
     items: &[Item],
     typetokens: &mut TypeInterner,
     ast_types: &mut AstMap<TypeToken>,
     typetable: &mut HashMap<Symbol, TypeToken>,
 ) -> Result<(), Vec<Error>> {
-    let mut annotater = TypeAnnotater::new(typetokens, ast_types, typetable);
-
-    annotater.visit_items(items);
-
-    if !annotater.errors.is_empty() {
-        return Err(annotater.errors);
+    {
+        let mut annotater = TypeAnnotater::new();
+        let mut ctx = TypeAnnotaterContext { typetokens, typetable, ast_types, };
+        annotater.visit_items(&mut ctx, items);
+        if !annotater.errors.is_empty() {
+            return Err(annotater.errors);
+        }
     }
 
     Ok(())
