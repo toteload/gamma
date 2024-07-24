@@ -41,8 +41,8 @@ fn verify_access(
 
 struct TypeAnnotaterContext<'a> {
     typetokens: &'a TypeInterner,
-    typetable:  &'a HashMap<Symbol, TypeToken>,
-    ast_types:  &'a mut AstMap<TypeToken>,
+    typetable: &'a HashMap<Symbol, TypeToken>,
+    ast_types: &'a mut AstMap<TypeToken>,
 }
 
 struct TypeAnnotater {
@@ -51,8 +51,7 @@ struct TypeAnnotater {
 }
 
 impl TypeAnnotater {
-    fn new(
-    ) -> TypeAnnotater {
+    fn new() -> TypeAnnotater {
         TypeAnnotater {
             scopes: ScopeStack::new(),
             errors: Vec::new(),
@@ -79,9 +78,9 @@ impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
                     global_scope.insert(
                         name.sym,
                         ctx.ast_types
-                           .get(&item.id)
-                           .copied()
-                           .expect("Item should have a type"),
+                            .get(&item.id)
+                            .copied()
+                            .expect("Item should have a type"),
                     );
                 }
                 _ => {}
@@ -135,7 +134,7 @@ impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
         use BuiltinOpKind::*;
         use ExpressionKind::*;
 
-        let typetoken = match &expression.kind {
+        let typetoken: TypeToken = match &expression.kind {
             IntLiteral(_) => ctx.typetokens.add(Type::IntConstant),
             BoolLiteral(_) => ctx.typetokens.add(Type::Bool),
             Identifier(sym) => self.scopes.get(sym).copied().expect(""),
@@ -143,20 +142,25 @@ impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
                 let base_type = typetoken_of_node(ctx.ast_types, &base.id);
 
                 if accessors.is_empty() {
-                    todo!()
-                }
-
-                let mut tok = base_type;
-                for accessor in accessors.iter() {
-                    match verify_access(ctx.typetokens, ctx.ast_types, tok, accessor) {
-                        Ok(t) => tok = t,
-                        Err(err) => {
-                            self.errors.push(err);
-                            break;
+                    let ty = ctx.typetokens.get(&base_type);
+                    if let Type::Pointer(inner) = ty {
+                        *inner
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    let mut tok = base_type;
+                    for accessor in accessors.iter() {
+                        match verify_access(ctx.typetokens, ctx.ast_types, tok, accessor) {
+                            Ok(t) => tok = t,
+                            Err(err) => {
+                                self.errors.push(err);
+                                break;
+                            }
                         }
                     }
+                    tok
                 }
-                tok
             }
             Cast { ty, e } => *ctx.ast_types.get(&ty.id).expect(""),
             BuiltinOp { op, args } => match op {
@@ -175,7 +179,9 @@ impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
                     .unwrap_or(ctx.typetokens.add(Type::IntConstant)),
             },
             Call { name, args } => {
-                let function_type = ctx.typetokens.get(&self.get_typetoken_of_identifier(&name.sym));
+                let function_type = ctx
+                    .typetokens
+                    .get(&self.get_typetoken_of_identifier(&name.sym));
                 let Type::Function { return_type, .. } = function_type else {
                     panic!()
                 };
@@ -190,7 +196,7 @@ impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
 
 struct AccessAnnotaterContext<'a> {
     typetokens: &'a TypeInterner,
-    ast_types:  &'a AstMap<TypeToken>,
+    ast_types: &'a AstMap<TypeToken>,
 }
 
 struct AccessAnnotater {
@@ -199,9 +205,7 @@ struct AccessAnnotater {
 
 impl AccessAnnotater {
     fn new() -> AccessAnnotater {
-        AccessAnnotater {
-            errors: Vec::new(),
-        }
+        AccessAnnotater { errors: Vec::new() }
     }
 }
 
@@ -222,7 +226,11 @@ pub fn type_annotate(
 ) -> Result<(), Vec<Error>> {
     {
         let mut annotater = TypeAnnotater::new();
-        let mut ctx = TypeAnnotaterContext { typetokens, typetable, ast_types, };
+        let mut ctx = TypeAnnotaterContext {
+            typetokens,
+            typetable,
+            ast_types,
+        };
         annotater.visit_items(&mut ctx, items);
         if !annotater.errors.is_empty() {
             return Err(annotater.errors);

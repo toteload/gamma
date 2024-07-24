@@ -253,4 +253,3 @@ pub fn type_check(
         Ok(())
     }
 }
-

@@ -150,7 +150,6 @@ pub trait VisitorMutWithContext<Ctx> {
                 }
             }
             IntLiteral(_) | BoolLiteral(_) | Identifier(_) => {}
-
         }
 
         self.on_expression_leave(ctx, expression);

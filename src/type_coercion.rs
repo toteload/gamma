@@ -24,10 +24,11 @@ struct TypeCoercer {
 }
 
 impl TypeCoercer {
+    #[rustfmt::skip]
     fn new() -> TypeCoercer {
         TypeCoercer {
-            functions: HashMap::new(),
-            errors: Vec::new(),
+            functions:            HashMap::new(),
+            errors:               Vec::new(),
             declared_return_type: None,
         }
     }

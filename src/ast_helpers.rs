@@ -99,3 +99,12 @@ pub fn inject_coercion_type_cast(
         std::ptr::write(e, cast);
     }
 }
+
+fn box_interject<T, F: Fn(Box<T>) -> T>(b: &mut Box<T>, f: F) {
+    unsafe {
+        let p: &mut T = &mut **b;
+        let cpy = Box::from_raw(p);
+        let val = f(cpy);
+        std::ptr::write(p, val);
+    }
+}
