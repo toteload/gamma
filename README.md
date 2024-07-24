@@ -1,5 +1,7 @@
 # Gamma
 
+## What is this?
+
 This project is a compiler written in Rust for the Gamma programming language.
 Gamma is a programming language with C-like semantics.
 C is also where Gamma gets its name from; just like C is the third letter in the Latin alphabet, Gamma is the third letter in the ancient Greek alphabet.
@@ -9,6 +11,8 @@ This is why I set the goal of writing a Tetris clone in Gamma with SDL2.
 I implement features to Gamma that I need to achieve this goal, but no more.
 For example, I probably will not add an import or module feature to Gamma, which means that all code must be written in one file.
 Because of this, the language can be tedious to use in some places.
+
+## Language overview
 
 Now, for the language... 
 Below is an example program, that loops for 10 iterations and then returns the number of iterations. 
@@ -32,3 +36,17 @@ fn main(): i32
 end
 ```
 
+## Architecture
+
+### Type checking
+
+### Code generation
+
+### Tests
+
+`tests` contains snapshot tests for small programs. 
+This is also a good folder to find sample Gamma code.
+The tests take the sample Gamma programs, compile them and output textual LLVM IR code.
+The LLVM IR is saved and compared with the output of the next time the test is run.
+This way you can easily detect if modifications in the compiler code effect the output.
+It is very convient for comparing larger textual outputs!
