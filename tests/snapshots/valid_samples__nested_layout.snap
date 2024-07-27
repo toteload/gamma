@@ -18,15 +18,19 @@ entry:
   %0 = call ptr @llvm.stacksave()
   %1 = alloca [12 x i8], align 4
   %2 = getelementptr [12 x i8], ptr %1, i32 0, i32 0
-  store i32 1, ptr %2, align 4
-  %3 = getelementptr [12 x i8], ptr %1, i32 0, i32 4
-  store i32 123, ptr %3, align 4
-  %4 = getelementptr [12 x i8], ptr %1, i32 0, i32 8
-  store i32 8, ptr %4, align 4
-  %5 = getelementptr [12 x i8], ptr %1, i32 0, i32 4
-  %6 = load i32, ptr %5, align 4
+  %3 = getelementptr [8 x i8], ptr %2, i32 0, i32 0
+  store i32 1, ptr %3, align 4
+  %4 = getelementptr [12 x i8], ptr %1, i32 0, i32 0
+  %5 = getelementptr [8 x i8], ptr %4, i32 0, i32 4
+  store i32 123, ptr %5, align 4
+  %6 = getelementptr [12 x i8], ptr %1, i32 0, i32 8
+  store i32 8, ptr %6, align 4
+  %7 = getelementptr [12 x i8], ptr %1, i32 0, i32 0
+  %8 = getelementptr [8 x i8], ptr %7, i32 0, i32 4
+  %9 = load i32, ptr %8, align 4
   call void @llvm.stackrestore(ptr %0)
-  ret i32 %6
+  ret i32 %9
 }
 
 attributes #0 = { nocallback nofree nosync nounwind willreturn }
+

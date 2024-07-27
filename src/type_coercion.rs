@@ -4,7 +4,7 @@ use crate::{
     error::Error,
     string_interner::Symbol,
     type_interner::{TypeInterner, TypeToken},
-    types::{Type, U64},
+    types::Type,
     visitor_mut_with_context::VisitorMutWithContext,
 };
 use std::collections::HashMap;

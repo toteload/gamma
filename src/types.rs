@@ -22,6 +22,12 @@ pub struct Layout {
     pub fields: Vec<LayoutField>,
 }
 
+impl Layout {
+    pub fn find_field(&self, field: Symbol) -> Option<LayoutField> {
+        self.fields.iter().copied().find(|f| f.name == field)
+    }
+}
+
 #[derive(Clone, Debug, Eq, Serialize)]
 pub enum Type {
     Invalid,

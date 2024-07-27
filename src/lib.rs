@@ -2,6 +2,7 @@
 
 pub mod ast;
 pub mod ast_helpers;
+pub mod ast_transform;
 
 pub mod parser;
 pub mod tokenizer;

@@ -2,6 +2,7 @@
 
 mod ast;
 mod ast_helpers;
+mod ast_transform;
 mod compiler;
 mod error;
 mod ink_codegen;

@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::ast_helpers::typetoken_of_node;
 use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::type_interner::*;
@@ -15,7 +16,7 @@ use inkwell::{
     passes::PassManager,
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
     types::{BasicType, BasicTypeEnum, FunctionType, IntType, VoidType},
-    values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
+    values::{BasicValueEnum, FunctionValue, PointerValue},
     AddressSpace, IntPredicate, OptimizationLevel,
 };
 use std::collections::HashMap;
@@ -54,13 +55,14 @@ enum ScopeKind {
     Global,
 }
 
+#[rustfmt::skip]
 struct Scope<'ctx> {
-    kind: ScopeKind,
-    label: Option<Symbol>,
-    block_loop_start: Option<BasicBlock<'ctx>>,
-    block_after: Option<BasicBlock<'ctx>>,
+    kind:               ScopeKind,
+    label:              Option<Symbol>,
+    block_loop_start:   Option<BasicBlock<'ctx>>,
+    block_after:        Option<BasicBlock<'ctx>>,
     stack_restorepoint: Option<BasicValueEnum<'ctx>>,
-    variables: HashMap<Symbol, Variable<'ctx>>,
+    variables:          HashMap<Symbol, Variable<'ctx>>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -81,37 +83,39 @@ struct LayoutAccessData<'ctx> {
     basic_type: BasicTypeEnum<'ctx>,
 }
 
+#[rustfmt::skip]
 pub struct CodeGenerator<'ctx> {
-    ctx: &'ctx Context,
-    builder: Builder<'ctx>,
-    module: Module<'ctx>,
+    ctx:           &'ctx Context,
+    symbols:       &'ctx StringInterner,
+    node_types:    &'ctx HashMap<NodeId, TypeToken>,
+    type_interner: &'ctx TypeInterner,
+
+    builder:        Builder<'ctx>,
+    module:         Module<'ctx>,
     target_machine: Option<TargetMachine>,
 
-    current_function: Option<FunctionValue<'ctx>>,
+    current_function:    Option<FunctionValue<'ctx>>,
     current_basic_block: Option<BasicBlock<'ctx>>,
 
-    functions: HashMap<Symbol, FunctionValue<'ctx>>,
+    functions:           HashMap<Symbol, FunctionValue<'ctx>>,
     function_typetokens: HashMap<Symbol, TypeToken>,
 
     scopes: Vec<Scope<'ctx>>,
 
-    llvm_stacksave: FunctionValue<'ctx>,
+    llvm_stacksave:    FunctionValue<'ctx>,
     llvm_stackrestore: FunctionValue<'ctx>,
 
     bool_t: IntType<'ctx>,
-    i8_t: IntType<'ctx>,
-    i16_t: IntType<'ctx>,
-    i32_t: IntType<'ctx>,
-    i64_t: IntType<'ctx>,
+    i8_t:   IntType<'ctx>,
+    i16_t:  IntType<'ctx>,
+    i32_t:  IntType<'ctx>,
+    i64_t:  IntType<'ctx>,
     void_t: VoidType<'ctx>,
-    ptr_t: PointerType<'ctx>,
+    ptr_t:  PointerType<'ctx>,
 
     void_token: TypeToken,
-    typetoken_to_inktype: HashMap<TypeToken, BasicTypeEnum<'ctx>>,
 
-    symbols: &'ctx StringInterner,
-    node_types: &'ctx HashMap<NodeId, TypeToken>,
-    type_interner: &'ctx TypeInterner,
+    typetoken_to_inktype: HashMap<TypeToken, BasicTypeEnum<'ctx>>,
 }
 
 impl<'ctx> CodeGenerator<'ctx> {
@@ -232,6 +236,77 @@ impl<'ctx> CodeGenerator<'ctx> {
         }
     }
 
+    fn get_base_pointer(&mut self, e: &Expression) -> Result<PointerValue<'ctx>, Error> {
+        let ptr = match &e.kind {
+            ExpressionKind::Identifier(sym) => {
+                let Variable { ty, val, .. } =
+                    self.get_variable(sym).expect("Identifer should exist");
+                match val {
+                    VariableValue::Stack(ptr) => ptr,
+                    VariableValue::Parameter(x) => x.into_pointer_value(),
+                }
+            }
+            _ => todo!(),
+        };
+
+        Ok(ptr)
+    }
+
+    // TODO: This is not really a 'get' since it also generates code.
+    fn get_access_pointer(
+        &mut self,
+        base: &Expression,
+        accessors: &[Accessor],
+    ) -> Result<PointerValue<'ctx>, Error> {
+        let mut tok = typetoken_of_node(&self.node_types, &base.id);
+
+        let base_ptr = self.get_base_pointer(base)?;
+
+        let mut p = base_ptr;
+
+        for accessor in accessors {
+            let ty = self.type_interner.get(&tok);
+
+            match (ty, accessor) {
+                (Type::Pointer(inner) | Type::Array(_, inner), Accessor::Expr(idx_expr)) => {
+                    let idx = self.gen_expr(idx_expr)?.into_int_value();
+
+                    let inktype = self.get_ink_basic_type(tok);
+
+                    p = unsafe {
+                        self.builder
+                            .build_gep(inktype, p, &[self.i32_t.const_zero(), idx], "")?
+                    };
+                }
+
+                (Type::Layout(layout), Accessor::Field(accessor)) => {
+                    let field = layout.find_field(accessor.field).unwrap();
+
+                    let inktype = self.get_ink_basic_type(tok);
+
+                    p = unsafe {
+                        self.builder.build_gep(
+                            inktype,
+                            p,
+                            &[
+                                self.i32_t.const_zero(),
+                                self.i32_t.const_int(field.offset as u64, false),
+                            ],
+                            "",
+                        )?
+                    };
+
+                    tok = field.ty;
+                }
+                _ => todo!(),
+            }
+        }
+
+        let ty = self.get_ink_basic_type(tok);
+
+        Ok(p)
+    }
+
     fn determine_access_offset(
         &mut self,
         base_typetoken: TypeToken,
@@ -260,6 +335,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         todo!()
     }
 
+    /*
     fn get_layout_access_data(
         &mut self,
         layout_type_token: TypeToken,
@@ -286,6 +362,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             basic_type: self.get_ink_basic_type(current),
         }
     }
+    */
 
     fn int_type(&self, width: u32) -> IntType<'ctx> {
         match width {
@@ -343,6 +420,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 assert!(*size < u32::MAX as i64);
                 t.array_type(*size as u32).into()
             }
+            Type::Layout(_) => self.get_alloca_type_data(token).basic_type,
             _ => todo!("Create LLVM type for internal type: {:?}", ty),
         };
 
@@ -801,18 +879,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 };
                 Ok(ptr)
             }
-            ExpressionKind::Access { base, accessors } => {
-                let base_val = self.gen_expr(base)?;
-                if accessors.is_empty() {
-                    let ty = self.get_inktype_of_node(base.id);
-                    return Ok(self
-                        .builder
-                        .build_load(ty, base_val.into_pointer_value(), "")?
-                        .into_pointer_value());
-                }
-
-                todo!()
-            }
+            ExpressionKind::Access { base, accessors } => self.get_access_pointer(base, accessors),
             /*
             ExpressionKind::CompoundIdentifier(syms) => {
                 let Variable {
@@ -900,7 +967,9 @@ impl<'ctx> CodeGenerator<'ctx> {
                 }
             }
             ExpressionKind::Access { base, accessors } => {
-                todo!()
+                let ptr = self.get_access_pointer(base, accessors)?;
+                let pointee_ty = self.get_inktype_of_node(e.id);
+                Ok(self.builder.build_load(pointee_ty, ptr, "")?)
             }
             /*
             ExpressionKind::CompoundIdentifier(syms) => {

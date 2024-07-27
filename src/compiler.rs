@@ -1,5 +1,6 @@
 use crate::{
     ast::{AstMap, NodeIdGenerator},
+    ast_transform::desugar_ast,
     error::Error,
     ink_codegen::{CodeGenerator, MachineTarget},
     parser::Parser,

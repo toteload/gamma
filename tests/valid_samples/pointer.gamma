@@ -1,6 +1,6 @@
 fn main(): i32
-    let i: i32 = 999
+    let i:  i32 = 999
     let p: ^i32 = (& i)
-    set (@ p) = (+ (@ p) 1)
+    set (@ p)   = (+ (@ p) 1)
     return i
 end
