@@ -13,7 +13,7 @@ impl VisitorMutWithContext<AstTransformerContext<'_>> for AstTransformer {
         expression: &mut Expression,
     ) {
         match &mut expression.kind {
-            ExpressionKind::Access { base, accessors } if accessors.len() == 0 => {
+            ExpressionKind::Access { base, accessors } if accessors.is_empty() => {
                 accessors.push(Accessor::Expr(Expression {
                     id: ctx.id_generator.gen_id(),
                     kind: ExpressionKind::IntLiteral(0),

@@ -17,10 +17,13 @@ pub trait SemanticProver {
 }
 
 pub fn validate_semantics(context: &SemanticContext, items: &[Item]) -> Result<(), Vec<Error>> {
-    let x: Box<dyn SemanticProver> = Box::new(has_main::Prover::new(context));
-    let y: Box<dyn SemanticProver> = Box::new(validate_symbol_use::Prover::new(context));
+    let prove_has_main: Box<dyn SemanticProver> = Box::new(has_main::Prover::new(context));
+    let prove_valid_symbol_use: Box<dyn SemanticProver> = Box::new(validate_symbol_use::Prover::new(context));
 
-    let mut provers = vec![x, y];
+    let mut provers = [
+        prove_has_main, 
+        prove_valid_symbol_use,
+    ];
 
     let errors: Vec<_> = provers
         .iter_mut()

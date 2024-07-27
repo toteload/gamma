@@ -169,7 +169,7 @@ impl TypeNodeAnnotater {
 
         for item in items {
             if let ItemKind::Layout { name, fields } = &item.kind {
-                layouts.insert(name.sym, (item.id, &fields));
+                layouts.insert(name.sym, (item.id, fields));
             }
         }
 
@@ -195,7 +195,7 @@ impl TypeNodeAnnotater {
         }
 
         for (id, tykind) in self.userdefined_type_refs.iter() {
-            match get_typetoken_of_typekind(typetokens, typetable, &tykind) {
+            match get_typetoken_of_typekind(typetokens, typetable, tykind) {
                 Ok(tok) => {
                     ast_types.insert(*id, tok);
                 }

@@ -3,7 +3,7 @@ use crate::ast_helpers::typetoken_of_node;
 use crate::error::Error;
 use crate::string_interner::{StringInterner, Symbol};
 use crate::type_interner::*;
-use crate::types::{Layout, Signedness, Type};
+use crate::types::{Signedness, Type};
 use inkwell::targets::TargetMachine;
 use inkwell::types::PointerType;
 use inkwell::{
@@ -258,7 +258,7 @@ impl<'ctx> CodeGenerator<'ctx> {
         base: &Expression,
         accessors: &[Accessor],
     ) -> Result<PointerValue<'ctx>, Error> {
-        let mut tok = typetoken_of_node(&self.node_types, &base.id);
+        let mut tok = typetoken_of_node(self.node_types, &base.id);
 
         let base_ptr = self.get_base_pointer(base)?;
 
@@ -306,63 +306,6 @@ impl<'ctx> CodeGenerator<'ctx> {
 
         Ok(p)
     }
-
-    fn determine_access_offset(
-        &mut self,
-        base_typetoken: TypeToken,
-        accessors: &[Accessor],
-    ) -> LayoutAccessData {
-        let mut current = base_typetoken;
-        let mut byte_offset = 0;
-
-        for accessor in accessors {
-            let ty = self.type_interner.get(&current);
-
-            match (ty, accessor) {
-                (
-                    Type::Layout(Layout { fields }),
-                    Accessor::Field(FieldAccessor { field, id, .. }),
-                ) => {
-                    todo!()
-                }
-                (Type::Pointer(inner) | Type::Array(_, inner), Accessor::Expr(e)) => {
-                    todo!()
-                }
-                _ => panic!("Illegal access"),
-            }
-        }
-
-        todo!()
-    }
-
-    /*
-    fn get_layout_access_data(
-        &mut self,
-        layout_type_token: TypeToken,
-        accessor: &[Symbol],
-    ) -> LayoutAccessData<'ctx> {
-        let mut offset = 0;
-        let mut current = layout_type_token;
-        for name in accessor {
-            let Type::Layout(layout) = self.type_interner.get(&current) else {
-                panic!()
-            };
-            let field = layout
-                .fields
-                .iter()
-                .find(|field| field.name == *name)
-                .unwrap();
-            offset += field.offset;
-            current = field.ty;
-        }
-
-        LayoutAccessData {
-            byte_offset: offset,
-            align: self.type_interner.get(&current).align(self.type_interner),
-            basic_type: self.get_ink_basic_type(current),
-        }
-    }
-    */
 
     fn int_type(&self, width: u32) -> IntType<'ctx> {
         match width {

@@ -1,6 +1,5 @@
 use crate::{
     ast::{AstMap, NodeIdGenerator},
-    ast_transform::desugar_ast,
     error::Error,
     ink_codegen::{CodeGenerator, MachineTarget},
     parser::Parser,
@@ -163,9 +162,9 @@ impl Context {
 
         type_coerce(
             &mut items,
-            &mut self.type_tokens,
+            & self.type_tokens,
             &mut self.types,
-            &mut self.id_generator,
+            & self.id_generator,
         )?;
 
         type_check(

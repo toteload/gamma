@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::collections::HashMap;
+use std::fmt;
 
 #[derive(PartialEq, Debug, Clone, Copy, Hash, Eq, PartialOrd, Ord, Serialize)]
 pub struct Symbol(pub u32);
@@ -50,15 +51,15 @@ impl StringInterner {
     pub fn get(&self, symbol: &Symbol) -> &str {
         &self.strings[symbol.0 as usize]
     }
+}
 
-    pub fn to_string(&self) -> String {
-        let mut out = String::new();
-
+impl fmt::Display for StringInterner {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, s) in self.strings.iter().enumerate() {
-            out.push_str(&format!("{i:4} = {s}\n"));
+            writeln!(f, "{i:4} = {s}")?;
         }
 
-        out
+        Ok(())
     }
 }
 

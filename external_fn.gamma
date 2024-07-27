@@ -1,6 +1,0 @@
-external_fn ExitProcess(exit_code: u32): void
-
-fn main(): i32
-  (ExitProcess (cast u32 12345))
-  return (cast i32 0)
-end

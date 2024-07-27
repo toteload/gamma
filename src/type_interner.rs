@@ -10,6 +10,8 @@ pub struct TypeToken(u32);
 
 pub struct TypeInterner {
     tokens: Cell<HashMap<&'static Type, TypeToken>>,
+
+    #[allow(clippy::vec_box)]
     types: Cell<Vec<Box<Type>>>,
 }
 

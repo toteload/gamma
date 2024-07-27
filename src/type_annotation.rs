@@ -116,17 +116,12 @@ impl VisitorWithContext<TypeAnnotaterContext<'_>> for TypeAnnotater {
     }
 
     fn on_statement_enter(&mut self, ctx: &mut TypeAnnotaterContext, statement: &Statement) {
-        use StatementKind::*;
-
-        match statement.kind {
-            Let {
+        if let StatementKind::Let {
                 name: Name { sym, .. },
                 ty: crate::ast::Type { id, .. },
                 ..
-            } => {
+            } = statement.kind {
                 self.scopes.insert(sym, *ctx.ast_types.get(&id).unwrap());
-            }
-            _ => {}
         }
     }
 
