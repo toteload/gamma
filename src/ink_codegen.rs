@@ -68,7 +68,7 @@ struct Scope<'ctx> {
 #[derive(Debug, Copy, Clone)]
 pub enum MachineTarget {
     Windows,
-    Macos,
+    MacOs,
 }
 
 struct AllocaTypeData<'ctx> {
@@ -262,6 +262,10 @@ impl<'ctx> CodeGenerator<'ctx> {
 
         let base_ptr = self.get_base_pointer(base)?;
 
+        if accessors.is_empty() {
+            return Ok(self.builder.build_load(self.ptr_t, base_ptr, "")?.into_pointer_value());
+        }
+
         let mut p = base_ptr;
 
         for accessor in accessors {
@@ -301,8 +305,6 @@ impl<'ctx> CodeGenerator<'ctx> {
                 _ => todo!(),
             }
         }
-
-        let ty = self.get_ink_basic_type(tok);
 
         Ok(p)
     }
@@ -722,8 +724,8 @@ impl<'ctx> CodeGenerator<'ctx> {
                 );
             }
             StatementKind::Set { dst, val } => {
-                let p = self.get_dst_ptr(dst)?;
                 let x = self.gen_expr(val)?;
+                let p = self.get_dst_ptr(dst)?;
                 self.builder.build_store(p, x)?;
             }
             StatementKind::Break(label) => {
@@ -823,61 +825,6 @@ impl<'ctx> CodeGenerator<'ctx> {
                 Ok(ptr)
             }
             ExpressionKind::Access { base, accessors } => self.get_access_pointer(base, accessors),
-            /*
-            ExpressionKind::CompoundIdentifier(syms) => {
-                let Variable {
-                    ty,
-                    type_token,
-                    val,
-                } = self.get_variable(&syms[0]).expect("Identifer should exist");
-
-                match val {
-                    VariableValue::Stack(base_ptr) => {
-                        let LayoutAccessData {
-                            byte_offset,
-                            align,
-                            basic_type: pointee_ty,
-                        } = self.get_layout_access_data(type_token, &syms[1..]);
-
-                        let ptr = unsafe {
-                            self.builder.build_gep(
-                                ty,
-                                base_ptr,
-                                &[
-                                    self.i32_t.const_zero(),
-                                    self.i32_t.const_int(byte_offset as u64, false),
-                                ],
-                                "",
-                            )?
-                        };
-
-                        Ok(ptr)
-                    }
-                    _ => todo!(),
-                }
-            }
-            ExpressionKind::BuiltinOp {
-                op: BuiltinOpKind::At,
-                args,
-            } => {
-                assert!(args.len() <= 2);
-
-                if args.len() == 1 {
-                    let ty = self.get_inktype_of_node(args[0].id);
-                    let ptr = self.get_dst_ptr(&args[0])?;
-                    let ptr = self.builder.build_load(ty, ptr, "")?.into_pointer_value();
-                    Ok(ptr)
-                } else {
-                    let ty = self.get_inktype_of_node(args[0].id);
-                    let ptr = self.get_dst_ptr(&args[0])?;
-                    let idx = self.gen_expr(&args[1])?.into_int_value();
-                    Ok(unsafe {
-                        self.builder
-                            .build_gep(ty, ptr, &[self.i32_t.const_zero(), idx], "")?
-                    })
-                }
-            }
-            */
             _ => todo!("Get pointer for expression: {:?}", e.kind),
         }
     }
@@ -914,47 +861,6 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let pointee_ty = self.get_inktype_of_node(e.id);
                 Ok(self.builder.build_load(pointee_ty, ptr, "")?)
             }
-            /*
-            ExpressionKind::CompoundIdentifier(syms) => {
-                let Variable {
-                    ty,
-                    type_token,
-                    val,
-                } = self.get_variable(&syms[0]).expect("Identifer should exist");
-
-                match val {
-                    VariableValue::Stack(base_ptr) => {
-                        let LayoutAccessData {
-                            byte_offset,
-                            align,
-                            basic_type: pointee_ty,
-                        } = self.get_layout_access_data(type_token, &syms[1..]);
-
-                        let ptr = unsafe {
-                            self.builder.build_gep(
-                                ty,
-                                base_ptr,
-                                &[
-                                    self.i32_t.const_zero(),
-                                    self.i32_t.const_int(byte_offset as u64, false),
-                                ],
-                                "",
-                            )?
-                        };
-
-                        let pointee_val = self.builder.build_load(pointee_ty, ptr, "")?;
-
-                        pointee_val
-                            .as_instruction_value()
-                            .expect("")
-                            .set_alignment(align)?;
-
-                        Ok(pointee_val)
-                    }
-                    _ => todo!(),
-                }
-            }
-            */
             ExpressionKind::Cast { e: src, .. } => {
                 let src_ty_token = self.node_types.get(&src.id).unwrap();
                 let src_ty = self.type_interner.get(src_ty_token);
@@ -1237,36 +1143,6 @@ impl<'ctx> CodeGenerator<'ctx> {
 
                     Ok(ptr.into())
                 }
-                /*
-                BuiltinOpKind::At => {
-                    let ExpressionKind::Identifier(sym) = args[0].kind else {
-                        todo!()
-                    };
-
-                    let Variable {
-                        type_token,
-                        ty,
-                        val,
-                    } = self.get_variable(&sym).unwrap();
-
-                    debug_assert!(ty.is_pointer_type());
-
-                    let ptr = match val {
-                        VariableValue::Stack(p) => p,
-                        VariableValue::Parameter(p) => p.into_pointer_value(),
-                    };
-
-                    let addr = self.builder.build_load(ty, ptr, "")?.into_pointer_value();
-
-                    let Type::Pointer(pointee_type_token) = self.type_interner.get(&type_token)
-                    else {
-                        todo!()
-                    };
-                    let pointee_type = self.get_ink_basic_type(*pointee_type_token);
-
-                    Ok(self.builder.build_load(pointee_type, addr, "")?)
-                }
-                */
                 _ => todo!("BuiltinOpKind \"{:?}\"", op),
             },
 
@@ -1325,7 +1201,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
         let triple = match machine {
             MachineTarget::Windows => TargetTriple::create("x86_64-pc-windows-msvc"),
-            MachineTarget::Macos => TargetTriple::create("x86_64-apple-darwin21.6.0"),
+            MachineTarget::MacOs => TargetTriple::create("x86_64-apple-darwin21.6.0"),
         };
         self.module.set_triple(&triple);
 
