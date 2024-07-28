@@ -7,7 +7,7 @@ use crate::{
     source_location::SourceSpan,
     string_interner::{StringInterner, Symbol},
     type_annotation::type_annotate,
-    type_check2::type_check,
+    type_checking::type_check,
     type_coercion::type_coerce,
     type_interner::{TypeInterner, TypeToken},
     type_node_annotation::annotate_type_nodes,

@@ -337,17 +337,20 @@ pub fn is_type_coercible_to(type_tokens: &TypeInterner, from: TypeToken, to: Typ
     false
 }
 
+#[rustfmt::skip]
 pub fn is_valid_type_cast(from: &Type, to: &Type) -> bool {
     use Type::*;
 
-    match (to, from) {
-        (Int { .. }, IntConstant) => true,
-        (Int { .. }, Int { .. }) => true,
-        (Int { .. }, Bool) => true,
-        (Bool, Int { .. }) => true,
-        (Pointer(_), Int { .. }) => true,
-        (Pointer(_), IntConstant) => true,
+    match (from, to) {
+        (IntConstant , Int { .. }) => true,
+        (IntConstant , Pointer(_)) => true,
+        (Int { .. }  , Int { .. }) => true,
+        (Int { .. }  , Bool      ) => true,
+        (Int { .. }  , Pointer(_)) => true,
+        (Bool        , Int { .. }) => true,
+
         (Pointer(ta), Array(_, tb)) if ta == tb => true,
+
         _ => false,
     }
 }

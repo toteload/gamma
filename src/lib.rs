@@ -9,10 +9,10 @@ pub mod tokenizer;
 
 pub mod semantics;
 
-pub mod type_annotation;
-pub mod type_check2;
-pub mod type_coercion;
 pub mod type_node_annotation;
+pub mod type_annotation;
+pub mod type_coercion;
+pub mod type_checking;
 
 pub mod ink_codegen;
 

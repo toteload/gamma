@@ -1,33 +1,9 @@
 #![allow(dead_code, unused_variables)]
 
-mod ast;
-mod ast_helpers;
-mod ast_transform;
-mod compiler;
-mod error;
-mod ink_codegen;
-mod parser;
-mod scope_stack;
-mod semantics;
-mod source_location;
-mod string_interner;
-mod tokenizer;
-mod type_annotation;
-mod type_check2;
-mod type_coercion;
-mod type_interner;
-mod type_node_annotation;
-mod types;
-mod utils;
-mod visitor;
-mod visitor_mut;
-mod visitor_mut_with_context;
-mod visitor_with_context;
-
 use anyhow::Result;
 use clap::Parser as ClapParser;
-use compiler::{Context, Options};
-use ink_codegen::MachineTarget;
+use gamma::compiler::{Context, Options};
+use gamma::ink_codegen::MachineTarget;
 use inkwell::targets::{InitializationConfig, Target};
 use std::fs;
 use std::path::Path;
@@ -35,7 +11,7 @@ use std::path::Path;
 fn parse_machine_target(s: &str) -> Result<MachineTarget, &'static str> {
     match s {
         "windows" => Ok(MachineTarget::Windows),
-        "macos" => Ok(MachineTarget::Macos),
+        "macos" => Ok(MachineTarget::MacOs),
         _ => Err("Invalid machine target"),
     }
 }
@@ -113,19 +89,9 @@ fn main() -> Result<()> {
                     &compiler_context.type_tokens,
                 );
             }
-            //println!("{}", compiler_context.symbols.to_string());
             return Ok(());
         }
     };
-
-    // Instructions for building an executable on Windows:
-    // - Make sure to run `vcvarsall.bat x64` before doing anything.
-    // - Make sure that start_windows.o exists. If it doesn't, compile it with `clang -c
-    // start_windows.c -o start_windows.o`.
-    // - Output the Gamma program as assembly into a file like program.asm
-    // - Compile the assembly with `clang -c program.asm -o program.o`
-    // - Link the two files into an executable with `link start_windows.o program.o -entry:start
-    // /NODEFAULTLIB kernel32.lib`.
 
     let input_path = Path::new(&input_file);
     let stem = input_path.file_stem();
